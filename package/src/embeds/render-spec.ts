@@ -44,7 +44,8 @@ function frameStyle(frame: Pick<EmbedFrame, 'aspectRatio' | 'height'>): string {
   if (frame.height !== null && Number.isFinite(frame.height) && frame.height > 0 && frame.height <= 2000) {
     return `--pc-embed-height: ${Math.round(frame.height)}px`;
   }
-  const ratio = frame.aspectRatio !== null && frame.aspectRatio >= 0.2 && frame.aspectRatio <= 5 ? frame.aspectRatio : 16 / 9;
+  const ratio =
+    frame.aspectRatio !== null && frame.aspectRatio >= 0.2 && frame.aspectRatio <= 5 ? frame.aspectRatio : 16 / 9;
   return `--pc-embed-ratio: ${Math.round(ratio * 10000) / 10000}`;
 }
 
@@ -69,7 +70,7 @@ function checkedFrame(frame: EmbedFrame): EmbedFrame | null {
 /** The `video` node's attributes as a checked ref, or `null`. */
 export function videoRefOf(attrs: Attrs): VideoRef | null {
   const provider = attrs.provider;
-  if (provider !== 'youtube' && provider !== 'vimeo' || typeof attrs.videoId !== 'string') return null;
+  if ((provider !== 'youtube' && provider !== 'vimeo') || typeof attrs.videoId !== 'string') return null;
   const video: VideoRef = {
     provider,
     videoId: attrs.videoId,
@@ -132,7 +133,10 @@ export function embedRender(attrs: Attrs): EmbedRender | null {
     frame = null;
   }
   if (!frame) return null;
-  const stored = typeof attrs.aspectRatio === 'number' && attrs.aspectRatio >= 0.2 && attrs.aspectRatio <= 5 ? attrs.aspectRatio : null;
+  const stored =
+    typeof attrs.aspectRatio === 'number' && attrs.aspectRatio >= 0.2 && attrs.aspectRatio <= 5
+      ? attrs.aspectRatio
+      : null;
   return {
     provider,
     frame: frame.height === null && stored !== null ? { ...frame, aspectRatio: stored } : frame,
@@ -161,15 +165,18 @@ function iframeSpec(frame: EmbedFrame, title: string): Spec {
   ];
 }
 
-function facadeSpec(frame: EmbedFrame, options: {
-  canonical: string;
-  playerTitle: string;
-  label: string;
-  badge: string;
-  thumbnail: string | null;
-  note: string | null;
-  play: boolean;
-}): Spec {
+function facadeSpec(
+  frame: EmbedFrame,
+  options: {
+    canonical: string;
+    playerTitle: string;
+    label: string;
+    badge: string;
+    thumbnail: string | null;
+    note: string | null;
+    play: boolean;
+  },
+): Spec {
   return [
     'div',
     {
@@ -326,12 +333,20 @@ export function linkCardSpec(attrs: Attrs, options: EmbedRenderOptions, extra: A
   if (options.render === 'link') return linkSpec(extra, card.url, card.title);
   return [
     'div',
-    { ...extra, class: card.image ? 'pc-link-card' : 'pc-link-card pc-link-card-text', 'data-pc-link-card': '', 'data-url': card.url },
+    {
+      ...extra,
+      class: card.image ? 'pc-link-card' : 'pc-link-card pc-link-card-text',
+      'data-pc-link-card': '',
+      'data-url': card.url,
+    },
     [
       'a',
       { class: 'pc-link-card-anchor', href: card.url, target: '_blank', rel: externalRel },
       ...compact([
-        card.image && ['img', { class: 'pc-link-card-image', src: card.image, alt: '', loading: 'lazy', decoding: 'async' }],
+        card.image && [
+          'img',
+          { class: 'pc-link-card-image', src: card.image, alt: '', loading: 'lazy', decoding: 'async' },
+        ],
         [
           'span',
           { class: 'pc-link-card-body' },
@@ -341,7 +356,14 @@ export function linkCardSpec(attrs: Attrs, options: EmbedRenderOptions, extra: A
             ...compact([
               card.favicon && [
                 'img',
-                { class: 'pc-link-card-favicon', src: card.favicon, alt: '', width: '16', height: '16', loading: 'lazy' },
+                {
+                  class: 'pc-link-card-favicon',
+                  src: card.favicon,
+                  alt: '',
+                  width: '16',
+                  height: '16',
+                  loading: 'lazy',
+                },
               ],
               card.site,
             ]),

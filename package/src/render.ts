@@ -24,5 +24,12 @@ export {
   type SanitizeResult,
 } from './output/sanitize';
 export { activateEmbeds } from './output/activate-embeds';
-export { embedViews, EmbedPlayer, VideoView, EmbedView, LinkCardView, type EmbedPlayerProps } from './embeds/view/index';
+export {
+  embedViews,
+  EmbedPlayer,
+  VideoView,
+  EmbedView,
+  LinkCardView,
+  type EmbedPlayerProps,
+} from './embeds/view/index';
 export type { EmbedRenderMode } from './embeds/render-spec';

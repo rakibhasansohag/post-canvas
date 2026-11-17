@@ -303,7 +303,8 @@ function cleanNode(walk: Walk, raw: unknown, path: string, depth: number, parent
   if (cleaned.transient) remove(walk, path, 'transient', raw.type);
 
   if (raw.content !== undefined && !Array.isArray(raw.content)) remove(walk, path, 'invalid-content', raw.type);
-  const children = type.isLeaf || !Array.isArray(raw.content) ? [] : cleanChildren(walk, raw.content, path, depth, type);
+  const children =
+    type.isLeaf || !Array.isArray(raw.content) ? [] : cleanChildren(walk, raw.content, path, depth, type);
   const node = fit(walk, type, cleaned.attrs, children, cleanMarks(walk, raw.marks, path, parent), path);
   return node ? [node] : [];
 }

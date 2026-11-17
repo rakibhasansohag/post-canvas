@@ -39,8 +39,13 @@ function parserHost(options: FromHTMLOptions): HTMLParserHost {
 export function fromHTML(html: string, options: FromHTMLOptions = {}): JSONContent {
   const host = parserHost(options);
   const { schema } = sanitizerSetup({ features: options.features });
-  const document = new host.DOMParser().parseFromString(`<!doctype html><html><body>${html}</body></html>`, 'text/html');
-  for (const element of Array.from(document.querySelectorAll('script, style, template, noscript, object, embed, link, meta'))) {
+  const document = new host.DOMParser().parseFromString(
+    `<!doctype html><html><body>${html}</body></html>`,
+    'text/html',
+  );
+  for (const element of Array.from(
+    document.querySelectorAll('script, style, template, noscript, object, embed, link, meta'),
+  )) {
     element.remove();
   }
   const parsed = SchemaParser.fromSchema(schema).parse(document.body).toJSON() as JSONContent;

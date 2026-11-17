@@ -44,7 +44,11 @@ const EmbedsState = Extension.create<{ consent: EmbedConsent }, EmbedsStorage>({
   },
 
   addStorage() {
-    return { pending: new Set<string>(), controllers: new Map<string, AbortController>(), consent: this.options.consent };
+    return {
+      pending: new Set<string>(),
+      controllers: new Map<string, AbortController>(),
+      consent: this.options.consent,
+    };
   },
 
   onDestroy() {
@@ -83,7 +87,13 @@ function openField(editor: Editor, range: Range | undefined, kind: EmbedInputKin
   chain.insertEmbedInput({ kind }).run();
 }
 
-function insertItem(editor: Editor, id: string, kind: EmbedInputKind, icon: InsertItem['icon'], keywords: string[]): InsertItem {
+function insertItem(
+  editor: Editor,
+  id: string,
+  kind: EmbedInputKind,
+  icon: InsertItem['icon'],
+  keywords: string[],
+): InsertItem {
   const { t } = editor.storage.postCanvasCore;
   const key = id === 'link-card' ? 'linkCard' : id;
   return {

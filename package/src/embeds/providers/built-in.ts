@@ -41,7 +41,8 @@ export const spotify: EmbedProvider = {
     };
   },
   canonicalUrl: (ref) => `https://open.spotify.com/${ref.type}/${ref.id}`,
-  oembed: (ref) => `https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/${ref.type}/${ref.id}`)}`,
+  oembed: (ref) =>
+    `https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/${ref.type}/${ref.id}`)}`,
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -69,7 +70,9 @@ const soundcloudReserved = new Set([
 ]);
 
 function soundcloudPage(ref: EmbedRef): string {
-  return ref.set ? `https://soundcloud.com/${ref.user}/sets/${ref.set}` : `https://soundcloud.com/${ref.user}/${ref.track}`;
+  return ref.set
+    ? `https://soundcloud.com/${ref.user}/sets/${ref.set}`
+    : `https://soundcloud.com/${ref.user}/${ref.track}`;
 }
 
 /** SoundCloud tracks and sets (playlists). */
@@ -85,7 +88,11 @@ export const soundcloud: EmbedProvider = {
     const user = parts[0];
     if (!fits(user, soundcloudSlug) || soundcloudReserved.has(user.toLowerCase())) return null;
     if (parts.length === 3 && parts[1] === 'sets' && fits(parts[2], soundcloudSlug)) return { user, set: parts[2] };
-    if (parts.length === 2 && fits(parts[1], soundcloudSlug) && !['sets', 'tracks', 'albums', 'likes'].includes(parts[1])) {
+    if (
+      parts.length === 2 &&
+      fits(parts[1], soundcloudSlug) &&
+      !['sets', 'tracks', 'albums', 'likes'].includes(parts[1])
+    ) {
       return { user, track: parts[1] };
     }
     return null;
@@ -121,7 +128,10 @@ export const x: EmbedProvider = {
     if (!xHosts.has(host(url))) return null;
     const parts = pathParts(url);
     const [user, status, id] = parts;
-    if ((parts.length === 3 || (parts.length === 5 && ['photo', 'video'].includes(parts[3] ?? ''))) && status === 'status') {
+    if (
+      (parts.length === 3 || (parts.length === 5 && ['photo', 'video'].includes(parts[3] ?? ''))) &&
+      status === 'status'
+    ) {
       return fits(user, xUser) && fits(id, xId) ? { user, id } : null;
     }
     return null;
@@ -195,8 +205,10 @@ export const tiktok: EmbedProvider = {
     if (parts.length === 3 && fits(parts[0], tiktokUser) && parts[1] === 'video' && fits(parts[2], tiktokId)) {
       return { user: parts[0].slice(1), id: parts[2] };
     }
-    if (parts.length === 3 && parts[0] === 'embed' && parts[1] === 'v2' && fits(parts[2], tiktokId)) return { id: parts[2] };
-    if (parts.length === 3 && parts[0] === 'player' && parts[1] === 'v1' && fits(parts[2], tiktokId)) return { id: parts[2] };
+    if (parts.length === 3 && parts[0] === 'embed' && parts[1] === 'v2' && fits(parts[2], tiktokId))
+      return { id: parts[2] };
+    if (parts.length === 3 && parts[0] === 'player' && parts[1] === 'v1' && fits(parts[2], tiktokId))
+      return { id: parts[2] };
     return null;
   },
   frame(ref) {
@@ -257,7 +269,8 @@ export const codepen: EmbedProvider = {
     };
   },
   canonicalUrl: (ref) => `${codepenOwner(ref)}/pen/${ref.pen}`,
-  oembed: (ref) => `https://codepen.io/api/oembed?format=json&url=${encodeURIComponent(`${codepenOwner(ref)}/pen/${ref.pen}`)}`,
+  oembed: (ref) =>
+    `https://codepen.io/api/oembed?format=json&url=${encodeURIComponent(`${codepenOwner(ref)}/pen/${ref.pen}`)}`,
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -359,7 +372,8 @@ export const googleMaps: EmbedProvider = {
     const parts = pathParts(url);
     if (host(url) !== 'maps.google.com' && parts[0] !== 'maps') return null;
     const rest = host(url) === 'maps.google.com' && parts[0] !== 'maps' ? parts : parts.slice(1);
-    const z = (value: string | undefined): EmbedRef => (fits(value, zoom) ? { z: String(Math.round(Number(value))) } : {});
+    const z = (value: string | undefined): EmbedRef =>
+      fits(value, zoom) ? { z: String(Math.round(Number(value))) } : {};
     const query = url.searchParams.get('q') ?? url.searchParams.get('query');
     if (query !== null) {
       const q = query.trim();
@@ -378,7 +392,12 @@ export const googleMaps: EmbedProvider = {
       if (fits(name, placeQuery)) return { q: name, ...z(position?.[3]) };
       return null;
     }
-    if (position && fits(position[1], coordinate) && fits(position[2], coordinate) && inRange(position[1], position[2])) {
+    if (
+      position &&
+      fits(position[1], coordinate) &&
+      fits(position[2], coordinate) &&
+      inRange(position[1], position[2])
+    ) {
       return { lat: position[1], lng: position[2], z: z(position[3]).z ?? '15' };
     }
     return null;

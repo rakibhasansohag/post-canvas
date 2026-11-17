@@ -38,7 +38,8 @@ function plain<T>(fallback: T) {
 const idAttribute = {
   default: null,
   parseHTML: (element: HTMLElement) => cleanId(element.getAttribute('data-id')),
-  renderHTML: (attrs: Record<string, unknown>) => (typeof attrs.id === 'string' && attrs.id ? { 'data-id': attrs.id } : {}),
+  renderHTML: (attrs: Record<string, unknown>) =>
+    typeof attrs.id === 'string' && attrs.id ? { 'data-id': attrs.id } : {},
 };
 
 function childText(element: HTMLElement, selector: string): string {
@@ -46,7 +47,12 @@ function childText(element: HTMLElement, selector: string): string {
 }
 
 function sourceOf(element: HTMLElement): string | null {
-  return element.getAttribute('data-url') ?? element.getAttribute('src') ?? element.getAttribute('url') ?? element.getAttribute('data-oembed-url');
+  return (
+    element.getAttribute('data-url') ??
+    element.getAttribute('src') ??
+    element.getAttribute('url') ??
+    element.getAttribute('data-oembed-url')
+  );
 }
 
 /** Parse rules for a pasted or imported player: our own figure, a bare iframe, and CKEditor-style oEmbed elements. */

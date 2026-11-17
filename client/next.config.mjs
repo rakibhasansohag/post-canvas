@@ -10,24 +10,21 @@ const withMDX = createMDX();
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
 
+// The site is a static export (`out/`) that any static host can serve. To host it under a sub-path, such as
+// GitHub Pages' `/post-canvas`, set NEXT_PUBLIC_BASE_PATH when you build. NEXT_PUBLIC_SITE_URL sets the absolute URLs in
+// the sitemap and the Open Graph tags.
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || undefined;
+
 /** @type {import('next').NextConfig} */
 const config = {
+  output: 'export',
+  basePath,
+  trailingSlash: true,
+  images: { unoptimized: true },
   reactStrictMode: true,
   outputFileTracingRoot: repoRoot,
   turbopack: {
     root: repoRoot,
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/docs/:path*.md',
-        destination: '/llms.mdx/docs/:path*.md',
-      },
-      {
-        source: '/docs/:path*.txt',
-        destination: '/llms.mdx/docs/:path*.txt',
-      },
-    ];
   },
 };
 

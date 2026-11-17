@@ -43,7 +43,9 @@ const refKey = /^[a-z][a-zA-Z0-9]{0,19}$/;
  */
 export function defineEmbedProvider(provider: EmbedProvider): EmbedProvider {
   if (!providerName.test(provider.name)) {
-    throw new Error(`[post-canvas] Embed provider name "${provider.name}" must be lower-case letters, digits and dashes.`);
+    throw new Error(
+      `[post-canvas] Embed provider name "${provider.name}" must be lower-case letters, digits and dashes.`,
+    );
   }
   if (typeof provider.match !== 'function' || typeof provider.frame !== 'function') {
     throw new Error(`[post-canvas] Embed provider "${provider.name}" needs match() and frame().`);
@@ -55,7 +57,11 @@ export function defineEmbedProvider(provider: EmbedProvider): EmbedProvider {
 }
 
 /** Every built-in provider: YouTube and Vimeo (for the `video` node), then the nine `embed` providers. */
-export const builtInProviders: readonly EmbedProvider[] = [videoProviders.youtube, videoProviders.vimeo, ...embedProviders];
+export const builtInProviders: readonly EmbedProvider[] = [
+  videoProviders.youtube,
+  videoProviders.vimeo,
+  ...embedProviders,
+];
 
 const registry = new Map<string, EmbedProvider>(embedProviders.map((provider) => [provider.name, provider]));
 
@@ -87,7 +93,9 @@ function isCleanRef(ref: unknown): ref is EmbedRef {
   const entries = Object.entries(ref);
   return (
     entries.length <= 8 &&
-    entries.every(([key, value]) => refKey.test(key) && typeof value === 'string' && value.length > 0 && value.length <= 200)
+    entries.every(
+      ([key, value]) => refKey.test(key) && typeof value === 'string' && value.length > 0 && value.length <= 200,
+    )
   );
 }
 

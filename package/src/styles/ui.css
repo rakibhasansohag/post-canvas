@@ -574,12 +574,14 @@
 }
 
 .pc-handle {
+  position: absolute;
   z-index: 2;
-  transition: opacity var(--pc-duration) ease;
+  transform: translateY(-50%);
 }
 
-.pc-handle[data-dragging='true'] {
-  opacity: 0;
+/* The block being dragged, while the drop line shows where it goes. */
+.pc-root .ProseMirror > .pc-block-dragging {
+  opacity: 0.4;
 }
 
 .pc-handle__grip {

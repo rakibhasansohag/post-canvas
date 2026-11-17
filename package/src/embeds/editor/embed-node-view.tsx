@@ -16,7 +16,8 @@ export function EmbedNodeView({ node, editor, getPos, selected, deleteNode, exte
   const { t } = editor.storage.postCanvasCore;
   const editable = useEditable(editor);
   const embed = embedRender(node.attrs);
-  const consent = embedsStorage(editor).consent ?? (extension.options as { consent?: 'click' | 'auto' }).consent ?? 'click';
+  const consent =
+    embedsStorage(editor).consent ?? (extension.options as { consent?: 'click' | 'auto' }).consent ?? 'click';
   if (!embed) return <NodeViewWrapper data-pc-node="embed" />;
   const provider = embed.provider.label;
   const label = `${t('embeds.embed.label')}: ${embed.title || provider}`;

@@ -34,7 +34,8 @@ export function setPending(editor: Editor, id: string, pending: boolean, control
     storage.pending.delete(id);
     storage.controllers.delete(id);
   }
-  if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta('postCanvasEmbeds', { id, pending }).setMeta('addToHistory', false));
+  if (!editor.isDestroyed)
+    editor.view.dispatch(editor.state.tr.setMeta('postCanvasEmbeds', { id, pending }).setMeta('addToHistory', false));
 }
 
 /** Aborts a running lookup for a node. */

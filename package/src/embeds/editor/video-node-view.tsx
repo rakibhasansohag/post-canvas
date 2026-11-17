@@ -43,13 +43,22 @@ function GrowingTextarea(props: {
 }
 
 /** The editor view of a `video` node. */
-export function VideoNodeView({ node, editor, getPos, selected, updateAttributes, deleteNode, extension }: NodeViewProps) {
+export function VideoNodeView({
+  node,
+  editor,
+  getPos,
+  selected,
+  updateAttributes,
+  deleteNode,
+  extension,
+}: NodeViewProps) {
   const { t } = editor.storage.postCanvasCore;
   const editable = useEditable(editor);
   const video = videoRender(node.attrs);
   const id = typeof node.attrs.id === 'string' ? node.attrs.id : '';
   const loading = embedsStorage(editor).pending.has(id);
-  const consent = embedsStorage(editor).consent ?? (extension.options as { consent?: 'click' | 'auto' }).consent ?? 'click';
+  const consent =
+    embedsStorage(editor).consent ?? (extension.options as { consent?: 'click' | 'auto' }).consent ?? 'click';
   if (!video) return <NodeViewWrapper data-pc-node="video" />;
   const provider = video.provider.label;
   const title = typeof node.attrs.title === 'string' ? node.attrs.title : '';

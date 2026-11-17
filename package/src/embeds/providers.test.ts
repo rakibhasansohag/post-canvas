@@ -97,20 +97,40 @@ describe('parseEmbedUrl', () => {
 
 describe('embed providers', () => {
   it.each([
-    ['https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC', 'spotify', { type: 'track', id: '4uLU6hMCjMI75M1A2tKUQC' }],
-    ['https://open.spotify.com/intl-de/album/4uLU6hMCjMI75M1A2tKUQC?si=abc', 'spotify', { type: 'album', id: '4uLU6hMCjMI75M1A2tKUQC' }],
+    [
+      'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC',
+      'spotify',
+      { type: 'track', id: '4uLU6hMCjMI75M1A2tKUQC' },
+    ],
+    [
+      'https://open.spotify.com/intl-de/album/4uLU6hMCjMI75M1A2tKUQC?si=abc',
+      'spotify',
+      { type: 'album', id: '4uLU6hMCjMI75M1A2tKUQC' },
+    ],
     ['https://soundcloud.com/artist-name/track-name', 'soundcloud', { user: 'artist-name', track: 'track-name' }],
     ['https://soundcloud.com/artist/sets/my-set', 'soundcloud', { user: 'artist', set: 'my-set' }],
     ['https://x.com/jack/status/20', 'x', { user: 'jack', id: '20' }],
     ['https://twitter.com/jack/status/20?s=20', 'x', { user: 'jack', id: '20' }],
     ['https://www.instagram.com/p/CxYz123AbC/', 'instagram', { kind: 'p', code: 'CxYz123AbC' }],
     ['https://www.instagram.com/reel/CxYz123AbC/', 'instagram', { kind: 'reel', code: 'CxYz123AbC' }],
-    ['https://www.tiktok.com/@scout2015/video/6718335390845095173', 'tiktok', { user: 'scout2015', id: '6718335390845095173' }],
+    [
+      'https://www.tiktok.com/@scout2015/video/6718335390845095173',
+      'tiktok',
+      { user: 'scout2015', id: '6718335390845095173' },
+    ],
     ['https://codepen.io/someone/pen/abcDEF1', 'codepen', { user: 'someone', pen: 'abcDEF1' }],
     ['https://codepen.io/team/codepen/pen/PNaGbb', 'codepen', { team: 'codepen', pen: 'PNaGbb' }],
     ['https://www.loom.com/share/0123456789abcdef0123456789abcdef', 'loom', { id: '0123456789abcdef0123456789abcdef' }],
-    ['https://www.figma.com/design/AbCdEfGhIjKlMnOp/My-File?node-id=1-2', 'figma', { kind: 'design', key: 'AbCdEfGhIjKlMnOp', node: '1-2' }],
-    ['https://www.google.com/maps/place/Eiffel+Tower/@48.8584,2.2945,17z', 'google-maps', { q: 'Eiffel Tower', z: '17' }],
+    [
+      'https://www.figma.com/design/AbCdEfGhIjKlMnOp/My-File?node-id=1-2',
+      'figma',
+      { kind: 'design', key: 'AbCdEfGhIjKlMnOp', node: '1-2' },
+    ],
+    [
+      'https://www.google.com/maps/place/Eiffel+Tower/@48.8584,2.2945,17z',
+      'google-maps',
+      { q: 'Eiffel Tower', z: '17' },
+    ],
     ['https://www.google.com/maps/@48.8584,2.2945,15z', 'google-maps', { lat: '48.8584', lng: '2.2945', z: '15' }],
     ['https://maps.google.com/?q=Brandenburg+Gate', 'google-maps', { q: 'Brandenburg Gate' }],
   ])('matches %s', (url, provider, ref) => {

@@ -39,6 +39,11 @@ export interface PostCanvasViewProps {
  * Shows a document read-only, with the same look as the editor. Media and embed nodes use their interactive views;
  * everything else renders from the schema's static HTML. It sanitizes by default and works from a Server Component.
  *
+ * **Render it on the server.** In a React Server Component the schema, the sanitizer and Tiptap stay on the server, and
+ * the browser gets only the small client parts (the click-to-load player and the carousel): about 1.5 KB gzipped on
+ * top of React. Rendered in the browser, it carries Tiptap and ProseMirror: about 150 KB gzipped. For pages without
+ * React on the server, store the output of `renderToHTML()` when the post is saved instead.
+ *
  * @example
  * ```tsx
  * import { PostCanvasView } from 'post-canvas/render';
@@ -65,7 +70,14 @@ export function PostCanvasView({
   const nodeMapping = Object.fromEntries(
     Object.entries(map).flatMap(([type, View]) =>
       View
-        ? [[type, ({ node }: { node: { attrs: Record<string, unknown> } }) => <View node={{ type, attrs: node.attrs }} t={t} />]]
+        ? [
+            [
+              type,
+              ({ node }: { node: { attrs: Record<string, unknown> } }) => (
+                <View node={{ type, attrs: node.attrs }} t={t} />
+              ),
+            ],
+          ]
         : [],
     ),
   );

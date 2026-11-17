@@ -77,7 +77,13 @@ const starter: JSONContent = {
     },
     {
       type: 'video',
-      attrs: { id: 'demo-video', provider: 'youtube', videoId: yt, title: 'A video facade', description: 'Click to load the player.' },
+      attrs: {
+        id: 'demo-video',
+        provider: 'youtube',
+        videoId: yt,
+        title: 'A video facade',
+        description: 'Click to load the player.',
+      },
     },
     { type: 'paragraph' },
   ],
@@ -87,16 +93,26 @@ const starter: JSONContent = {
 const xssFixture: JSONContent = {
   type: 'doc',
   content: [
-    { type: 'paragraph', attrs: { onclick: 'alert(1)' }, content: [{ type: 'text', text: '<script>alert("text")</script>' }] },
-    ...['javascript:alert(1)', 'JaVaScRiPt:alert(1)', '&#106;avascript:alert(1)', 'data:text/html,<script>alert(1)</script>'].map(
-      (href, index): JSONContent => ({
-        type: 'paragraph',
-        content: [{ type: 'text', text: `Hostile link ${index + 1}`, marks: [{ type: 'link', attrs: { href } }] }],
-      }),
-    ),
+    {
+      type: 'paragraph',
+      attrs: { onclick: 'alert(1)' },
+      content: [{ type: 'text', text: '<script>alert("text")</script>' }],
+    },
+    ...[
+      'javascript:alert(1)',
+      'JaVaScRiPt:alert(1)',
+      '&#106;avascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+    ].map((href, index): JSONContent => ({
+      type: 'paragraph',
+      content: [{ type: 'text', text: `Hostile link ${index + 1}`, marks: [{ type: 'link', attrs: { href } }] }],
+    })),
     { type: 'iframe', attrs: { srcdoc: '<script>alert(1)</script>' } },
     { type: 'video', attrs: { provider: 'youtube', videoId: '"><img src=x onerror=alert(1)>' } },
-    { type: 'embed', attrs: { provider: 'spotify', ref: { type: 'track', id: '4uLU6hMCjMI75M1A2tKUQC' }, url: 'javascript:alert(1)' } },
+    {
+      type: 'embed',
+      attrs: { provider: 'spotify', ref: { type: 'track', id: '4uLU6hMCjMI75M1A2tKUQC' }, url: 'javascript:alert(1)' },
+    },
     { type: 'linkCard', attrs: { url: 'javascript:alert(1)', title: 'bad card' } },
     { type: 'embedInput', attrs: { value: 'transient' } },
   ],
@@ -183,7 +199,9 @@ function App() {
       </header>
 
       <section className="pg-panel pg-pad" aria-label="Links to try">
-        <p className="pg-note">Each button opens a paste-a-link field with the link and adds it. Or copy one and paste it into an empty line.</p>
+        <p className="pg-note">
+          Each button opens a paste-a-link field with the link and adds it. Or copy one and paste it into an empty line.
+        </p>
         <div className="pg-chips">
           {samples.map(([label, url]) => (
             <button key={label} type="button" title={url} onClick={() => addLink(url)}>
@@ -224,7 +242,13 @@ function App() {
               </ul>
             )}
             <h2 className="pg-h2">Import HTML</h2>
-            <textarea className="pg-textarea" value={html} onChange={(event) => setHtml(event.target.value)} rows={8} aria-label="HTML to import" />
+            <textarea
+              className="pg-textarea"
+              value={html}
+              onChange={(event) => setHtml(event.target.value)}
+              rows={8}
+              aria-label="HTML to import"
+            />
             <button type="button" onClick={() => editorRef.current?.setContent(fromHTML(html))}>
               Import into the editor
             </button>
@@ -242,12 +266,18 @@ function App() {
           <div className="pg-pad" role="tabpanel">
             <p className="pg-note" data-testid="removed">
               Sanitizer removed {sanitized.removed.length} item(s)
-              {sanitized.removed.length > 0 && `: ${[...new Set(sanitized.removed.map((item) => `${item.reason} ${item.type ?? ''}`.trim()))].join(', ')}`}.
-              Excerpt: “{excerpt(sanitized.doc, 80)}”
+              {sanitized.removed.length > 0 &&
+                `: ${[...new Set(sanitized.removed.map((item) => `${item.reason} ${item.type ?? ''}`.trim()))].join(', ')}`}
+              . Excerpt: “{excerpt(sanitized.doc, 80)}”
             </p>
             {tab === 'html' && (
               <>
-                <iframe className="pg-frame" title="renderToHTML output" sandbox="allow-popups allow-popups-to-escape-sandbox" srcDoc={frameDoc} />
+                <iframe
+                  className="pg-frame"
+                  title="renderToHTML output"
+                  sandbox="allow-popups allow-popups-to-escape-sandbox"
+                  srcDoc={frameDoc}
+                />
                 <details>
                   <summary>HTML source</summary>
                   <pre className="pg-json">{output}</pre>

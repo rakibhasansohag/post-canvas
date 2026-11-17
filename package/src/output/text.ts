@@ -91,7 +91,9 @@ function blockText(node: JSONContent, depth = 0): string {
 
 /** The document as plain text: blocks separated by blank lines, list items and table rows by line breaks. */
 export function toPlainText(json: JSONContent): string {
-  return blockText(json).replace(/\n{3,}/g, '\n\n').trim();
+  return blockText(json)
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function firstText(node: JSONContent, depth = 0): string | null {
@@ -166,7 +168,12 @@ export function getCover(json: JSONContent): CoverImage | null {
   walk(json, (node) => {
     const attrs = attrsOf(node);
     if (node.type === 'image') cover = coverFrom(attrs);
-    else if (node.type === 'gallery' && Array.isArray(attrs.photos) && attrs.photos[0] && typeof attrs.photos[0] === 'object') {
+    else if (
+      node.type === 'gallery' &&
+      Array.isArray(attrs.photos) &&
+      attrs.photos[0] &&
+      typeof attrs.photos[0] === 'object'
+    ) {
       cover = coverFrom(attrs.photos[0] as Attrs);
     }
     return cover !== null;
@@ -197,7 +204,8 @@ function hasTransientValue(value: unknown, depth = 0): boolean {
   if (Array.isArray(value)) return value.some((item) => hasTransientValue(item, depth + 1));
   if (value && typeof value === 'object') {
     return Object.entries(value).some(
-      ([key, item]) => (key === 'uploadKey' && item !== null && item !== undefined) || hasTransientValue(item, depth + 1),
+      ([key, item]) =>
+        (key === 'uploadKey' && item !== null && item !== undefined) || hasTransientValue(item, depth + 1),
     );
   }
   return false;

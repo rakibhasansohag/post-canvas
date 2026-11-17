@@ -72,7 +72,10 @@ function identify(input: string, providers?: readonly string[]): Target | null {
     return { provider, ref, key: `${provider.name}:${provider.canonicalUrl(ref)}` };
   }
   if (video) return null;
-  const match = matchEmbedUrl(input, providers?.filter((name) => name !== 'youtube' && name !== 'vimeo'));
+  const match = matchEmbedUrl(
+    input,
+    providers?.filter((name) => name !== 'youtube' && name !== 'vimeo'),
+  );
   return match ? { provider: match.provider, ref: match.ref, key: `${match.provider.name}:${match.url}` } : null;
 }
 

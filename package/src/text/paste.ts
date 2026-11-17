@@ -383,9 +383,22 @@ export function cleanOwnHTML(html: string): string {
       element.remove();
       return;
     }
+    // A photo's placeholder lives in its img's style; keep that one declaration, and only a strict data URL.
+    const placeholder =
+      tag === 'img' && element.closest('[data-pc-image], [data-pc-gallery]') ? placeholderStyle(element) : null;
     cleanElement(element, { keepSlice: element === sliced });
+    if (placeholder) element.setAttribute('style', placeholder);
   });
   return doc.body.innerHTML;
+}
+
+const placeholderPattern =
+  /background-image:\s*url\(\s*["']?(data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]{1,2800})["']?\s*\)/i;
+
+/** The `background-image` placeholder of a photo, rebuilt from a strict base64 JPEG, PNG or WebP data URL, or `null`. */
+function placeholderStyle(img: Element): string | null {
+  const url = placeholderPattern.exec(img.getAttribute('style') ?? '')?.[1];
+  return url ? `background-image: url(${url})` : null;
 }
 
 /** Runs every node's and mark's sanitizer over a pasted slice, so nothing skips the schema's rules. */

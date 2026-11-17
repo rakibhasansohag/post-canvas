@@ -99,7 +99,9 @@ function inline(nodes: readonly JSONContent[]): string {
     closeTo(common);
     let text: string;
     if (node.type === 'text') {
-      text = marks.some((mark) => mark.type === 'code') ? str(node.text).replace(/`/g, "'") : escapeText(str(node.text));
+      text = marks.some((mark) => mark.type === 'code')
+        ? str(node.text).replace(/`/g, "'")
+        : escapeText(str(node.text));
     } else if (node.type === 'hardBreak') {
       text = '\\\n';
     } else if (node.type === 'mention') {
@@ -158,7 +160,11 @@ function list(node: JSONContent, ordered: boolean): string {
   return kids(node)
     .map((item, index) => {
       const marker =
-        item.type === 'taskItem' ? `- [${attrsOf(item).checked === true ? 'x' : ' '}] ` : ordered ? `${start + index}. ` : '- ';
+        item.type === 'taskItem'
+          ? `- [${attrsOf(item).checked === true ? 'x' : ' '}] `
+          : ordered
+            ? `${start + index}. `
+            : '- ';
       const body = blocks(kids(item), true);
       return marker + indent(body, ' '.repeat(ordered ? marker.length : 2));
     })
@@ -185,7 +191,9 @@ function block(node: JSONContent, tight: boolean): string {
     case 'orderedList':
       return list(node, true);
     case 'codeBlock': {
-      const code = kids(node).map((child) => str(child.text)).join('');
+      const code = kids(node)
+        .map((child) => str(child.text))
+        .join('');
       const fence = /```/.test(code) ? '~~~~' : '```';
       const language = /^[a-z0-9+#-]{1,20}$/.test(str(attrs.language)) ? str(attrs.language) : '';
       return `${fence}${language}\n${code}\n${fence}`;

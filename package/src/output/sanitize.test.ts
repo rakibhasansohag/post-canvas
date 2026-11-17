@@ -61,22 +61,54 @@ const linked = (href: string): JSONContent => ({
 const hostile: JSONContent = {
   type: 'doc',
   content: [
-    { type: 'paragraph', attrs: { onclick: 'alert(1)', style: 'x:expression(alert(1))' }, content: [{ type: 'text', text: '<script>alert(1)</script>' }] },
+    {
+      type: 'paragraph',
+      attrs: { onclick: 'alert(1)', style: 'x:expression(alert(1))' },
+      content: [{ type: 'text', text: '<script>alert(1)</script>' }],
+    },
     ...badHrefs.map(linked),
     { type: 'script', content: [{ type: 'text', text: 'kept inside unknown' }] },
-    { type: 'paragraph', content: [{ type: 'text', text: 'marked', marks: [{ type: 'evil', attrs: { onload: 'x' } }] }] },
+    {
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'marked', marks: [{ type: 'evil', attrs: { onload: 'x' } }] }],
+    },
     { type: 'iframe', attrs: { src: 'https://evil.com', srcdoc: '<script>alert(1)</script>' } },
     { type: 'video', attrs: { provider: 'youtube', videoId: '"><img src=x onerror=alert(1)>' } },
-    { type: 'video', attrs: { provider: 'youtube', videoId: yt, thumbnailUrl: 'https://evil.com/pixel.png', title: 'ok' } },
+    {
+      type: 'video',
+      attrs: { provider: 'youtube', videoId: yt, thumbnailUrl: 'https://evil.com/pixel.png', title: 'ok' },
+    },
     { type: 'video', attrs: { provider: 'evil', videoId: yt } },
-    { type: 'embed', attrs: { provider: 'spotify', ref: { type: 'track', id: '"><script>alert(1)</script>' }, url: 'https://open.spotify.com/track/x' } },
-    { type: 'embed', attrs: { provider: 'spotify', ref: { type: 'track', id: '4uLU6hMCjMI75M1A2tKUQC' }, url: 'javascript:alert(1)' } },
+    {
+      type: 'embed',
+      attrs: {
+        provider: 'spotify',
+        ref: { type: 'track', id: '"><script>alert(1)</script>' },
+        url: 'https://open.spotify.com/track/x',
+      },
+    },
+    {
+      type: 'embed',
+      attrs: { provider: 'spotify', ref: { type: 'track', id: '4uLU6hMCjMI75M1A2tKUQC' }, url: 'javascript:alert(1)' },
+    },
     { type: 'embed', attrs: { provider: 'evil', ref: { id: '1' }, url: 'https://evil.com' } },
     { type: 'embed', attrs: { provider: 'google-maps', ref: { q: '"><svg onload=alert(1)>' } } },
     { type: 'linkCard', attrs: { url: 'javascript:alert(1)', title: 'x' } },
-    { type: 'linkCard', attrs: { url: 'https://example.org/post', title: 'Card', image: 'javascript:alert(1)', favicon: 'data:text/html,x' } },
+    {
+      type: 'linkCard',
+      attrs: {
+        url: 'https://example.org/post',
+        title: 'Card',
+        image: 'javascript:alert(1)',
+        favicon: 'data:text/html,x',
+      },
+    },
     { type: 'embedInput', attrs: { value: 'https://evil.com' } },
-    { type: 'codeBlock', attrs: { language: '"><script>alert(1)</script>' }, content: [{ type: 'text', text: 'let a = 1;' }] },
+    {
+      type: 'codeBlock',
+      attrs: { language: '"><script>alert(1)</script>' },
+      content: [{ type: 'text', text: 'let a = 1;' }],
+    },
     { type: 'heading', attrs: { level: '<script>' }, content: [{ type: 'text', text: 'Heading' }] },
   ],
 };
@@ -142,10 +174,29 @@ describe('sanitizeDocument', () => {
             { type: 'text', text: 'a link', marks: [{ type: 'link', attrs: { href: 'https://example.com/a?b=1' } }] },
           ],
         },
-        { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one' }] }] }] },
-        { type: 'video', attrs: { id: 'v1', provider: 'vimeo', videoId: '76979871', hash: '8272103f6e', title: 'Clip', description: 'About it' } },
-        { type: 'embed', attrs: { provider: 'x', ref: { user: 'jack', id: '20' }, url: 'https://x.com/jack/status/20' } },
-        { type: 'linkCard', attrs: { url: 'https://example.com/', title: 'Example', description: 'A page', siteName: 'Example' } },
+        {
+          type: 'bulletList',
+          content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one' }] }] }],
+        },
+        {
+          type: 'video',
+          attrs: {
+            id: 'v1',
+            provider: 'vimeo',
+            videoId: '76979871',
+            hash: '8272103f6e',
+            title: 'Clip',
+            description: 'About it',
+          },
+        },
+        {
+          type: 'embed',
+          attrs: { provider: 'x', ref: { user: 'jack', id: '20' }, url: 'https://x.com/jack/status/20' },
+        },
+        {
+          type: 'linkCard',
+          attrs: { url: 'https://example.com/', title: 'Example', description: 'A page', siteName: 'Example' },
+        },
       ],
     };
     const { doc, removed } = sanitizeDocument(normal);
@@ -163,7 +214,13 @@ describe('sanitizeDocument', () => {
   });
 
   it('cuts at the caps', () => {
-    const many = { type: 'doc', content: Array.from({ length: 50 }, () => ({ type: 'paragraph', content: [{ type: 'text', text: 'x'.repeat(100) }] })) };
+    const many = {
+      type: 'doc',
+      content: Array.from({ length: 50 }, () => ({
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'x'.repeat(100) }],
+      })),
+    };
     const { doc, removed } = sanitizeDocument(many, { limits: { maxNodes: 21, maxTextLength: 1050 } });
     expect(doc.content!.length).toBeLessThanOrEqual(11);
     expect(removed.map((item) => item.reason)).toEqual(expect.arrayContaining(['limit-nodes']));
@@ -175,7 +232,15 @@ describe('sanitizeDocument', () => {
   });
 
   it('survives garbage input', () => {
-    for (const input of [null, 42, 'doc', [], { type: 'doc', content: 'x' }, { type: 'doc', content: [null, 1, { type: 1 }] }, { __proto__: { type: 'doc' } }]) {
+    for (const input of [
+      null,
+      42,
+      'doc',
+      [],
+      { type: 'doc', content: 'x' },
+      { type: 'doc', content: [null, 1, { type: 1 }] },
+      { __proto__: { type: 'doc' } },
+    ]) {
       const { doc } = sanitizeDocument(input);
       expect(doc.type).toBe('doc');
       expect(doc.content?.length).toBeGreaterThan(0);
@@ -207,7 +272,11 @@ describe('review regressions', () => {
         note: { default: null },
         label: { default: null },
       }),
-      renderHTML: ({ HTMLAttributes, node }) => ['div', HTMLAttributes, ['a', { href: node.attrs.url as string }, 'open']],
+      renderHTML: ({ HTMLAttributes, node }) => [
+        'div',
+        HTMLAttributes,
+        ['a', { href: node.attrs.url as string }, 'open'],
+      ],
     });
     const html = renderToHTML(
       {
@@ -285,7 +354,9 @@ describe('fromHTML', () => {
 
   it('drops script inside SVG', () => {
     // happy-dom (unlike browsers) swallows everything after a <script> inside <svg>, so this case runs on its own.
-    const doc = fromHTML('<p>a</p><svg><script>alert(1)</script><a href="javascript:alert(1)">svg</a></svg>', { window: host });
+    const doc = fromHTML('<p>a</p><svg><script>alert(1)</script><a href="javascript:alert(1)">svg</a></svg>', {
+      window: host,
+    });
     expectClean(renderToHTML(doc));
     expect(JSON.stringify(doc)).toContain('"text":"a"');
   });
@@ -302,7 +373,18 @@ describe('fromHTML', () => {
       <p><iframe src="https://player.vimeo.com/video/76979871" width="640" height="360"></iframe></p>`;
     const doc = fromHTML(tinymce, { window: host });
     const types = JSON.stringify(doc);
-    for (const type of ['heading', 'bold', 'italic', 'link', 'bulletList', 'orderedList', 'blockquote', 'codeBlock', 'table', 'video']) {
+    for (const type of [
+      'heading',
+      'bold',
+      'italic',
+      'link',
+      'bulletList',
+      'orderedList',
+      'blockquote',
+      'codeBlock',
+      'table',
+      'video',
+    ]) {
       expect(types, type).toContain(`"type":"${type}"`);
     }
     expect(types).toContain('Nested');

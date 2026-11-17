@@ -35,7 +35,8 @@ const youtubeHosts = new Set([
 ]);
 const vimeoHosts = new Set(['vimeo.com', 'www.vimeo.com']);
 
-const videoAllow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+const videoAllow =
+  'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
 const videoSandbox = 'allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox';
 
 /** Reads `90`, `90s`, `1m30s` or `1h2m3s` as seconds. Anything else, zero, or over twelve hours is `null`. */
@@ -215,6 +216,7 @@ export function defaultVideoThumbnail(video: Pick<VideoRef, 'provider' | 'videoI
 /** True for a thumbnail URL the `video` node may keep: YouTube's or Vimeo's own image hosts, over https. */
 export function isVideoThumbnail(provider: VideoProvider, url: unknown): url is string {
   if (typeof url !== 'string' || url.length > 1024) return false;
-  if (provider === 'youtube') return /^https:\/\/i\.ytimg\.com\/vi\/[A-Za-z0-9_-]{11}\/[a-z0-9_]{1,40}\.(?:jpg|webp)$/.test(url);
+  if (provider === 'youtube')
+    return /^https:\/\/i\.ytimg\.com\/vi\/[A-Za-z0-9_-]{11}\/[a-z0-9_]{1,40}\.(?:jpg|webp)$/.test(url);
   return /^https:\/\/i\.vimeocdn\.com\/[A-Za-z0-9/_.,=-]{1,400}$/.test(url) && !url.includes('..');
 }

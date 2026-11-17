@@ -4,7 +4,14 @@
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
 import { Link2, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useId, useRef } from 'react';
-import { cancelEmbedInput, patchById, replaceById, linkParagraph, submitEmbedInput, type EmbedInputKind } from './actions';
+import {
+  cancelEmbedInput,
+  patchById,
+  replaceById,
+  linkParagraph,
+  submitEmbedInput,
+  type EmbedInputKind,
+} from './actions';
 import { parseEmbedUrl } from '../providers/index';
 
 /** The editor view of the transient `embedInput` node. */
@@ -85,7 +92,13 @@ export function EmbedInputView({ node, editor }: NodeViewProps) {
             {loading ? <LoaderCircle size={18} aria-hidden="true" className="pc-spin" /> : null}
             {loading ? t('embeds.input.lookingUp') : t('embeds.input.add')}
           </button>
-          <button type="button" className="pc-embed-input-cancel" aria-label={t('embeds.input.cancel')} title={t('embeds.input.cancel')} onClick={cancel}>
+          <button
+            type="button"
+            className="pc-embed-input-cancel"
+            aria-label={t('embeds.input.cancel')}
+            title={t('embeds.input.cancel')}
+            onClick={cancel}
+          >
             <X size={18} strokeWidth={2.2} aria-hidden="true" />
           </button>
         </div>
@@ -102,7 +115,10 @@ export function EmbedInputView({ node, editor }: NodeViewProps) {
                 {t('embeds.input.retry')}
               </button>
               {errorKey !== 'embeds.input.invalid' && parseEmbedUrl(value) && (
-                <button type="button" onClick={() => replaceById(editor, id, linkParagraph(editor, parseEmbedUrl(value)?.href ?? value))}>
+                <button
+                  type="button"
+                  onClick={() => replaceById(editor, id, linkParagraph(editor, parseEmbedUrl(value)?.href ?? value))}
+                >
                   {t('embeds.input.asLink')}
                 </button>
               )}

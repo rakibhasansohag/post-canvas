@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { activateEmbeds } from './activate-embeds';
 import { renderToHTML } from './html';
 
-const click = (element: Element) => element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+const click = (element: Element) =>
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
 
 describe('activateEmbeds', () => {
   it('rebuilds the player from the provider, never from DOM attributes', () => {
@@ -24,7 +25,9 @@ describe('activateEmbeds', () => {
     click(bad!);
     const frames = Array.from(root.querySelectorAll('iframe'));
     expect(frames).toHaveLength(1);
-    expect(frames[0]!.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&playsinline=1&autoplay=1');
+    expect(frames[0]!.getAttribute('src')).toBe(
+      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&playsinline=1&autoplay=1',
+    );
     expect(frames[0]!.getAttribute('sandbox')).not.toContain('top-navigation');
     stop();
   });

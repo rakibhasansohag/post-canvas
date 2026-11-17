@@ -1,0 +1,18 @@
+{
+  "title": "Guides",
+  "pages": [
+    "uploads",
+    "galleries",
+    "mentions-and-hashtags",
+    "embeds-and-link-previews",
+    "custom-embed-provider",
+    "autosave",
+    "saving-and-loading",
+    "ssr-rendering",
+    "theming",
+    "i18n",
+    "headless",
+    "keyboard-and-accessibility",
+    "migrating-from-tinymce-froala"
+  ]
+}

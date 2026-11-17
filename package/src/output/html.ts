@@ -29,10 +29,14 @@ export interface RenderHTMLOptions {
 }
 
 /**
- * Renders a document to an HTML string, on the server or in the browser, with no DOM. By default it sanitizes the
- * document first, wraps the result in `.pc-view > .pc-content` (style it with `post-canvas/styles.css`), and shows
- * videos and embeds as click-to-load facades: call `activateEmbeds()` from `post-canvas/vanilla` on the page to turn a
- * click into the player, or use `embeds: 'iframe'`.
+ * Renders a document to an HTML string, on the server or in the browser, with no DOM.
+ *
+ * **Run it on the server or when the post is saved**, and send readers the HTML. It needs Tiptap and ProseMirror, so
+ * calling it in the browser adds about 150 KB gzipped to the page.
+ *
+ * By default it sanitizes the document first, wraps the result in `.pc-view > .pc-content` (style it with
+ * `post-canvas/styles.css`), and shows videos and embeds as click-to-load facades: call `activateEmbeds()` from
+ * `post-canvas/vanilla` on the page to turn a click into the player, or use `embeds: 'iframe'`.
  *
  * @example
  * ```ts

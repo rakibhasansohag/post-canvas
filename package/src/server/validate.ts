@@ -82,7 +82,8 @@ export function validateDocument(json: unknown, options: ValidateOptions = {}): 
   const { doc, removed, omitted } = sanitizeDocument(json, options);
   const errors = removed.map((item) => error(item.path, item.reason, item.type));
   // The sanitizer lists at most 100 removals; say that there were more.
-  if (omitted > 0) errors.push({ ...error('doc', 'invalid-node'), message: `${omitted} more problems were not listed.` });
+  if (omitted > 0)
+    errors.push({ ...error('doc', 'invalid-node'), message: `${omitted} more problems were not listed.` });
   // hasTransientContent walks without recursion and skips anything malformed, so it is safe on raw input.
   const flagged = errors.some((item) => item.code === 'transient');
   if (!flagged && json && typeof json === 'object' && hasTransientContent(json)) {

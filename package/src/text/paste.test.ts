@@ -252,3 +252,17 @@ describe('review fixes', () => {
     expect(cleanPastedHTML(html)).toContain('deep');
   });
 });
+
+describe('own clipboard photos', () => {
+  it('keeps a photo placeholder style and the upload key, and nothing else in the style', () => {
+    const lqip = 'data:image/webp;base64,UklGRh4AAABXRUJQVlA4';
+    const clean = cleanOwnHTML(
+      `<figure data-pm-slice="0 0 []" data-pc-image=""><img src="https://a.co/x.jpg" data-upload-key="u1" style="background-image: url(${lqip}); position: fixed; background: url(https://evil.example/x)"></figure><p style="color:red">t</p>`,
+    );
+    expect(clean).toContain(`style="background-image: url(${lqip})"`);
+    expect(clean).toContain('data-upload-key="u1"');
+    expect(clean).not.toContain('evil.example');
+    expect(clean).not.toContain('position');
+    expect(clean).not.toContain('color:red');
+  });
+});

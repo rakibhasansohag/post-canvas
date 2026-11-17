@@ -28,6 +28,7 @@ import { StatusBar } from '../ui/status-bar';
 import { SuggestionMenu } from '../ui/suggestion-menu';
 import { Toolbar } from '../ui/toolbar';
 import { EditorUiProvider, useDocInfo, type EditorUi } from '../ui/ui-context';
+import { setEmbedConsent } from '../embeds/editor/storage';
 import {
   usePostCanvasEditor,
   type ContentFormat,
@@ -63,6 +64,11 @@ export interface PostCanvasProps extends Omit<UsePostCanvasEditorOptions, 'notif
   autosave?: boolean | AutosaveOptions;
   /** Puts the caret in the editor on mount: `true`, `'start'`, `'end'` or a position. */
   autofocus?: FocusPosition;
+  /**
+   * Whether third-party players (videos, embeds) load in the editor before a click. Default `click`: a facade until
+   * clicked, so nothing loads from another site until the writer asks.
+   */
+  embedConsent?: 'click' | 'auto';
   className?: string;
   slots?: PostCanvasSlots;
 }
@@ -99,6 +105,7 @@ export const PostCanvas = forwardRef<PostCanvasHandle, PostCanvasProps>(function
     autosave,
     className,
     slots,
+    embedConsent,
     readOnly = false,
     onChange,
     ...editorOptions
@@ -251,6 +258,11 @@ export const PostCanvas = forwardRef<PostCanvasHandle, PostCanvasProps>(function
     }),
     [editor, setFields],
   );
+
+  // Each new editor instance (a features change rebuilds it) gets the current consent.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && embedConsent) setEmbedConsent(editor, embedConsent);
+  }, [editor, embedConsent]);
 
   const info = useDocInfo(editor);
   const canvas = useRef<HTMLDivElement>(null);

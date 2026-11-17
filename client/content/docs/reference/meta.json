@@ -1,0 +1,16 @@
+{
+  "title": "Reference",
+  "pages": [
+    "post-canvas",
+    "hooks",
+    "commands",
+    "nodes-and-marks",
+    "render",
+    "server",
+    "vanilla",
+    "extensions",
+    "embed-providers",
+    "utilities",
+    "types"
+  ]
+}

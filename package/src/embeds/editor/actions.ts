@@ -155,7 +155,12 @@ export async function fetchEmbedMetadata(editor: Editor, node: JSONContent): Pro
 
 /** Why a link card lookup failed, as a message key. */
 function failureKey(error: unknown): string {
-  const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : error instanceof Error ? error.message : '';
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? String(error.code)
+      : error instanceof Error
+        ? error.message
+        : '';
   if (code === 'not_found') return 'embeds.input.notFound';
   if (code === 'not_embeddable' || code === 'blocked') return 'embeds.input.notEmbeddable';
   return 'embeds.input.failed';

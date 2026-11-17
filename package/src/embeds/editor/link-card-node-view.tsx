@@ -21,7 +21,11 @@ export function LinkCardNodeView({ node, editor, getPos, selected, deleteNode }:
   const replace = (content: Parameters<typeof editor.commands.insertContentAt>[1]) => {
     const pos = getPos();
     if (typeof pos !== 'number') return;
-    editor.chain().focus().insertContentAt({ from: pos, to: pos + node.nodeSize }, content).run();
+    editor
+      .chain()
+      .focus()
+      .insertContentAt({ from: pos, to: pos + node.nodeSize }, content)
+      .run();
   };
 
   return (
@@ -34,8 +38,16 @@ export function LinkCardNodeView({ node, editor, getPos, selected, deleteNode }:
         toolbar={
           editable ? (
             <MediaToolbar label={t('core.frame.tools', { label })}>
-              <ToolButton icon={Link2} label={t('embeds.changeLink')} onClick={() => replace(embedInputContent('link', card.url))} />
-              <ToolButton icon={Unlink} label={t('embeds.linkCard.toLink')} onClick={() => replace(linkParagraph(editor, card.url))} />
+              <ToolButton
+                icon={Link2}
+                label={t('embeds.changeLink')}
+                onClick={() => replace(embedInputContent('link', card.url))}
+              />
+              <ToolButton
+                icon={Unlink}
+                label={t('embeds.linkCard.toLink')}
+                onClick={() => replace(linkParagraph(editor, card.url))}
+              />
               <ToolButton icon={Trash2} label={t('embeds.linkCard.remove')} onClick={deleteNode} />
             </MediaToolbar>
           ) : undefined
@@ -43,10 +55,14 @@ export function LinkCardNodeView({ node, editor, getPos, selected, deleteNode }:
       >
         <div className={card.image ? 'pc-link-card' : 'pc-link-card pc-link-card-text'}>
           <div className="pc-link-card-anchor">
-            {card.image && <img className="pc-link-card-image" src={card.image} alt="" loading="lazy" decoding="async" />}
+            {card.image && (
+              <img className="pc-link-card-image" src={card.image} alt="" loading="lazy" decoding="async" />
+            )}
             <span className="pc-link-card-body">
               <span className="pc-link-card-site">
-                {card.favicon && <img className="pc-link-card-favicon" src={card.favicon} alt="" width={16} height={16} />}
+                {card.favicon && (
+                  <img className="pc-link-card-favicon" src={card.favicon} alt="" width={16} height={16} />
+                )}
                 {card.site}
               </span>
               <span className="pc-link-card-title">{card.title}</span>
