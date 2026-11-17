@@ -265,6 +265,45 @@ label[for],
   border-radius: 28px;
 }
 
+/* The closing call to action: the accent, white text, in both themes. */
+.site-cta {
+  position: relative;
+  isolation: isolate;
+  border-radius: 28px;
+  background: #2f5fd0;
+  color: #ffffff;
+  background-image: radial-gradient(rgb(255 255 255 / 0.14) 1.1px, transparent 1.3px);
+  background-size: 18px 18px;
+}
+
+.site-cta .site-btn-primary {
+  background: #ffffff;
+  color: #0e1320;
+}
+
+.site-cta .site-btn-primary:hover {
+  background: #e6edfb;
+}
+
+.site-cta .site-btn-primary .site-btn-tile {
+  background: #2f5fd0;
+  color: #ffffff;
+}
+
+.site-cta .site-btn-secondary {
+  border-color: rgb(255 255 255 / 0.4);
+  color: #ffffff;
+}
+
+.site-cta .site-btn-secondary:hover {
+  border-color: #ffffff;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.site-cta .site-btn-secondary .site-btn-tile {
+  background: rgb(255 255 255 / 0.14);
+}
+
 /* The canvas: a dot grid behind live stages. */
 .site-dots {
   background-image: radial-gradient(var(--site-dot) 1.1px, transparent 1.3px);
@@ -624,6 +663,10 @@ label[for],
   to {
     opacity: 1;
   }
+}
+
+.site-swap {
+  animation: site-fade 380ms var(--ease-out) both;
 }
 
 /* Window chrome around the hero editor. */

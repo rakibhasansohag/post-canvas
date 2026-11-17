@@ -10,11 +10,15 @@ export const metadata: Metadata = {
 
 export default function PlaygroundPage() {
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-      <h1 className="mb-2 text-2xl font-bold">Playground</h1>
-      <p className="mb-6 text-fd-muted-foreground">
-        Try the editor with a preset, a language and a feature set of your choice. Nothing you type leaves your browser.
-      </p>
+    <main className="site-col flex-1 pt-10 sm:pt-14">
+      <div className="mb-8 flex flex-col gap-3 md:mb-10">
+        <p className="site-label">Playground</p>
+        <h1 className="site-h2">Try every switch</h1>
+        <p className="site-lead max-w-[42rem]">
+          Pick a preset, a theme, a language and the features you want, then write. The document updates below as JSON,
+          HTML, Markdown, text and the read-only view.
+        </p>
+      </div>
       <PlaygroundEditor />
     </main>
   );

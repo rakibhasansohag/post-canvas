@@ -6,16 +6,28 @@ export const appDescription =
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
 
-/** The sub-path the site is hosted under, such as `/post-canvas` on GitHub Pages. Empty at the domain root. */
+/** The sub-path the site is hosted under, such as `/post-canvas`. Empty at the domain root. */
 export const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 /** The public origin, for the sitemap and Open Graph tags. Set `NEXT_PUBLIC_SITE_URL` when you build for a host. */
-export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3100').replace(/\/$/, '');
+export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://post-canvas.pages.dev').replace(/\/$/, '');
 
 export const gitConfig = {
   user: 'saimulft',
   repo: 'post-canvas',
   branch: 'main',
+};
+
+export const repoUrl = `https://github.com/${gitConfig.user}/${gitConfig.repo}`;
+export const npmUrl = 'https://www.npmjs.com/package/post-canvas';
+
+/** Real numbers about the package, shown on the home page. Update them with each release. */
+export const facts = {
+  tests: 425,
+  languages: 6,
+  presets: 4,
+  layouts: 4,
+  renderKb: 142,
 };
 
 const getImageUrl = createGetUrl(docsImageRoute);

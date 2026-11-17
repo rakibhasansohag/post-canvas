@@ -161,6 +161,23 @@
   padding-inline-start: 1.6em;
 }
 
+/* Set the markers explicitly: CSS resets such as Tailwind's preflight remove them from every list. */
+.pc-content ul {
+  list-style-type: disc;
+}
+
+.pc-content ul ul {
+  list-style-type: circle;
+}
+
+.pc-content ul ul ul {
+  list-style-type: square;
+}
+
+.pc-content ol {
+  list-style-type: decimal;
+}
+
 .pc-content li + li,
 .pc-content li > :is(ul, ol) {
   margin-top: 0.3em;
