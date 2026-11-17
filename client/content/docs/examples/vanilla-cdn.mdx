@@ -196,11 +196,9 @@ This page does not create an editor. It takes the saved JSON and calls `PostCanv
         // textContent, so the title can never become markup.
         document.getElementById('title').textContent = (raw.fields && raw.fields.title) || 'Untitled';
 
-        // Sanitizes the JSON, then returns <div class="pc-view"><div class="pc-content">...</div></div>.
+        // Sanitizes the JSON, then returns <div class="pc-view" data-pc-theme="auto"><div class="pc-content">...</div></div>.
+        // The wrapper follows the reader's light or dark setting. Pass { theme: 'light' } or { theme: 'dark' } to fix it.
         container.innerHTML = PostCanvas.renderToHTML(raw.content);
-
-        // Follow the reader's light or dark setting. The wrapper has no theme attribute by default.
-        container.firstElementChild.setAttribute('data-pc-theme', 'auto');
 
         // Turn the click-to-load placeholders into players.
         PostCanvas.activateEmbeds(container);

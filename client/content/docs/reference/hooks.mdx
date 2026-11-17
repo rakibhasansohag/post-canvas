@@ -61,7 +61,7 @@ export function PlainEditor({ onText }: { onText: (text: string) => void }) {
 type ContentFormat = 'json' | 'html' | 'markdown';
 ```
 
-The default is `html`. The hook treats `markdown` specially: with a string `defaultContent` and `contentFormat: 'markdown'` it loads Tiptap's Markdown extension and parses the string as Markdown. For an object `defaultContent` (Tiptap JSON) you do not need `contentFormat`. `setContent(content, format)` on the `ref` handle takes the same type, and its `'markdown'` format needs that extension, so it works only on an editor that started from Markdown. To load Markdown into any editor, convert it with `fromMarkdown` from `post-canvas/render` and pass the JSON.
+The default is `html`. With a string `defaultContent` and `contentFormat: 'markdown'` the hook parses the string as Markdown. For an object `defaultContent` (Tiptap JSON) you do not need `contentFormat`. The hook always loads Tiptap's Markdown extension, so `setContent(content, 'markdown')` on the `ref` handle, which takes the same type, parses Markdown on any editor. To turn Markdown into JSON without an editor, use `fromMarkdown` from `post-canvas/render`.
 
 ## usePostCanvasContext
 

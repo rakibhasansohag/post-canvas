@@ -186,6 +186,16 @@
   background: var(--pc-border);
 }
 
+/* The measuring copy is laid out at full width but clipped to nothing, so it adds no page overflow. */
+.pc-toolbar-measure-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .pc-toolbar--measure {
   position: absolute;
   top: 0;

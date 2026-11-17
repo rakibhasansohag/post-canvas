@@ -8,7 +8,7 @@ import type { Features, InsertItem, Problem } from '../core/types';
 import { embedInputContent, type EmbedInputKind } from './editor/actions';
 import { EmbedInputView } from './editor/embed-input-view';
 import { EmbedNodeView } from './editor/embed-node-view';
-import { embedStopEvent } from './editor/frame';
+import { embedStopEvent } from '../core/react/node-view';
 import { LinkCardNodeView } from './editor/link-card-node-view';
 import { EmbedPaste } from './editor/paste';
 import type { EmbedsStorage } from './editor/storage';

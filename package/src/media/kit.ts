@@ -12,7 +12,7 @@ import { galleryAttrsOf } from './coerce';
 import { FileNodeView } from './editor/file-node-view';
 import { GalleryNodeView } from './editor/gallery-node-view';
 import { ImageNodeView } from './editor/image-node-view';
-import { mediaStopEvent } from './editor/node-view-utils';
+import { mediaStopEvent } from '../core/react/node-view';
 import { stagedSrcPrefix, type SourceOptions } from './html';
 import { dataUrlToFile, htmlHasText } from './paste';
 import { createGalleryNode, FileNode, fileParseRules, galleryParseRules, ImageNode, imageParseRules } from './schema';
@@ -26,21 +26,33 @@ import { createPositionPlugin, createUploadPlugin, patchUploads, uploadPluginKey
 
 /** What `insertImage` takes: a finished picture, with an http(s) `src`. */
 export interface InsertImageOptions {
+  /** An http or https URL. Anything else is refused. */
   src: string;
+  /** Intrinsic width in pixels. Leave out to have the editor measure the picture when it loads. */
   width?: number;
+  /** Intrinsic height in pixels. Leave out to have the editor measure the picture when it loads. */
   height?: number;
+  /** Alternative text. Default empty. */
   alt?: string;
+  /** Plain text under the picture. Default empty. */
   caption?: string;
+  /** Where the picture sits. Default `center`. */
   align?: 'center' | 'wide' | 'full' | 'left' | 'right';
+  /** A `srcset` such as `"url 640w, url 1280w"`. Invalid entries are dropped. */
   srcset?: string | null;
+  /** A tiny `data:image/(jpeg|png|webp);base64` preview of at most 2 KB. */
   placeholder?: string | null;
+  /** Your storage's id for the picture. */
   uploadId?: string | null;
 }
 
 /** What `insertGallery` takes: finished photos, with http(s) sources. */
 export interface InsertGalleryOptions {
+  /** Default `carousel`, or the first layout the features allow. */
   layout?: GalleryLayout;
+  /** The photos, each with an http or https `src`. Extra photos past `maxPhotos` are left out. */
   photos: Array<Partial<GalleryPhoto> & { src: string }>;
+  /** Plain text under the gallery. Default empty. */
   caption?: string;
 }
 
@@ -235,6 +247,7 @@ export const MediaUploads = Extension.create<Record<string, never>, MediaStorage
         key: new PluginKey('postCanvasMediaPaste'),
         props: { transformPastedHTML: (html) => stagePastedImages(editor, html) },
       }),
+      plainPastePlugin(),
     ];
   },
 
@@ -377,6 +390,33 @@ export const MediaUploads = Extension.create<Record<string, never>, MediaStorage
     return problems;
   },
 });
+
+/**
+ * Shift-paste (Mod-Shift-V) pastes plain text, as it does everywhere else in the editor, even when the clipboard also
+ * holds files: an office app puts a picture of the selection next to its text. It runs before the file handler.
+ */
+function plainPastePlugin(): Plugin {
+  let shift = false;
+  const track = (_view: unknown, event: KeyboardEvent) => {
+    shift = event.shiftKey;
+    return false;
+  };
+  return new Plugin({
+    key: new PluginKey('postCanvasPlainPaste'),
+    props: {
+      handleDOMEvents: { keydown: track, keyup: track, blur: () => ((shift = false), false) },
+      handlePaste: (view, event) => {
+        const data = event.clipboardData;
+        if (!shift || !data || data.files.length === 0) return false;
+        const text = data.getData('text/plain');
+        if (!text) return false;
+        // Without the original event, so neither this plugin nor the file handler sees its files again.
+        view.pasteText(text);
+        return true;
+      },
+    },
+  });
+}
 
 /** The editor media extensions for a feature set, with node views, commands, paste and drop, and insert items. */
 export function mediaKit(features: Features): AnyExtension[] {

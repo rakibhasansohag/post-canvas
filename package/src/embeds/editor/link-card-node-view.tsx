@@ -2,17 +2,19 @@
 // The `linkCard` node in the editor: the card as readers see it, with tools to change the link, show it as a plain
 // link, or remove it.
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
+import { useOptionalPostCanvasContext } from '../../core/react/context';
 import { Link2, Trash2, Unlink } from 'lucide-react';
 import { MediaFrame } from '../../core/react/media-frame';
 import { MediaToolbar } from '../../core/react/media-toolbar';
 import { ToolButton } from '../../core/react/tool-button';
 import { linkCardRender } from '../render-spec';
 import { embedInputContent, linkParagraph } from './actions';
-import { runFrameKey, useEditable } from './frame';
+import { runFrameKey, useEditable } from '../../core/react/node-view';
 
 /** The editor view of a `linkCard` node. */
 export function LinkCardNodeView({ node, editor, getPos, selected, deleteNode }: NodeViewProps) {
-  const { t } = editor.storage.postCanvasCore;
+  // From React context first, so a language change re-renders the block; the editor's storage outside a provider.
+  const t = useOptionalPostCanvasContext()?.t ?? editor.storage.postCanvasCore.t;
   const editable = useEditable(editor);
   const card = linkCardRender(node.attrs);
   if (!card) return <NodeViewWrapper data-pc-node="linkCard" />;

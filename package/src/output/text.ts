@@ -1,7 +1,9 @@
 // Plain-text helpers over Tiptap JSON: plain text, an excerpt, the cover picture and the transient-content check. Pure
 // JSON walks, with no schema and no DOM, so they work anywhere and on any document.
 import type { CoverImage, JSONContent } from '../core/types';
-import { safeMediaSrc } from '../core/url';
+import { isStagedSrc, safeMediaSrc } from '../core/url';
+import { textLimits } from '../media/rules';
+import { cleanLine, cleanPlaceholder, cleanSrcset, cleanUploadId } from '../media/sanitize';
 import { embedRender, linkCardRender, videoRender } from '../embeds/render-spec';
 
 type Attrs = Record<string, unknown>;
@@ -129,10 +131,10 @@ function coverFrom(source: Attrs): CoverImage | null {
     src,
     width,
     height,
-    alt: str(source.alt),
-    srcset: typeof source.srcset === 'string' && source.srcset ? source.srcset : null,
-    placeholder: typeof source.placeholder === 'string' && source.placeholder ? source.placeholder : null,
-    uploadId: typeof source.uploadId === 'string' && source.uploadId ? source.uploadId : null,
+    alt: cleanLine(source.alt, textLimits.alt),
+    srcset: cleanSrcset(source.srcset),
+    placeholder: cleanPlaceholder(source.placeholder),
+    uploadId: cleanUploadId(source.uploadId),
   };
 }
 
@@ -200,7 +202,7 @@ export function getCover(json: JSONContent): CoverImage | null {
 
 function hasTransientValue(value: unknown, depth = 0): boolean {
   if (depth > 6) return false;
-  if (typeof value === 'string') return /^\s*blob:/i.test(value);
+  if (typeof value === 'string') return /^\s*blob:/i.test(value) || isStagedSrc(value);
   if (Array.isArray(value)) return value.some((item) => hasTransientValue(item, depth + 1));
   if (value && typeof value === 'object') {
     return Object.entries(value).some(
@@ -213,7 +215,7 @@ function hasTransientValue(value: unknown, depth = 0): boolean {
 
 /**
  * True when a document still holds editor-only state that must not be saved: an open paste-a-link field, an upload
- * that is running or failed (`uploadKey`), or a `blob:` source. Check it before saving; `sanitizeDocument()` removes
+ * that is running or failed (`uploadKey`), a `blob:` source or a staged-upload marker. Check it before saving; `sanitizeDocument()` removes
  * all of them.
  */
 export function hasTransientContent(json: JSONContent): boolean {

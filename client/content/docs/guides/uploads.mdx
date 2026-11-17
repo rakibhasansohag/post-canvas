@@ -92,7 +92,8 @@ import { randomUUID } from 'node:crypto';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-const s3 = new S3Client({ region: process.env.S3_REGION });
+// WHEN_REQUIRED keeps the SDK from adding a checksum of the empty body to the signed URL, which S3 would reject.
+const s3 = new S3Client({ region: process.env.S3_REGION, requestChecksumCalculation: 'WHEN_REQUIRED' });
 const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'application/pdf']);
 const maxBytes = 20 * 1024 * 1024;
 
@@ -114,12 +115,26 @@ export async function POST(request: Request) {
 }
 ```
 
-A presigned `PUT` does not enforce the size you checked. If you need a hard limit, use a presigned `POST` with a content-length condition instead.
+A presigned `PUT` does not enforce the size you checked. If you need a hard limit, use a presigned `POST` (`createPresignedPost` from `@aws-sdk/s3-presigned-post`) with a `content-length-range` condition instead.
+
+Version 3.729 and later of the AWS SDK add a checksum of the empty body to a presigned `PUT` URL by default, and S3 then refuses the real upload with a checksum error. The `requestChecksumCalculation: 'WHEN_REQUIRED'` setting above avoids that.
 
 </Step>
 <Step>
 
-**Allow the browser to upload.** On the bucket, add a CORS rule that allows `PUT` from your site's origin and the `Content-Type` header.
+**Allow the browser to upload.** On the bucket, add a CORS rule that allows `PUT` from your site's origin and the `Content-Type` header. In the S3 console (Permissions, Cross-origin resource sharing) the configuration is JSON:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://www.example.com"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "ExposeHeaders": [],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
 
 </Step>
 <Step>
@@ -244,7 +259,8 @@ export async function POST() {
   // Check the signed-in user here.
   const timestamp = Math.round(Date.now() / 1000);
   const folder = 'posts';
-  // Cloudinary signs the parameters in alphabetical order, followed by your API secret.
+  // Sign every parameter you send, except file, cloud_name, resource_type and api_key: sorted by name, written as
+  // name=value, joined with &, with your API secret appended at the end. SHA-1 is Cloudinary's default.
   const signature = createHash('sha1')
     .update(`folder=${folder}&timestamp=${timestamp}${process.env.CLOUDINARY_API_SECRET}`)
     .digest('hex');
@@ -300,6 +316,8 @@ export const cloudinarySignedUpload: UploadAdapter = {
   },
 };
 ```
+
+Whatever you sign must be sent with the same name and value, and nothing else may be added to the form. If you add a parameter such as `public_id` or `eager`, add it to the signed string too. A signature is valid for one hour from its `timestamp`.
 
 Add the same `srcset` code as the unsigned tab if you want responsive sources.
 

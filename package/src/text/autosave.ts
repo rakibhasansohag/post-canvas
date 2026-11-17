@@ -4,7 +4,10 @@ import { getDocStats } from './stats';
 
 /** Autosave settings. Pass `true` for the defaults. */
 export interface AutosaveOptions {
-  /** The storage key. Use one per document, such as `post:new` or `post:42`. Default `post-canvas:draft`. */
+  /**
+   * The storage key. Use one per document, such as `post:new` or `post:42`. Default `draft`, which the localStorage
+   * default stores as `post-canvas:draft`; a custom `adapters.storage` receives the key as it is.
+   */
   key?: string;
   /** Milliseconds typing must rest before a save. Default 800. */
   delay?: number;
@@ -85,7 +88,24 @@ export interface AutosaveController {
   dispose(): void;
 }
 
-/** Creates an autosave for one storage key. */
+/** Runs a storage call and swallows its failure, sync or async: a draft that isn't kept must never break typing. */
+function quietly(call: () => void | Promise<void>): Promise<void> {
+  try {
+    return Promise.resolve(call()).catch(reportStorageError);
+  } catch (error) {
+    reportStorageError(error);
+    return Promise.resolve();
+  }
+}
+
+function reportStorageError(error: unknown): void {
+  console.warn('[post-canvas] The draft storage failed; the draft is not kept.', error);
+}
+
+/**
+ * Creates an autosave for one storage key. Storage errors, thrown or rejected, are caught and logged as warnings, so a
+ * failing `DraftStorage` only means the draft isn't kept.
+ */
 export function createAutosave(storage: DraftStorage, options: AutosaveOptions = {}): AutosaveController {
   const key = options.key ?? 'draft';
   const delay = options.delay ?? 800;
@@ -99,10 +119,10 @@ export function createAutosave(storage: DraftStorage, options: AutosaveOptions =
     if (!next) return;
     const content = storableContent(next.content);
     if (!hasDraftContent(content, next.fields)) {
-      void storage.clear(key);
+      void quietly(() => storage.clear(key));
       return;
     }
-    void storage.save(key, { content, fields: next.fields, savedAt: new Date().toISOString() });
+    void quietly(() => storage.save(key, { content, fields: next.fields, savedAt: new Date().toISOString() }));
   };
 
   return {
@@ -119,7 +139,7 @@ export function createAutosave(storage: DraftStorage, options: AutosaveOptions =
       if (timer) clearTimeout(timer);
       timer = null;
       pending = null;
-      await storage.clear(key);
+      await quietly(() => storage.clear(key));
     },
     async load() {
       try {

@@ -120,7 +120,7 @@ function draggingPlugin() {
     props: {
       decorations: (state) => {
         const pos = draggingKey.getState(state) ?? null;
-        const node = pos === null ? null : state.doc.nodeAt(pos);
+        const node = pos === null || pos < 0 || pos >= state.doc.content.size ? null : state.doc.nodeAt(pos);
         if (pos === null || !node) return null;
         return DecorationSet.create(state.doc, [
           Decoration.node(pos, pos + node.nodeSize, { class: 'pc-block-dragging' }),
@@ -128,6 +128,14 @@ function draggingPlugin() {
       },
     },
   });
+}
+
+/** `pos` when it is still the start of a block in the current document, else `null`. */
+function blockStartOrNull(editor: Editor, pos: number | null): number | null {
+  const { doc } = editor.state;
+  if (pos === null || !Number.isInteger(pos) || pos < 0 || pos >= doc.content.size) return null;
+  const node = doc.nodeAt(pos);
+  return node && node.isBlock ? pos : null;
 }
 
 function markDragging(editor: Editor, pos: number | null): void {
@@ -270,11 +278,12 @@ export function BlockHandle({ canvas, narrow }: { canvas: RefObject<HTMLDivEleme
   const pointer = usePointerDrag(
     {
       onStart: (event) => {
-        if (!spot) return;
+        const from = blockStartOrNull(editor, spot?.pos ?? null);
+        if (!spot || from === null) return;
         setMenu(false);
         setFrozen(spot);
-        drag.current = { from: spot.pos, index: null, y: event.clientY, frame: 0 };
-        markDragging(editor, spot.pos);
+        drag.current = { from, index: null, y: event.clientY, frame: 0 };
+        markDragging(editor, from);
         track(event.clientY);
         drag.current.frame = requestAnimationFrame(scrollLoop);
       },
@@ -295,7 +304,9 @@ export function BlockHandle({ canvas, narrow }: { canvas: RefObject<HTMLDivEleme
     [],
   );
 
-  const pos = spot?.pos ?? null;
+  // A spot is kept across edits until the next hover or caret move, so after an undo or a remote change its position can
+  // point past the end or inside another node. Only a position that still starts a block counts.
+  const pos = blockStartOrNull(editor, spot?.pos ?? null);
   const entries: MenuEntry[] = [];
   if (pos !== null && menu) {
     const run = (action: () => void) => () => {
@@ -377,9 +388,10 @@ export function BlockHandle({ canvas, narrow }: { canvas: RefObject<HTMLDivEleme
             onPointerDown={pointer.onPointerDown}
             onClickCapture={pointer.onClickCapture}
             onClick={() => {
-              if (!menu && node && !node.isTextblock) {
+              const at = blockStartOrNull(editor, spot.pos);
+              if (!menu && at !== null && !editor.state.doc.nodeAt(at)?.isTextblock) {
                 // Select a media block, so it's clear what the menu acts on.
-                editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, spot.pos)));
+                editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, at)));
               }
               if (menu) closeMenu();
               else openMenu();

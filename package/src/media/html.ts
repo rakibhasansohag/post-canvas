@@ -10,7 +10,7 @@ import type {
   ImageAttrs,
   MediaSource,
 } from '../core/types';
-import { safeHttpUrl, safeMediaSrc } from '../core/url';
+import { safeHttpUrl, safeMediaSrc, stagedSrcPrefix } from '../core/url';
 import {
   boxToStyle,
   clampPlace,
@@ -54,11 +54,7 @@ export interface SourceOptions {
   ownsBlob?: (url: string) => boolean;
 }
 
-/**
- * The placeholder source of a pasted picture that was staged for upload before the HTML was cleaned. The `.invalid`
- * top-level domain never resolves, so the address can't load anything; the parse rule swaps it for the preview.
- */
-export const stagedSrcPrefix = 'https://staged.post-canvas.invalid/';
+export { stagedSrcPrefix };
 
 /** The `img` attributes shared by every picture. */
 export function imgAttrs(source: MediaSource, extra: { className: string; sizes?: string; style?: string }): Attrs {

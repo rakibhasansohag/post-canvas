@@ -5,7 +5,9 @@ import type { DocStats } from './stats';
 
 /** Caps on a document. Every one is optional; leave one out for no cap. */
 export interface Limits {
+  /** Most words, counted as `getDocStats` does. */
   maxWords?: number;
+  /** Most characters a reader sees, line breaks excluded. */
   maxCharacters?: number;
   /** Media blocks of any kind (photo, video, embed, link card, file). */
   maxMedia?: number;

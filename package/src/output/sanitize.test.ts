@@ -6,6 +6,8 @@ import { fromHTML, type HTMLParserHost } from './from-html';
 import { renderToHTML } from './html';
 import { sanitizeDocument } from './sanitize';
 import { hasTransientContent } from './text';
+import { toMarkdown } from './markdown';
+import { postCanvasSchema } from '../core/schema';
 
 const yt = 'dQw4w9WgXcQ';
 const ctrl = String.fromCharCode(1);
@@ -210,7 +212,7 @@ describe('sanitizeDocument', () => {
     expect(html).toContain('Clip');
     expect(html).toContain('https://x.com/jack/status/20');
     expect(html).toContain('class="pc-link-card pc-link-card-text"');
-    expect(html.startsWith('<div class="pc-view"><div class="pc-content">')).toBe(true);
+    expect(html.startsWith('<div class="pc-view" data-pc-theme="auto"><div class="pc-content">')).toBe(true);
   });
 
   it('cuts at the caps', () => {
@@ -393,5 +395,111 @@ describe('fromHTML', () => {
 
   it('needs a parser on the server', () => {
     expect(() => fromHTML('<p>x</p>')).toThrow(/needs an HTML parser/);
+  });
+});
+
+describe('review regressions', () => {
+  const staged = 'https://staged.post-canvas.invalid/k1';
+  const photo = (src: string, key: string) => ({
+    key,
+    src,
+    width: 10,
+    height: 10,
+    alt: '',
+    srcset: null,
+    placeholder: null,
+    uploadId: null,
+    uploadKey: null,
+    place: null,
+  });
+
+  it('treats the staged-upload marker as transient', () => {
+    const image = { type: 'image', attrs: { id: 'i', ...photo(staged, 'x'), caption: '', align: 'center' } };
+    const gallery = {
+      type: 'gallery',
+      attrs: {
+        id: 'g',
+        layout: 'grid',
+        caption: '',
+        photos: [photo(staged, 'a'), photo('https://cdn.example/b.jpg', 'b')],
+      },
+    };
+    const doc = { type: 'doc', content: [image, gallery] };
+    expect(hasTransientContent(doc)).toBe(true);
+    const { doc: clean, removed } = sanitizeDocument(doc);
+    expect(JSON.stringify(clean)).not.toContain('staged.post-canvas.invalid');
+    expect(clean.content).toHaveLength(1);
+    expect((clean.content?.[0]?.attrs?.photos as unknown[]).length).toBe(1);
+    expect(removed.every((item) => item.reason === 'transient')).toBe(true);
+  });
+
+  it('lists what fromHTML leaves out, and keeps h5 and h6 as h4', () => {
+    const removed: string[] = [];
+    const doc = fromHTML(
+      '<h5>Deep</h5><img src="/relative.png"><img src="data:image/png;base64,AAAA"><iframe src="https://evil.example/x"></iframe><script>1</script><p>Text</p>',
+      { window: host, onRemoved: (list) => removed.push(...list.map((item) => item.type ?? '')) },
+    );
+    expect(doc.content?.[0]).toMatchObject({ type: 'heading', attrs: { level: 4 } });
+    expect(removed).toEqual(['script', 'img', 'img', 'iframe']);
+  });
+
+  it('marks the wrapper with the theme', () => {
+    expect(renderToHTML({ type: 'doc', content: [] }, { theme: 'dark' })).toContain('data-pc-theme="dark"');
+  });
+
+  it('keeps Markdown output inert: backslash schemes, raw HTML in link text, code fences', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'x', marks: [{ type: 'link', attrs: { href: 'javascript\\:alert(1)' } }] }],
+        },
+        {
+          type: 'file',
+          attrs: { id: 'f', src: 'https://cdn.example/a.pdf', name: '<img src=x onerror=alert(1)>.pdf' },
+        },
+        {
+          type: 'codeBlock',
+          attrs: { language: null },
+          content: [{ type: 'text', text: '```\n~~~~\n<img src=x onerror=1>' }],
+        },
+      ],
+    };
+    const markdown = toMarkdown(doc);
+    expect(markdown).not.toMatch(/javascript\\?:/i);
+    // The file name is escaped as text (`\\<img`); the `<img` left is inside the code fence, where it's only code.
+    expect(markdown.split('\n').find((line) => line.includes('.pdf'))).toContain('\\<img');
+    expect(markdown).toContain('````\n```\n~~~~');
+  });
+
+  it('nulls dangerous schemes in custom attributes, whitespace or not', () => {
+    const Custom = Node.create({
+      name: 'custom',
+      group: 'block',
+      atom: true,
+      addAttributes: () => ({ to: { default: null } }),
+      renderHTML: ({ HTMLAttributes }) => ['a', { href: HTMLAttributes.to as string }],
+    });
+    for (const to of ['javascript:alert(1) ', ' javascript:void(0); alert(1)', 'java\tscript:x\n']) {
+      const { doc } = sanitizeDocument(
+        { type: 'doc', content: [{ type: 'custom', attrs: { to } }] },
+        { extensions: [...postCanvasSchema(), Custom] },
+      );
+      expect(doc.content?.[0]?.attrs?.to).toBeNull();
+    }
+    const note = sanitizeDocument(
+      { type: 'doc', content: [{ type: 'custom', attrs: { to: 'Note: read this' } }] },
+      { extensions: [...postCanvasSchema(), Custom] },
+    );
+    expect(note.doc.content?.[0]?.attrs?.to).toBe('Note: read this');
+  });
+
+  it('refuses oversized or absurdly nested HTML before parsing', () => {
+    expect(() => fromHTML('<p>x</p>'.repeat(200_000), { window: host })).toThrow(RangeError);
+    expect(() => fromHTML('<blockquote>'.repeat(5000), { window: host })).toThrow(RangeError);
+    expect(fromHTML('<ul>' + '<li>item'.repeat(2000) + '</ul>', { window: host }).content?.[0]?.type).toBe(
+      'bulletList',
+    );
   });
 });

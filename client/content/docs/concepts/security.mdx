@@ -53,7 +53,7 @@ It walks the document, keeps only what the schema knows, and rebuilds the result
 - **Unknown nodes and marks.** An unknown wrapper is removed, and the text of an unknown inline wrapper stays. Nodes of a feature that is off are removed too.
 - **Unsafe URLs.** See the next section.
 - **Unsafe attributes.** For a custom node without its own sanitizer, `on*`, `style`, `srcdoc` and `srcset` attributes are dropped, only plain values are kept, and any value that looks like a URL with a dangerous scheme becomes `null`. If you add your own nodes, give them a `postCanvasSanitize` function.
-- **Editor-only state.** The open link field, upload keys and `blob:` pictures.
+- **Editor-only state.** The open link field, upload keys, `blob:` pictures and the staged-upload marker (see below).
 - **Colours.** Only the nine palette names are kept. A hex value or a CSS string is dropped.
 - **Size.** Documents are cut at 20,000 nodes, 48 levels of nesting and 500,000 characters of text by default. Override with `limits`. Anything cut appears in `removed`.
 - **Control characters.** Bidirectional text controls are stripped from captions, names and similar fields, so a file called `invoice<RLO>fdp.exe` cannot read as something else.
@@ -62,6 +62,7 @@ It walks the document, keeps only what the schema knows, and rebuilds the result
 
 All checks run on the server, and again when rendering.
 
+- **Length.** A URL longer than 8,192 characters is refused, wherever it appears.
 - **Links** (`href`): `http`, `https`, `mailto`, `tel` and relative URLs. Every other scheme is blocked, including `javascript:`, `data:` and `vbscript:`, also when hidden behind spaces, control characters, mixed case, HTML entities or percent-encoding. Protocol-relative URLs such as `//example.com` are blocked.
 - **Pictures and media** (`src`, `image`, `favicon`): absolute `http` or `https` only. A `blob:` source never survives in a saved document.
 - **Links that open a new tab** get `rel` with at least `noopener`. Other `rel` tokens are checked against a short list. Links on embeds and link cards carry `noopener noreferrer nofollow`.
@@ -71,7 +72,7 @@ All checks run on the server, and again when rendering.
 
 A `video` or `embed` node holds a provider name and ids, such as a YouTube video id. The player URL, the `allow` list and the `sandbox` list are built at render time from the provider's code, from ids that pass that provider's strict pattern and an exact host allowlist. A document cannot bring its own iframe address.
 
-Every iframe gets the provider's minimal `sandbox` tokens, a `referrerpolicy` of `strict-origin-when-cross-origin`, and an `https` address. The sandbox limits what the player can do to your page, but a player still needs to run its own scripts to work. In the default `facade` mode, nothing from the provider runs until a click. See [rendering](/docs/concepts/rendering).
+Every iframe gets the provider's minimal `sandbox` tokens, a `referrerpolicy` of `strict-origin-when-cross-origin`, and an `https` address. A custom provider cannot ask for more than the built-in ones need: its `sandbox` list is cut to a short allowlist (no top navigation, for example), and its `allow` list to playback features such as `autoplay`, `fullscreen` and `picture-in-picture`, never the camera, microphone or location. A provider's player must live on the provider's own host, never on your app's origin, because a frame with `allow-scripts allow-same-origin` on your origin could lift its own sandbox. The sandbox limits what the player can do to your page, but a player still needs to run its own scripts to work. In the default `facade` mode, nothing from the provider runs until a click. See [rendering](/docs/concepts/rendering).
 
 In `renderToHTML` and `PostCanvasView`, text and attribute values are escaped by the renderer. Nothing in a document is written into the page as raw HTML.
 
@@ -79,11 +80,19 @@ In `renderToHTML` and `PostCanvasView`, text and attribute values are escaped by
 
 `fromHTML(html)` reads HTML from other editors. It parses the markup into an inert document (scripts do not run), removes `script`, `style`, `template`, `noscript`, `object`, `embed`, `link` and `meta` elements, reads the rest through the schema, and then runs `sanitizeDocument`. On a server you pass a DOM window, for example from `happy-dom`, which you install yourself. Pasted content in the editor goes through a similar cleaning step.
 
+`fromHTML` refuses hostile size before it parses anything. Input longer than `maxLength` (1,000,000 characters by default), or nested deeper than 512 elements, throws a `RangeError`. On a server, wrap the call in `try`/`catch` and answer with a `422`. The `onRemoved` option lists what the import left out, such as stripped scripts and refused pictures or frames. See [Migrating from TinyMCE or Froala](/docs/guides/migrating-from-tinymce-froala).
+
+## Markdown output
+
+`toMarkdown` escapes link text and link destinations, so a title or file name cannot close a link early or carry markup into the Markdown. A code block is fenced with one more backtick than the longest run of backticks inside it, so nothing in the code can close the fence. Treat the Markdown like any other text you write into a page: render it with a Markdown renderer that sanitizes its HTML.
+
 ## Link previews and SSRF
 
 SSRF (server-side request forgery) means a user tricks your server into requesting an address it should not, such as an internal admin page or a cloud metadata endpoint. A link-card feature is a natural way to do it, because the writer gives you a URL and your server fetches it.
 
 `createLinkPreviewResolver()` guards against it. Before every request and every redirect it checks that the URL is `http` or `https`, uses an allowed port (80 and 443 by default) and has no user name or password. It resolves the host, checks that every address is public, and pins the connection to a checked address, so a second DNS answer cannot swap in a private one. It reads at most 1 MB of HTML by default and gives up after a timeout.
+
+What the page says about itself is checked too. The resolver keeps a preview image or favicon only when it is an `https` address that does not name a private or local address (such as `localhost` or `10.0.0.1`), so a page cannot point readers' browsers at their own network. It uses the page's `og:url` as the card's address only when it names the same host (ignoring `www.`), because a parent or sibling domain on a shared host belongs to someone else.
 
 `createEmbedResolver()` fetches only each provider's fixed oEmbed address (and YouTube's watch page for a description), never the URL the writer pasted.
 
@@ -96,16 +105,13 @@ Also protect the route that calls them. Require a signed-in user and add a rate 
 
 ## The staged-upload marker
 
-While a pasted picture is on its way in, the editor holds it as an image with the source `https://staged.post-canvas.invalid/<key>`. The `.invalid` domain is reserved and never loads anything, so the marker is harmless to a reader. It is also a valid `https` address, so it passes `sanitizeDocument` and `validateDocument`: the sanitizer does not know it as a problem.
+While a pasted picture is on its way in, the editor holds it as an image with the source `https://staged.post-canvas.invalid/<key>`. The `.invalid` domain is reserved and never loads anything, so the marker is harmless to a reader. It is transient, editor-only state, like an upload key or a `blob:` source:
 
-The client check is `hasPendingUploads(json)` from `post-canvas`: do not save while it is `true`. On the server, which cannot call that function, add a check of your own if you need one:
+- `sanitizeDocument` drops it (the picture, or the gallery photo, goes, and `removed` lists it with the reason `transient`).
+- `validateDocument` refuses a document that holds one.
+- `hasTransientContent(json)` reports it, and so does `hasPendingUploads(json)` on the client.
 
-```ts
-const text = JSON.stringify(doc);
-if (text.includes('staged.post-canvas.invalid')) {
-  return Response.json({ error: 'Uploads are not finished.' }, { status: 422 });
-}
-```
+So the server needs no check of its own. A document that carries the marker never reaches storage through `sanitizeDocument` or `validateDocument`. On the client, do not save while `hasPendingUploads(json)` is `true`.
 
 ## What Post Canvas does not protect against
 

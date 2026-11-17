@@ -109,8 +109,7 @@ What each part does:
 Comments come from the public, so the server should not accept more than the preset allows. Resolve the same feature set the editor uses and sanitize against it. A request that includes a picture, a table or a video then loses those nodes, even if someone sends the JSON by hand.
 
 ```ts title="app/api/comments/route.ts"
-import { resolveFeatures } from 'post-canvas';
-import { sanitizeDocument } from 'post-canvas/server';
+import { resolveFeatures, sanitizeDocument } from 'post-canvas/server';
 
 const features = resolveFeatures('comment');
 
@@ -132,8 +131,7 @@ Take the mentioned ids from the sanitized `doc` on the server, not from the `men
 Render each stored comment with the same features. This is a Server Component:
 
 ```tsx title="components/comment-list.tsx"
-import { resolveFeatures } from 'post-canvas';
-import { PostCanvasView } from 'post-canvas/render';
+import { PostCanvasView, resolveFeatures } from 'post-canvas/render';
 import type { JSONContent } from 'post-canvas';
 
 const features = resolveFeatures('comment');

@@ -27,7 +27,7 @@ Pass an object instead of `true` to change the defaults.
 <PostCanvas autosave={{ key: `post:${postId}`, delay: 1500 }} />
 ```
 
-Use one `key` for each document. With the default key (`draft`), every editor on your site would share one draft. If several people use the same browser, put the user id in the key as well, and clear drafts when someone signs out.
+Use one `key` for each document. With the default key (`draft`), every editor on your site would share one draft. The default storage keeps the key as `post-canvas:draft`, and a custom `adapters.storage` receives it as `draft`. If several people use the same browser, put the user id in the key as well, and clear drafts when someone signs out.
 
 Set `restore: false` to keep saving without ever bringing a draft back. No banner shows. Use it when you load the content yourself and do not want a stored draft to replace it.
 
@@ -70,11 +70,7 @@ export const indexedDbDrafts: DraftStorage = {
     return (await get<DraftSnapshot>(`post-canvas:${key}`)) ?? null;
   },
   async save(key, snapshot) {
-    try {
-      await set(`post-canvas:${key}`, snapshot);
-    } catch {
-      // Storage is full or blocked. The draft is not kept.
-    }
+    await set(`post-canvas:${key}`, snapshot);
   },
   async clear(key) {
     await del(`post-canvas:${key}`);
@@ -98,11 +94,7 @@ export const serverDrafts: DraftStorage = {
     return response.ok ? ((await response.json()) as DraftSnapshot | null) : null;
   },
   async save(key, snapshot) {
-    try {
-      await fetch(url(key), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(snapshot) });
-    } catch {
-      // Offline: the next change tries again.
-    }
+    await fetch(url(key), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(snapshot) });
   },
   async clear(key) {
     await fetch(url(key), { method: 'DELETE' });
@@ -127,7 +119,7 @@ export function Editor({ postId }: { postId: string }) {
 }
 ```
 
-Catch errors inside `save()`, as the examples do. Autosave does not wait for or catch a rejected `save()`, so an error you do not catch becomes an unhandled promise rejection. An error in `load()` is caught: the editor starts without a draft.
+Autosave catches storage errors, whether a method throws or its promise rejects, and logs them with `console.warn`. A failing storage only means the draft is not kept: typing is never interrupted, and an error in `load()` just starts the editor without a draft. Catching errors in your own adapter is optional, for example to retry a request or to show the writer a message. Note that a `fetch` that returns an error status does not reject, so check `response.ok` yourself if you want to know about failed saves.
 
 ## The restore banner
 

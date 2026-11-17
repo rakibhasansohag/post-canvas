@@ -25,6 +25,14 @@ export {
 } from './output/sanitize';
 export { activateEmbeds } from './output/activate-embeds';
 export {
+  registerEmbedProvider,
+  defineEmbedProvider,
+  getEmbedProvider,
+  listEmbedProviders,
+  type EmbedProvider,
+} from './embeds/providers/index';
+export { defaultFeatures, resolveFeatures, builtInEmbedProviderNames } from './core/features';
+export {
   embedViews,
   EmbedPlayer,
   VideoView,

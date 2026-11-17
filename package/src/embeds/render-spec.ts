@@ -61,10 +61,52 @@ function invalid(extra: Attrs): Spec {
   return ['div', { ...extra, class: 'pc-embed pc-embed-invalid', hidden: 'hidden' }];
 }
 
-/** A provider's frame, kept only when its player URL is an absolute https URL. */
-function checkedFrame(frame: EmbedFrame): EmbedFrame | null {
+/** Sandbox tokens a player may ask for. Top navigation and the rest are never granted, even to a custom provider. */
+const sandboxTokens = new Set([
+  'allow-scripts',
+  'allow-same-origin',
+  'allow-popups',
+  'allow-popups-to-escape-sandbox',
+  'allow-presentation',
+  'allow-forms',
+  'allow-modals',
+  'allow-orientation-lock',
+  'allow-pointer-lock',
+]);
+/** Permissions-policy features a player may ask for: playback only, never the camera, microphone or location. */
+const allowFeatures = new Set([
+  'autoplay',
+  'clipboard-write',
+  'encrypted-media',
+  'fullscreen',
+  'picture-in-picture',
+  'web-share',
+  'accelerometer',
+  'gyroscope',
+]);
+
+/**
+ * A provider's frame, kept only when its player URL is an absolute https URL, with its `sandbox` and `allow` lists cut
+ * down to the tokens above (bare feature names only, no origin lists).
+ */
+export function checkedFrame(frame: EmbedFrame): EmbedFrame | null {
   const src = safeHttpUrl(frame.src);
-  return src && src.startsWith('https://') ? { ...frame, src } : null;
+  if (!src || !src.startsWith('https://')) return null;
+  const sandbox = [
+    ...new Set(
+      String(frame.sandbox ?? '')
+        .toLowerCase()
+        .split(/\s+/),
+    ),
+  ]
+    .filter((token) => sandboxTokens.has(token))
+    .join(' ');
+  const allow = String(frame.allow ?? '')
+    .split(';')
+    .map((directive) => directive.trim().toLowerCase())
+    .filter((directive) => allowFeatures.has(directive))
+    .join('; ');
+  return { ...frame, src, sandbox, allow };
 }
 
 /** The `video` node's attributes as a checked ref, or `null`. */

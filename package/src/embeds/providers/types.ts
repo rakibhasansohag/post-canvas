@@ -10,9 +10,16 @@ export interface EmbedFrame {
   src: string;
   /** An English fallback title. Views replace it with a translated one. */
   title: string;
-  /** The iframe `allow` list. */
+  /**
+   * The iframe `allow` list, as bare feature names. Only playback features are kept: `autoplay`, `clipboard-write`,
+   * `encrypted-media`, `fullscreen`, `picture-in-picture`, `web-share`, `accelerometer` and `gyroscope`.
+   */
   allow: string;
-  /** The iframe `sandbox` tokens: the provider's minimal set. */
+  /**
+   * The iframe `sandbox` tokens: the provider's minimal set. `allow-top-navigation` and other tokens outside the usual
+   * player set are dropped. The player must live on the provider's own host, never on your app's origin: with
+   * `allow-scripts allow-same-origin`, a frame on your own origin could lift its own sandbox.
+   */
   sandbox: string;
   /** Width divided by height, or `null` when the player has a fixed height. */
   aspectRatio: number | null;

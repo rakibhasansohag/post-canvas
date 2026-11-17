@@ -2,13 +2,20 @@
 
 // --- chat 0: core ---
 export { PostCanvasCore, updatePostCanvasCore, type PostCanvasCoreOptions } from './core/extension';
-export { postCanvasKit, idNodeTypes } from './core/kit';
+export { postCanvasKit, idNodeTypes, type PostCanvasKitOptions } from './core/kit';
 export { postCanvasSchema } from './core/schema';
 export { sanitizersFor } from './core/registry';
 // --- end chat 0 ---
 
 // --- chat A: media ---
-export { ImageNode, GalleryNode, FileNode, createGalleryNode, mediaSchema, type GalleryNodeOptions } from './media/schema';
+export {
+  ImageNode,
+  GalleryNode,
+  FileNode,
+  createGalleryNode,
+  mediaSchema,
+  type GalleryNodeOptions,
+} from './media/schema';
 export { mediaKit, MediaUploads } from './media/kit';
 export { sanitizeImageAttrs, sanitizeGalleryAttrs, sanitizeFileAttrs, type GalleryLimits } from './media/sanitize';
 // --- end chat A ---
@@ -46,7 +53,15 @@ export type { MenuStore, SuggestionState, SuggestionEntry, SuggestionKind } from
 // --- end chat B ---
 
 // --- chat C: output and embeds ---
-export { Video, Embed, LinkCard, EmbedInput, createEmbedNode, embedsSchema, type EmbedNodeOptions } from './embeds/schema';
+export {
+  Video,
+  Embed,
+  LinkCard,
+  EmbedInput,
+  createEmbedNode,
+  embedsSchema,
+  type EmbedNodeOptions,
+} from './embeds/schema';
 export { embedsKit, EmbedPaste, type EmbedConsent, type EmbedsKitOptions } from './embeds/kit';
 export { setEmbedConsent } from './embeds/editor/storage';
 export { defineEmbedProvider, registerEmbedProvider, builtInProviders } from './embeds/providers/index';

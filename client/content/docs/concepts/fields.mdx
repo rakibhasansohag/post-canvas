@@ -61,11 +61,11 @@ Two things must be true for a field to show:
 | Preset    | Title and cover                                                                                                                                                         |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `full`    | Off. Turn them on with `features={{ title: true, cover: true }}`.                                                                                                       |
-| `article` | On. There is no classifier, so they always show, and a missing title is not an error.                                                                                   |
+| `article` | On. Its classifier always shows them, and once the document has content a missing title is a `title.missing` problem.                                                   |
 | `social`  | On, but the classifier shows them only when the post is an article. A text, photo, video or embed post has no title. Once it becomes an article, the title is required. |
 | `comment` | Off.                                                                                                                                                                    |
 
-If you pass `classify={null}` to `social`, the classifier goes away and the fields show whenever their features are on. See [classify](/docs/concepts/presets-and-features).
+If you pass `classify={null}` to `social` or `article`, the classifier goes away: the fields show whenever their features are on, and a missing title is no longer a problem. See [classify](/docs/concepts/presets-and-features).
 
 In read-only mode (`readOnly`), the editor shows the title as a heading and no cover. To show a saved post to readers, build the page yourself from your stored fields and the document, as in [rendering](/docs/concepts/rendering).
 

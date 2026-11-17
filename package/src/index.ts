@@ -64,6 +64,7 @@ export { getProblems } from './text/problems';
 export { limitProblems, isInsertCapped, maxMentions, type Limits } from './text/limits';
 export {
   socialClassifier,
+  articleClassifier,
   classifySocial,
   socialKind,
   articleReason,

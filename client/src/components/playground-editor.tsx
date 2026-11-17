@@ -84,9 +84,8 @@ export function PlaygroundEditor() {
 
   const resolved = resolveFeatures(preset, overrides, { adapters });
 
-  // A new feature set mounts a fresh editor that starts from the current document, cleaned for the new features. (The
-  // package also rebuilds the editor in place when features change, but the toolbar can render one frame against the
-  // old editor, so the playground starts clean.)
+  // The editor rebuilds itself in place when the features change and keeps the document, cleaned for the new features.
+  // `mountContent` is only the first document; later changes come from the editor itself.
   const featuresKey = JSON.stringify(resolved);
   const mountContent = useMemo(
     () => (json ? sanitizeDocument(json, { features: resolved }).doc : initial),
@@ -165,7 +164,6 @@ export function PlaygroundEditor() {
 
       <div className="rounded-xl border">
         <PostCanvas
-          key={featuresKey}
           ref={handle}
           defaultContent={mountContent}
           preset={preset}

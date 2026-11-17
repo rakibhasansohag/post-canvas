@@ -1,0 +1,51 @@
+---
+title: 'Reference'
+description: 'The API reference for every Post Canvas entry point: the component, hooks, commands, nodes, renderers, server helpers and types.'
+---
+
+Every export, by entry point. The tables come from the TSDoc in the package source.
+
+<Cards>
+  <Card title="PostCanvas component" href="/docs/reference/post-canvas">
+    Props, ref handle, slots, theme and provider of the PostCanvas React component, with the behaviour of each option.
+  </Card>
+  <Card title="React hooks" href="/docs/reference/hooks">
+    The React hooks of post-canvas: build your own editor chrome, read the editor context, translate strings and drag
+    blocks.
+  </Card>
+  <Card title="Commands and block helpers" href="/docs/reference/commands">
+    Editor commands for media, embeds and text, plus the block helpers that move, copy, delete and convert blocks.
+  </Card>
+  <Card title="Nodes and marks" href="/docs/reference/nodes-and-marks">
+    Every node and mark in a Post Canvas document, with its attributes, its feature flag and what the sanitizer clamps
+    or drops.
+  </Card>
+  <Card title="Render entry" href="/docs/reference/render">
+    The post-canvas/render entry: show saved documents as HTML or React, convert to Markdown and text, read HTML, and
+    sanitize JSON.
+  </Card>
+  <Card title="Server entry" href="/docs/reference/server">
+    The post-canvas/server entry: validate saved documents, resolve embed and link-card previews safely, and check
+    addresses for SSRF.
+  </Card>
+  <Card title="Vanilla and CDN entry" href="/docs/reference/vanilla">
+    The post-canvas/vanilla entry and the CDN bundle: mount the editor on any page without writing React, with the
+    PostCanvas global.
+  </Card>
+  <Card title="Extensions entry" href="/docs/reference/extensions">
+    The post-canvas/extensions entry: Tiptap kits, schemas, node classes, sanitizers and paste helpers for custom
+    editors and servers.
+  </Card>
+  <Card title="Embed providers" href="/docs/reference/embed-providers">
+    The embed provider registry: built-in providers with their link forms and sizes, plus functions to parse links and
+    add your own.
+  </Card>
+  <Card title="Helpers and utilities" href="/docs/reference/utilities">
+    Helper functions, constants and small components exported from post-canvas: presets, stats, limits, autosave,
+    uploads, URLs and UI parts.
+  </Card>
+  <Card title="Shared types" href="/docs/reference/types">
+    The shared TypeScript types of post-canvas: document attributes, features, adapters, translation, insert items,
+    problems and views.
+  </Card>
+</Cards>

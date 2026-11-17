@@ -51,7 +51,7 @@ export interface PostCanvasSlots {
 }
 
 /** Props of `PostCanvas`. */
-export interface PostCanvasProps extends Omit<UsePostCanvasEditorOptions, 'notify' | 'extensions' | 'autofocus'> {
+export interface PostCanvasProps extends Omit<UsePostCanvasEditorOptions, 'notify' | 'autofocus'> {
   /** The title and cover, controlled. Leave out to let the editor keep them (see `defaultFields`). */
   fields?: PostFields;
   /** The starting title and cover when `fields` isn't set. Read on mount. */
@@ -118,13 +118,24 @@ export const PostCanvas = forwardRef<PostCanvasHandle, PostCanvasProps>(function
   // Nothing is saved until a stored draft has had its chance to come back, so an empty start never overwrites it.
   const saving = useRef(false);
   const [restored, setRestored] = useState(false);
+  // After "Discard", the state the editor was reset to. It isn't saved, or the discarded draft would come back as the
+  // starting content; the first real change clears it.
+  const discarded = useRef<string | null>(null);
+  const scheduleSave = useCallback((json: JSONContent, next: PostFields) => {
+    if (!saving.current) return;
+    if (discarded.current !== null) {
+      if (JSON.stringify({ json, next }) === discarded.current) return;
+      discarded.current = null;
+    }
+    autosaveRef.current?.schedule(json, next);
+  }, []);
 
   const handleChange = useCallback(
     (change: PostCanvasChange) => {
-      if (saving.current) autosaveRef.current?.schedule(change.json, fieldsRef.current);
+      scheduleSave(change.json, fieldsRef.current);
       onChange?.(change, change.editor);
     },
-    [onChange],
+    [onChange, scheduleSave],
   );
 
   const { editor, features, t, adapters, limits } = usePostCanvasEditor({
@@ -149,8 +160,8 @@ export const PostCanvas = forwardRef<PostCanvasHandle, PostCanvasProps>(function
     const text = editor.storage.postCanvasText as PostCanvasTextStorage | undefined;
     if (text) text.fields = fields;
     editor.view.dispatch(editor.state.tr.setMeta('postCanvasFields', true).setMeta('addToHistory', false));
-    if (saving.current) autosaveRef.current?.schedule(editor.getJSON(), fields);
-  }, [editor, fields]);
+    scheduleSave(editor.getJSON(), fields);
+  }, [editor, fields, scheduleSave]);
 
   // Autosave: one controller per key and storage. Restores once, on the first editor.
   const autosaveOptions = useMemo<AutosaveOptions | null>(
@@ -212,7 +223,7 @@ export const PostCanvas = forwardRef<PostCanvasHandle, PostCanvasProps>(function
         typeof props.defaultContent === 'string' && props.contentFormat === 'markdown' ? 'markdown' : undefined,
     });
     setFields(defaultFields ?? {});
-    // The reset above schedules a save of the empty state; forget the draft after it too.
+    discarded.current = JSON.stringify({ json: editor.getJSON(), next: defaultFields ?? {} });
     void autosaveRef.current?.clear();
   };
 

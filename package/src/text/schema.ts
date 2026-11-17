@@ -1,6 +1,15 @@
 // The render-safe text schema: node and mark names, attributes, parseHTML, renderHTML and sanitizers. No React, no DOM
 // access at import time and no node views, so it runs on the server. `text/kit.ts` extends these for the editor.
-import { mergeAttributes, type AnyExtension, type Attributes } from '@tiptap/core';
+import {
+  createInlineMarkdownSpec,
+  Mark,
+  mergeAttributes,
+  Node,
+  type AnyExtension,
+  type Attributes,
+  type MarkConfig,
+  type NodeConfig,
+} from '@tiptap/core';
 import Blockquote from '@tiptap/extension-blockquote';
 import Bold from '@tiptap/extension-bold';
 import Code from '@tiptap/extension-code';
@@ -11,9 +20,7 @@ import Heading from '@tiptap/extension-heading';
 import Highlight, { type HighlightOptions } from '@tiptap/extension-highlight';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import Italic from '@tiptap/extension-italic';
-import Link, { type LinkOptions } from '@tiptap/extension-link';
 import { BulletList, ListItem, OrderedList, TaskItem, TaskList } from '@tiptap/extension-list';
-import Mention from '@tiptap/extension-mention';
 import Paragraph from '@tiptap/extension-paragraph';
 import Strike from '@tiptap/extension-strike';
 import Subscript from '@tiptap/extension-subscript';
@@ -128,22 +135,11 @@ export const PcCodeBlock = CodeBlock.extend({
 });
 
 /**
- * `link`: `href` must pass `safeHref`, `target` is `_blank` or nothing, and `rel` always carries `noopener` with
- * `_blank`. Nothing is clickable in the editor.
+ * The parts of `link` the schema and the editor share: attributes, parse and render rules, Markdown and the sanitizer.
+ * The schema version is a plain mark, so render bundles don't carry the editor's autolinking (linkifyjs); the kit
+ * extends Tiptap's `Link` with the same parts.
  */
-export const PcLink = Link.extend({
-  addOptions() {
-    return {
-      ...(this.parent?.() as LinkOptions),
-      openOnClick: false,
-      autolink: false,
-      linkOnPaste: false,
-      enableClickSelection: false,
-      defaultProtocol: 'https',
-      HTMLAttributes: {},
-      isAllowedUri: (url: string) => safeHref(url) !== null,
-    };
-  },
+export const linkSpec = {
   addAttributes() {
     return {
       href: { default: null, parseHTML: (element: HTMLElement) => safeHref(element.getAttribute('href')) },
@@ -158,14 +154,36 @@ export const PcLink = Link.extend({
       },
     };
   },
-  renderHTML({ HTMLAttributes }) {
+  parseHTML() {
+    return [
+      { tag: 'a[href]', getAttrs: (element: HTMLElement) => (safeHref(element.getAttribute('href')) ? null : false) },
+    ];
+  },
+  renderHTML({ HTMLAttributes }: { HTMLAttributes: Record<string, unknown> }) {
     // An unsafe href (from unsanitized JSON or a raw setMark) renders as plain text in an anchor without a link.
     const href = safeHref(HTMLAttributes.href);
     if (!href) return ['a', {}, 0];
     const target = HTMLAttributes.target === '_blank' ? '_blank' : null;
     return ['a', { href, target, rel: linkRel(HTMLAttributes.rel, target) }, 0];
   },
+  markdownTokenName: 'link',
+  parseMarkdown: (token, helpers) =>
+    helpers.applyMark('link', helpers.parseInline(token.tokens || []), { href: safeHref(token.href) }),
+  renderMarkdown: (node, h) => `[${h.renderChildren(node)}](${String(node.attrs?.href ?? '')})`,
   postCanvasSanitize: sanitizeLink,
+} satisfies Partial<MarkConfig>;
+
+/**
+ * `link`: `href` must pass `safeHref`, `target` is `_blank` or nothing, and `rel` always carries `noopener` with
+ * `_blank`. Nothing is clickable in the editor.
+ */
+export const PcLink = Mark.create({
+  name: 'link',
+  priority: 1000,
+  keepOnSplit: false,
+  exitable: true,
+  inclusive: false,
+  ...linkSpec,
 });
 
 /** `textStyle`, carrying a palette colour by name. */
@@ -221,20 +239,88 @@ export function mentionText(attrs: Record<string, unknown>): string {
   return `${char}${label}`;
 }
 
-/** `mention`: people with `@` and hashtags with `#`. The schema version never opens a suggestion list. */
-export const PcMention = Mention.extend({
-  postCanvasSanitize: sanitizeMention,
-}).configure({
-  suggestion: { allow: () => false },
-  renderText: ({ node }) => mentionText(node.attrs),
-  renderHTML: ({ options, node }) => [
+/** The attribute of a mention that Tiptap's `Mention` stores, read from and written to `data-*`. */
+function mentionAttribute(name: string, fallback: string | null, always = false) {
+  return {
+    default: fallback,
+    parseHTML: (element: HTMLElement) => element.getAttribute(`data-${name}`),
+    renderHTML: (attributes: Record<string, unknown>) =>
+      always || attributes[camel(name)] ? { [`data-${name}`]: attributes[camel(name)] } : {},
+  };
+}
+
+function camel(name: string): string {
+  return name.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
+/** The HTML of a mention: a span with its data, its class and its text. */
+function mentionHTML(HTMLAttributes: Record<string, unknown>, attrs: Record<string, unknown>) {
+  return [
     'span',
-    mergeAttributes(options.HTMLAttributes, {
-      class: node.attrs.mentionSuggestionChar === '#' ? 'pc-hashtag' : 'pc-mention',
+    mergeAttributes({ 'data-type': 'mention' }, HTMLAttributes, {
+      class: attrs.mentionSuggestionChar === '#' ? 'pc-hashtag' : 'pc-mention',
     }),
-    mentionText(node.attrs),
-  ],
+    mentionText(attrs),
+  ] as const;
+}
+
+/**
+ * The parts of `mention` the schema and the editor share. The schema version is a plain node, so render bundles don't
+ * carry the suggestion plugin; the kit extends Tiptap's `Mention` with the same attributes and output.
+ */
+export const mentionSpec = {
+  addAttributes() {
+    return {
+      id: mentionAttribute('id', null),
+      label: mentionAttribute('label', null),
+      mentionSuggestionChar: mentionAttribute('mention-suggestion-char', '@', true),
+    };
+  },
+  ...createInlineMarkdownSpec({
+    nodeName: 'mention',
+    name: '@',
+    selfClosing: true,
+    allowedAttributes: ['id', 'label', { name: 'mentionSuggestionChar', skipIfDefault: '@' }],
+    // As Tiptap's `Mention` writes them: `char="#"` stands for `mentionSuggestionChar`.
+    parseAttributes: (attrString: string) => {
+      const attrs: Record<string, string> = {};
+      for (const match of attrString.matchAll(/(?:^|\s)(\w+)=(?:"([^"]*)"|'([^']*)')/g)) {
+        const [, key = '', doubleQuoted, singleQuoted] = match;
+        attrs[key === 'char' ? 'mentionSuggestionChar' : key] = doubleQuoted ?? singleQuoted ?? '';
+      }
+      return attrs;
+    },
+    serializeAttributes: (attrs: Record<string, unknown>) =>
+      Object.entries(attrs)
+        .filter(([, value]) => value !== undefined && value !== null)
+        .map(([key, value]) => `${key === 'mentionSuggestionChar' ? 'char' : key}="${String(value)}"`)
+        .join(' '),
+  }),
+  postCanvasSanitize: sanitizeMention,
+} satisfies Partial<NodeConfig>;
+
+/** `mention`: people with `@` and hashtags with `#`. The schema version never opens a suggestion list. */
+export const PcMention = Node.create({
+  name: 'mention',
+  priority: 101,
+  group: 'inline',
+  inline: true,
+  selectable: false,
+  atom: true,
+  ...mentionSpec,
+  parseHTML() {
+    return [{ tag: 'span[data-type="mention"]' }];
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    return mentionHTML(HTMLAttributes, node.attrs);
+  },
+  renderText({ node }) {
+    return mentionText(node.attrs);
+  },
 });
+
+/** The mention's HTML, for the kit's `Mention` configuration. */
+export { mentionHTML };
 
 /** Options shared by the schema and the editor kit. */
 export interface TextExtensionParts {

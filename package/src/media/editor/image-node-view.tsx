@@ -25,7 +25,8 @@ import { imageAccept, openFilePicker } from '../upload/picker';
 import { uploadFiles } from '../upload/pipeline';
 import { CaptionField } from './caption-field';
 import { RadioMenu } from './radio-menu';
-import { runFrameKey, useEditable, useUpload } from './node-view-utils';
+import { runFrameKey, useEditable } from '../../core/react/node-view';
+import { useUpload } from './node-view-utils';
 import { UploadStatus, uploadView } from './upload-status';
 
 const alignIcons: Record<ImageAlign, LucideIcon> = {

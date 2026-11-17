@@ -1,7 +1,8 @@
 /**
  * The `post-canvas/server` entry: everything an app's server needs to accept, store and show documents, with no DOM
- * and no React. `validateDocument`, `sanitizeDocument` and `renderToHTML` also run in edge runtimes; the two resolvers
- * load `undici` and `node:dns` only when they first run, so they need Node.
+ * and no React. `validateDocument`, `sanitizeDocument` and `renderToHTML` also run in edge runtimes. The link-preview
+ * resolver loads `undici` and `node:dns` when it first runs, so it needs Node; the embed resolver only calls `fetch`
+ * (the global one by default) on fixed oEmbed endpoints.
  *
  * Always run `sanitizeDocument()` (or check `validateDocument()`) on JSON that came from a client before you show it to
  * anyone else.
@@ -76,4 +77,6 @@ export {
   type LookupFunction,
 } from './server/resolvers/ssrf';
 export { registerEmbedProvider, defineEmbedProvider, type EmbedProvider } from './embeds/providers/index';
+export { defaultFeatures, resolveFeatures, builtInEmbedProviderNames } from './core/features';
+export { hasPendingUploads } from './media/upload/pending';
 export type { EmbedRenderMode } from './embeds/render-spec';

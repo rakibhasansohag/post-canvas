@@ -132,13 +132,15 @@ export function Toolbar() {
           ))}
         </div>
       </Popover>
-      {/* An invisible, inert copy that measures every group's width. */}
-      <div ref={measure} className="pc-toolbar pc-toolbar--measure" aria-hidden="true" inert>
-        {groups.map((group) => (
-          <div key={group.id} className="pc-toolbar__group">
-            {group.node}
-          </div>
-        ))}
+      {/* An invisible, inert copy that measures every group's width, in a zero-size box so it never widens the page. */}
+      <div className="pc-toolbar-measure-box" aria-hidden="true">
+        <div ref={measure} className="pc-toolbar pc-toolbar--measure" inert>
+          {groups.map((group) => (
+            <div key={group.id} className="pc-toolbar__group">
+              {group.node}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

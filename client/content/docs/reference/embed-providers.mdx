@@ -7,7 +7,7 @@ An embed provider turns a pasted page link into a small `ref` of validated ids, 
 
 YouTube and Vimeo belong to the `video` node and have their own functions. The nine other built-in providers belong to the `embed` node and live in a registry that you can add to.
 
-All functions on this page are exported from `post-canvas`. `registerEmbedProvider` and `defineEmbedProvider` are also exported from `post-canvas/server` and `post-canvas/extensions`.
+All functions on this page are exported from `post-canvas`. `registerEmbedProvider` and `defineEmbedProvider` are also exported from `post-canvas/server`, `post-canvas/render`, `post-canvas/extensions` and `post-canvas/vanilla` (and so the CDN global). `getEmbedProvider`, `listEmbedProviders` and `builtInEmbedProviderNames` are also exported from `post-canvas/render`, and `builtInEmbedProviderNames` from `post-canvas/server`.
 
 ## Built-in providers
 
@@ -49,6 +49,8 @@ Instagram, Figma and Google Maps have no oEmbed endpoint in Post Canvas, so [`cr
 `EmbedFrame` says how to load the player. Every field is built from the `ref`, never from stored HTML or a stored URL.
 
 <TypeTable path="embeds/providers/types.ts" name="EmbedFrame" />
+
+Whatever a provider returns, Post Canvas keeps only an absolute `https` `src`, cuts `sandbox` to a short allowlist of tokens (no top navigation) and `allow` to playback features (no camera, microphone or location), and drops origin lists. The player must live on the provider's own host, never on your app's origin.
 
 `EmbedMatch` is a pasted URL that a provider recognised.
 
@@ -202,8 +204,12 @@ export function Editor() {
 ```
 
 ```ts title="app/api/posts/route.ts"
-import { registerEmbedProvider, sanitizeDocument } from 'post-canvas/server';
-import { builtInEmbedProviderNames, resolveFeatures } from 'post-canvas';
+import {
+  builtInEmbedProviderNames,
+  registerEmbedProvider,
+  resolveFeatures,
+  sanitizeDocument,
+} from 'post-canvas/server';
 import { peertube } from '../../../lib/peertube';
 
 registerEmbedProvider(peertube);

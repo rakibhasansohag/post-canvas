@@ -19,7 +19,7 @@ export function Composer({ save }: { save: (json: unknown) => void }) {
 
 ## Props
 
-`PostCanvasProps` is everything you can pass to the `PostCanvas` component. It extends `UsePostCanvasEditorOptions` (minus `notify`, `extensions` and `autofocus`, which `PostCanvas` handles itself), so the second table below lists the props it inherits.
+`PostCanvasProps` is everything you can pass to the `PostCanvas` component. It extends `UsePostCanvasEditorOptions` (minus `notify` and `autofocus`, which `PostCanvas` handles itself), so the second table below lists the props it inherits, including `extensions`.
 
 <TypeTable path="react/post-canvas.tsx" name="PostCanvasProps" />
 
@@ -43,7 +43,7 @@ Before you save `json`, check `hasPendingUploads(json)`. It is `true` while an u
 
 `defaultContent` is read once, on mount. It is Tiptap JSON, or a string. A string is read as HTML, or as Markdown when you set `contentFormat="markdown"`. To replace the content later, call `ref.current?.setContent(content, format)`.
 
-Markdown strings need care. `contentFormat="markdown"` loads Tiptap's Markdown extension, and `setContent(content, 'markdown')` works only on an editor that has it. If you did not start from a Markdown `defaultContent`, convert first with `fromMarkdown` from [`post-canvas/render`](/docs/reference/render#markdown) and pass the JSON.
+The editor always loads Tiptap's Markdown extension, so `setContent(content, 'markdown')` parses Markdown on any editor, whatever it started from. To convert Markdown on a server, or to store it as JSON first, use `fromMarkdown` from [`post-canvas/render`](/docs/reference/render#markdown).
 
 ### embedConsent
 
@@ -150,7 +150,7 @@ type PostCanvasTheme = 'light' | 'dark' | 'auto';
 `PostCanvasProvider` gives the editor, the translator, the adapters and the resolved features to the components inside it. `PostCanvas` renders one itself. Use your own when you build an editor from [`usePostCanvasEditor`](/docs/reference/hooks) and want parts such as `CoverField` to work outside `PostCanvas`.
 
 ```tsx
-function PostCanvasProvider(props: { value: PostCanvasContextValue; children: ReactNode }): JSX.Element;
+function PostCanvasProvider(props: { value: PostCanvasContextValue; children: ReactNode }): ReactNode;
 ```
 
 `value` is a `PostCanvasContextValue`:

@@ -1,6 +1,7 @@
 'use client';
 // The `embed` node in the editor: the provider's player behind a consent facade (or straight away with consent "auto").
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
+import { useOptionalPostCanvasContext } from '../../core/react/context';
 import { Link2, Trash2 } from 'lucide-react';
 import { MediaFrame } from '../../core/react/media-frame';
 import { MediaToolbar } from '../../core/react/media-toolbar';
@@ -8,12 +9,13 @@ import { ToolButton } from '../../core/react/tool-button';
 import { embedRender, externalRel } from '../render-spec';
 import { EmbedPlayer } from '../view/embed-player';
 import { embedInputContent } from './actions';
-import { runFrameKey, useEditable } from './frame';
+import { runFrameKey, useEditable } from '../../core/react/node-view';
 import { embedsStorage } from './storage';
 
 /** The editor view of an `embed` node. */
 export function EmbedNodeView({ node, editor, getPos, selected, deleteNode, extension }: NodeViewProps) {
-  const { t } = editor.storage.postCanvasCore;
+  // From React context first, so a language change re-renders the block; the editor's storage outside a provider.
+  const t = useOptionalPostCanvasContext()?.t ?? editor.storage.postCanvasCore.t;
   const editable = useEditable(editor);
   const embed = embedRender(node.attrs);
   const consent =

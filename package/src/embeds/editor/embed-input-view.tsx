@@ -2,6 +2,7 @@
 // The paste-a-link field: Enter adds, Escape or Backspace on an empty field cancels, and pasting a link adds it straight
 // away. It shows its lookup and its errors, with a retry.
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
+import { useOptionalPostCanvasContext } from '../../core/react/context';
 import { Link2, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useId, useRef } from 'react';
 import {
@@ -16,7 +17,8 @@ import { parseEmbedUrl } from '../providers/index';
 
 /** The editor view of the transient `embedInput` node. */
 export function EmbedInputView({ node, editor }: NodeViewProps) {
-  const { t } = editor.storage.postCanvasCore;
+  // From React context first, so a language change re-renders the block; the editor's storage outside a provider.
+  const t = useOptionalPostCanvasContext()?.t ?? editor.storage.postCanvasCore.t;
   const inputId = useId();
   const ref = useRef<HTMLInputElement>(null);
   const id = String(node.attrs.id ?? '');

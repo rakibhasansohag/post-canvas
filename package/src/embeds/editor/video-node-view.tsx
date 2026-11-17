@@ -1,6 +1,7 @@
 'use client';
 // The `video` node in the editor: the click-to-load player with its title and description edited where they show.
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
+import { useOptionalPostCanvasContext } from '../../core/react/context';
 import { Link2, Trash2 } from 'lucide-react';
 import { useLayoutEffect, useRef } from 'react';
 import { MediaFrame } from '../../core/react/media-frame';
@@ -10,7 +11,7 @@ import { titleMax, videoDescriptionMax } from '../attrs';
 import { externalRel, videoRender } from '../render-spec';
 import { EmbedPlayer } from '../view/embed-player';
 import { embedInputContent } from './actions';
-import { runFrameKey, useEditable } from './frame';
+import { runFrameKey, useEditable } from '../../core/react/node-view';
 import { embedsStorage } from './storage';
 
 function GrowingTextarea(props: {
@@ -52,7 +53,8 @@ export function VideoNodeView({
   deleteNode,
   extension,
 }: NodeViewProps) {
-  const { t } = editor.storage.postCanvasCore;
+  // From React context first, so a language change re-renders the block; the editor's storage outside a provider.
+  const t = useOptionalPostCanvasContext()?.t ?? editor.storage.postCanvasCore.t;
   const editable = useEditable(editor);
   const video = videoRender(node.attrs);
   const id = typeof node.attrs.id === 'string' ? node.attrs.id : '';

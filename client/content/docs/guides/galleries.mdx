@@ -81,11 +81,7 @@ Tab to a photo, then:
 
 A live region announces moves, layer changes and removals. Under `prefers-reduced-motion: reduce`, the editor turns off its animations and transitions.
 
-<Callout type="warn">
-  **Known gap: trackpad pinch.** A pinch on a laptop trackpad (which browsers report as Ctrl and mouse wheel) zooms the
-  whole page instead of the collage photo. Touch pinch and Safari gesture events work. On a trackpad, use the corner and
-  top handles or the keyboard.
-</Callout>
+A pinch on a laptop trackpad (which browsers report as Ctrl and mouse wheel) over a collage photo resizes that photo instead of zooming the page. Touch pinch and Safari gesture events work too.
 
 Each photo's position is stored as numbers between 0 and 1, relative to the background photo: `x` and `y` for the centre, `w` for the width and `r` for the rotation in degrees. A collage frame is never taller than 560 CSS pixels. It gets narrower instead.
 
@@ -103,15 +99,17 @@ A gallery has one caption for the whole block, below the photos. A single image 
 
 A single image block can sit in five places. Writers choose from the image's toolbar.
 
-| Value    | Where it sits                                                                  |
-| -------- | ------------------------------------------------------------------------------ |
-| `center` | In the text column. This is the default.                                       |
-| `wide`   | Reaches past the text column by the CSS variable `--pc-media-bleed-wide`.      |
-| `full`   | Reaches past the text column by `--pc-media-bleed-full`.                       |
-| `left`   | Floated left, up to half the column or 22rem, with text wrapping on the right. |
-| `right`  | Floated right, up to half the column or 22rem, with text wrapping on the left. |
+| Value    | Where it sits                                                                                                                       |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `center` | In the text column, at the picture's own size, up to 40rem or 85% of the column. This is the default.                               |
+| `wide`   | Fills the column. `--pc-media-bleed-wide` widens it past the column.                                                                |
+| `full`   | Fills the column and, in the editor, reaches into its side padding, with square corners. `--pc-media-bleed-full` widens it further. |
+| `left`   | Floated left, up to half the column or 22rem, with text wrapping on the right.                                                      |
+| `right`  | Floated right, up to half the column or 22rem, with text wrapping on the left.                                                      |
 
-`--pc-media-bleed-wide` is `0px` by default, so `wide` looks like `center` until you set it. Set both variables on your content wrapper if your page is wider than the text column. On a phone (480px and narrower), floated images take the full width.
+The three widths are visible with no setup. A `center` picture is not stretched: a small photo stays small, and a large one stops at the smaller of 40rem and 85% of the column. Set `--pc-media-center-width` on your content wrapper to change that cap. On a phone (480px and narrower), a centred picture may use the whole column, and floated images take the full width.
+
+`wide` fills the column. `--pc-media-bleed-wide` is `0px` by default. Set it, and `--pc-media-bleed-full`, on your content wrapper if your page has room beside the text column and you want those pictures to reach out further. In the editor, `full` already uses the editor's side padding (`--pc-media-bleed-full` is the padding there); in the read-only output it is `0px` until you set it.
 
 The value is stored as `align` on the `image` node. The read-only [renderer](/docs/guides/ssr-rendering) and `post-canvas/styles.css` draw all five.
 

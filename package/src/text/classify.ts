@@ -85,6 +85,23 @@ export const socialClassifier: Classifier = ({ json, stats, t }) => {
   };
 };
 
+/**
+ * The article classifier: everything is an article, so the title and cover always show, and a document with content
+ * needs a title. The `article` preset uses it.
+ */
+export const articleClassifier: Classifier = ({ stats, t }) => {
+  const empty = stats.textRuns === 0 && stats.mediaBlocks === 0;
+  return {
+    kind: empty ? null : 'article',
+    summary: empty
+      ? t('text.summary.empty')
+      : t('text.summary.article', { words: stats.words, minutes: stats.readMinutes }),
+    reason: null,
+    showFields: true,
+    requireTitle: !empty,
+  };
+};
+
 /** Classifies a document's JSON with the social rules. A shortcut for tests and servers. */
 export function classifySocial(json: JSONContent, t: Translator): Classification {
   return socialClassifier({ json, stats: getDocStats(json), t });

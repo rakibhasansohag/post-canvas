@@ -58,7 +58,12 @@ function App() {
       </header>
       <div className="pg-grid">
         <section className="pg-panel" aria-label="Editor">
-          <PostCanvas defaultContent={starter} adapters={fakeAdapters} theme={theme} onChange={({ json: next }) => setJson(next)} />
+          <PostCanvas
+            defaultContent={starter}
+            adapters={fakeAdapters}
+            theme={theme}
+            onChange={({ json: next }) => setJson(next)}
+          />
         </section>
         <section className="pg-panel" aria-label="Document JSON">
           <pre className="pg-json" data-testid="json">

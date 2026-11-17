@@ -42,3 +42,26 @@ export function translatorFor(locale: Locale = en): Translator {
   }
   return t;
 }
+
+const merged = new WeakMap<AnyExtension[], WeakMap<AnyExtension[], AnyExtension[]>>();
+
+/** `mergeExtensions(base, extra)`, built once per pair of arrays so the sanitizer's schema cache hits. */
+export function mergedFor(base: AnyExtension[], extra: AnyExtension[]): AnyExtension[] {
+  let byBase = merged.get(extra);
+  if (!byBase) {
+    byBase = new WeakMap();
+    merged.set(extra, byBase);
+  }
+  let result = byBase.get(base);
+  if (!result) {
+    result = mergeExtensions(base, extra);
+    byBase.set(base, result);
+  }
+  return result;
+}
+
+/** `base` with every extension in `extra` replacing the one with the same name, or added at the end. */
+export function mergeExtensions(base: AnyExtension[], extra: AnyExtension[]): AnyExtension[] {
+  const names = new Set(extra.map((extension) => extension.name));
+  return [...base.filter((extension) => !names.has(extension.name)), ...extra];
+}

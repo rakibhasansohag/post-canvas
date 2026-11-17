@@ -19,12 +19,12 @@ Each preset is a `PresetDefinition`:
 
 <TypeTable path="text/presets.ts" name="PresetDefinition" />
 
-| Preset    | Features                                                                                                                                                                                                                                                                                                        | Limits                | Classifier         |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------ |
-| `full`    | Everything on. The title and cover fields are off.                                                                                                                                                                                                                                                              | none                  | none               |
-| `article` | Everything, plus the `title` and `cover` fields.                                                                                                                                                                                                                                                                | none                  | none               |
-| `social`  | A post composer: bold, italic, links, lists, mentions, hashtags, photos, galleries, video, embeds and link cards. No headings, tables, code, task lists, underline, strike, colour or alignment, and no file blocks. The status bar shows the post kind. Title and cover show once the post becomes an article. | none                  | `socialClassifier` |
-| `comment` | Paragraphs, bold, italic, links and mentions. No lists, media, toolbar, slash menu, `+` button, block handle or status bar. The selection menu stays.                                                                                                                                                           | `maxCharacters: 2000` | none               |
+| Preset    | Features                                                                                                                                                                                                                                                                                                        | Limits                | Classifier          |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------- |
+| `full`    | Everything on. The title and cover fields are off.                                                                                                                                                                                                                                                              | none                  | none                |
+| `article` | Everything, plus the `title` and `cover` fields. A document with content needs a title. The status bar shows an "Article" badge.                                                                                                                                                                                | none                  | `articleClassifier` |
+| `social`  | A post composer: bold, italic, links, lists, mentions, hashtags, photos, galleries, video, embeds and link cards. No headings, tables, code, task lists, underline, strike, colour or alignment, and no file blocks. The status bar shows the post kind. Title and cover show once the post becomes an article. | none                  | `socialClassifier`  |
+| `comment` | Paragraphs, bold, italic, links and mentions. No lists, media, toolbar, slash menu, `+` button, block handle or status bar. The selection menu stays.                                                                                                                                                           | `maxCharacters: 2000` | none                |
 
 Without an upload adapter, `image`, `gallery` and `file` are off in every preset unless you set them in `features`.
 
@@ -127,7 +127,7 @@ if (blocking.length > 0) alert(blocking.map((problem) => problem.message).join('
 
 ## Post classification
 
-A classifier decides what kind of post a document is, and whether the title and cover fields apply. The `social` preset uses `socialClassifier`. Pass your own, or `null` to switch classification off, in the `classify` prop of `PostCanvas`.
+A classifier decides what kind of post a document is, and whether the title and cover fields apply. The `social` preset uses `socialClassifier` and the `article` preset uses `articleClassifier`. Pass your own, or `null` to switch classification off, in the `classify` prop of `PostCanvas`.
 
 <TypeTable path="text/classify.ts" name="Classification" />
 
@@ -141,16 +141,17 @@ type Classifier = (input: ClassifyInput) => Classification;
 type SocialKind = 'text' | 'photo' | 'video' | 'embed' | 'article';
 ```
 
-The social rule is simple. A post is at most one run of text plus at most one media block, up to 500 words. Anything more is an article, which needs a title and may have a cover.
+The social rule is simple. A post is at most one run of text plus at most one media block, up to 500 words. Anything more is an article, which needs a title and may have a cover. The article rule is simpler still: every document is an article, so the title and cover always show, and a document with content needs a title (the `title.missing` problem).
 
-| Export                        | What it does                                                                                                                              |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `socialClassifier`            | The social `Classifier`. Articles show and require the title field.                                                                       |
-| `classifySocial(json, t)`     | Classifies a document's JSON with the social rules. A shortcut for tests and servers.                                                     |
-| `socialKind(stats)`           | The `SocialKind` for a `DocStats`, or `null` when there is nothing to publish yet.                                                        |
-| `articleReason(stats, t)`     | Why the rules made this an article, already translated, or `null` when it is not one.                                                     |
-| `kindSummary(json, stats, t)` | The status bar badge, in the translator's language: "Text post", "Photo post · 3 photos · Masonry" or "Article · 612 words · 3 min read". |
-| `postMaxWords`                | 500. A post holds at most this many words. One more and it becomes an article.                                                            |
+| Export                        | What it does                                                                                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `socialClassifier`            | The social `Classifier`. Articles show and require the title field.                                                                                                                              |
+| `articleClassifier`           | The article `Classifier`: the title and cover always show, a document with content needs a title, and the badge reads "Article · N words · M min read". An empty document is not an article yet. |
+| `classifySocial(json, t)`     | Classifies a document's JSON with the social rules. A shortcut for tests and servers.                                                                                                            |
+| `socialKind(stats)`           | The `SocialKind` for a `DocStats`, or `null` when there is nothing to publish yet.                                                                                                               |
+| `articleReason(stats, t)`     | Why the rules made this an article, already translated, or `null` when it is not one.                                                                                                            |
+| `kindSummary(json, stats, t)` | The status bar badge, in the translator's language: "Text post", "Photo post · 3 photos · Masonry" or "Article · 612 words · 3 min read".                                                        |
+| `postMaxWords`                | 500. A post holds at most this many words. One more and it becomes an article.                                                                                                                   |
 
 ```ts
 import { classifySocial, createTranslator, en } from 'post-canvas';
@@ -168,7 +169,9 @@ Autosave saves drafts after typing rests. `PostCanvas` uses it when you pass `au
 function createAutosave(storage: DraftStorage, options?: AutosaveOptions): AutosaveController;
 ```
 
-`createAutosave` creates an autosave for one storage key. Saves are debounced, and a document with nothing worth keeping (no words, no media, no title, no cover) clears the stored draft instead.
+`createAutosave` creates an autosave for one storage key. Saves are debounced, and a document with nothing worth keeping (no words, no media, no title, no cover) clears the stored draft instead. The key defaults to `draft`: `localDraftStorage` stores it as `post-canvas:draft`, and a custom `DraftStorage` receives `draft` as it is.
+
+Errors from the storage, thrown or rejected, are caught and logged with `console.warn`. A failing `DraftStorage` only means the draft is not kept, and typing is never interrupted.
 
 `AutosaveOptions` are the settings. The `AutosaveController` that comes back saves, loads and clears drafts.
 
@@ -207,7 +210,7 @@ await autosave.clear(); // after the app has saved
 function hasPendingUploads(json: JSONContent | null | undefined): boolean;
 ```
 
-`hasPendingUploads` says whether a document still has uploads running, failed, or staged: a media node or gallery photo with an `uploadKey`, a `blob:` source that only exists in this browser, or a staged-upload marker source (`https://staged.post-canvas.invalid/<key>`). Do not save a document while it is `true`: `sanitizeDocument` would drop those pictures. `hasTransientContent(json)` from `post-canvas/render` covers editor-only state in general: an open link field, `blob:` sources and running uploads.
+`hasPendingUploads` says whether a document still has uploads running, failed, or staged: a media node or gallery photo with an `uploadKey`, a `blob:` source that only exists in this browser, or a staged-upload marker source (`https://staged.post-canvas.invalid/<key>`, a reserved domain that never loads anything). Do not save a document while it is `true`: `sanitizeDocument` would drop those pictures. `hasTransientContent(json)` covers editor-only state in general: an open link field, `blob:` sources, staged markers and running uploads. It is exported from `post-canvas`, `post-canvas/render` and `post-canvas/server`.
 
 ```ts
 const json = editor.getJSON();

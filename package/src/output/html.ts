@@ -4,7 +4,7 @@ import type { AnyExtension, JSONContent } from '@tiptap/core';
 import { renderToHTMLString } from '@tiptap/static-renderer/pm/html-string';
 import type { Features, Locale } from '../core/types';
 import type { EmbedRenderMode } from '../embeds/render-spec';
-import { renderExtensions } from './render-extensions';
+import { mergedFor, renderExtensions } from './render-extensions';
 import { sanitizeDocument, type DocumentLimits } from './sanitize';
 
 /** Options of `renderToHTML()`. */
@@ -18,8 +18,13 @@ export interface RenderHTMLOptions {
   sanitize?: boolean;
   /** How videos and embeds appear: `facade` (default, click to load), `iframe` or `link`. */
   embeds?: EmbedRenderMode;
-  /** Wrap the output in `<div class="pc-view"><div class="pc-content">`. Default `true`. */
+  /** Wrap the output in `<div class="pc-view" data-pc-theme="…"><div class="pc-content">`. Default `true`. */
   wrapper?: boolean;
+  /**
+   * The wrapper's `data-pc-theme`: light, dark, or the reader's system setting. Default `auto`, as in
+   * `PostCanvasView`. Without the wrapper, put `data-pc-theme` on your own element.
+   */
+  theme?: 'light' | 'dark' | 'auto';
   /** The language of the few strings the output contains, such as "Watch on YouTube". Default English. */
   locale?: Locale;
   /** Size caps for the sanitizer. */
@@ -32,11 +37,12 @@ export interface RenderHTMLOptions {
  * Renders a document to an HTML string, on the server or in the browser, with no DOM.
  *
  * **Run it on the server or when the post is saved**, and send readers the HTML. It needs Tiptap and ProseMirror, so
- * calling it in the browser adds about 150 KB gzipped to the page.
+ * calling it in the browser adds about 140 KB gzipped to the page.
  *
  * By default it sanitizes the document first, wraps the result in `.pc-view > .pc-content` (style it with
  * `post-canvas/styles.css`), and shows videos and embeds as click-to-load facades: call `activateEmbeds()` from
- * `post-canvas/vanilla` on the page to turn a click into the player, or use `embeds: 'iframe'`.
+ * `post-canvas/render` (or `post-canvas/vanilla`, or the CDN global) on the page to turn a click into the player, or
+ * use `embeds: 'iframe'`.
  *
  * @example
  * ```ts
@@ -45,35 +51,15 @@ export interface RenderHTMLOptions {
  * ```
  */
 export function renderToHTML(json: JSONContent, options: RenderHTMLOptions = {}): string {
-  const { features, sanitize = true, embeds = 'facade', wrapper = true, locale, limits } = options;
+  const { features, sanitize = true, embeds = 'facade', wrapper = true, theme = 'auto', locale, limits } = options;
   const base = renderExtensions(features, embeds, locale).extensions;
   const extensions = options.extensions?.length ? mergedFor(base, options.extensions) : base;
   const content = sanitize
     ? sanitizeDocument(json, { features, limits, ...(options.extensions?.length ? { extensions } : {}) }).doc
     : json;
   const html = renderToHTMLString({ content, extensions });
-  return wrapper ? `<div class="pc-view"><div class="pc-content">${html}</div></div>` : html;
-}
-
-const merged = new WeakMap<AnyExtension[], WeakMap<AnyExtension[], AnyExtension[]>>();
-
-/** `mergeExtensions(base, extra)`, built once per pair of arrays so the sanitizer's schema cache hits. */
-function mergedFor(base: AnyExtension[], extra: AnyExtension[]): AnyExtension[] {
-  let byBase = merged.get(extra);
-  if (!byBase) {
-    byBase = new WeakMap();
-    merged.set(extra, byBase);
-  }
-  let result = byBase.get(base);
-  if (!result) {
-    result = mergeExtensions(base, extra);
-    byBase.set(base, result);
-  }
-  return result;
-}
-
-/** `base` with every extension in `extra` replacing the one with the same name, or added at the end. */
-export function mergeExtensions(base: AnyExtension[], extra: AnyExtension[]): AnyExtension[] {
-  const names = new Set(extra.map((extension) => extension.name));
-  return [...base.filter((extension) => !names.has(extension.name)), ...extra];
+  const themeName = theme === 'light' || theme === 'dark' ? theme : 'auto';
+  return wrapper
+    ? `<div class="pc-view" data-pc-theme="${themeName}"><div class="pc-content">${html}</div></div>`
+    : html;
 }

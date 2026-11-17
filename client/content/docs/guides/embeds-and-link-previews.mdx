@@ -37,7 +37,7 @@ Embeds, from the `embed` feature:
 | Figma       | Files, designs, prototypes, boards, slides              | 16:10                 |
 | Google Maps | Places, searches and map positions on `google.com/maps` | 4:3                   |
 
-X, Instagram and CodePen players use a fixed height. A player from another site cannot tell your page how tall it wants to be, so the editor cannot resize it to fit.
+The Spotify, SoundCloud, X, Instagram and CodePen players use a fixed height. A player from another site cannot tell your page how tall it wants to be, so the editor cannot resize it to fit.
 
 Google Maps short links (`maps.app.goo.gl`) need a server lookup to find the real address, so they are not embedded. They become link cards, which the `links` adapter resolves.
 
@@ -63,7 +63,7 @@ Two optional adapters fill in details. Both are functions that take a URL and an
 The browser cannot read other sites' pages (browsers block it), so these lookups run on your server. `post-canvas/server` provides both:
 
 - `createEmbedResolver()` asks each provider's public oEmbed endpoint for the title and thumbnail. It only calls fixed endpoints built from validated ids, and it never passes on the provider's HTML.
-- `createLinkPreviewResolver()` fetches the page and reads its `og:` and `twitter:` tags, the title and the icons.
+- `createLinkPreviewResolver()` fetches the page and reads its `og:` and `twitter:` tags, the title and the icons. It keeps a preview image or icon only when it is an `https` address that does not name a private or local address.
 
 ### The route handler
 

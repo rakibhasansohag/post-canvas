@@ -52,7 +52,7 @@ Store the JSON in a JSON column (`jsonb` in Postgres) or as text. A title and co
 
 Check three things on the client, and one on the server.
 
-**1. No uploads in progress.** `hasPendingUploads(json)` is `true` while an upload is running, failed or staged. A staged upload is a pasted picture on its way in, marked with the source `https://staged.post-canvas.invalid/<key>`. Do not save a document while it is `true`: the pictures would be dropped. `hasTransientContent(json)` is wider. It also covers an open paste-a-link field and any `blob:` source, which exist only in the writer's browser.
+**1. No uploads in progress.** `hasPendingUploads(json)` is `true` while an upload is running, failed or staged. A staged upload is a pasted picture on its way in, marked with the source `https://staged.post-canvas.invalid/<key>`. Do not save a document while it is `true`: the pictures would be dropped. `hasTransientContent(json)` is wider. It also covers an open paste-a-link field, which exists only in the writer's browser. On the server, `sanitizeDocument` drops a staged picture and `validateDocument` refuses a document that holds one.
 
 **2. No problems.** `getProblems(editor)` returns what blocks publishing: a missing title in an article, words or photos over your limits, uploads still running, a link that is still loading. Each problem has a `code`, a translated `message` and a `severity` of `error` or `warning`.
 

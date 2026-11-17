@@ -16,7 +16,8 @@ import { uploadFiles } from '../upload/pipeline';
 import { GalleryPreview } from '../view/gallery-view';
 import { CaptionField } from './caption-field';
 import { GalleryManager, layoutIcons } from './gallery-manager';
-import { isFileDrag, runFrameKey, useEditable, useUploads } from './node-view-utils';
+import { isFileDrag, runFrameKey, useEditable } from '../../core/react/node-view';
+import { useUploads } from './node-view-utils';
 import { RadioMenu } from './radio-menu';
 import { uploadView } from './upload-status';
 

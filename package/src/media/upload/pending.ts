@@ -2,15 +2,14 @@ import type { JSONContent } from '../../core/types';
 
 const mediaTypes = new Set(['image', 'gallery', 'file']);
 
-/** The staged-upload marker source (see html.ts), which only exists while a paste is on its way in. */
-const stagedPrefix = 'https://staged.post-canvas.invalid/';
+import { isStagedSrc } from '../../core/url';
 
 function isPending(source: unknown): boolean {
   if (!source || typeof source !== 'object') return false;
   const { uploadKey, src } = source as { uploadKey?: unknown; src?: unknown };
   return (
     (typeof uploadKey === 'string' && uploadKey !== '') ||
-    (typeof src === 'string' && (/^\s*blob:/i.test(src) || src.startsWith(stagedPrefix)))
+    (typeof src === 'string' && (/^\s*blob:/i.test(src) || isStagedSrc(src)))
   );
 }
 

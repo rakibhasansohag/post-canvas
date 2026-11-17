@@ -8,6 +8,7 @@ import { cleanText, readHtmlMeta } from './html-meta';
 import {
   checkUrl,
   createPinnedLookup,
+  isBlockedAddress,
   LinkPreviewError,
   resolveHost,
   type LookupFunction,
@@ -123,11 +124,19 @@ function decodeBody(bytes: Uint8Array, contentType: string): string {
   return new TextDecoder('utf-8').decode(bytes);
 }
 
-/** Resolves a page-relative URL against the page and keeps it only when it's a safe http(s) image URL. */
+/**
+ * A preview image or icon the page names, made absolute. Readers' browsers load it, so it must be https and must not
+ * name a private or local address: a page can't point readers at their own network.
+ */
 function mediaUrl(value: string | undefined | null, base: URL): string | null {
   if (!value || value.length > 2048) return null;
   try {
-    return safeMediaSrc(new URL(value, base).href);
+    const url = new URL(value, base);
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== 'https:') return null;
+    if (host === 'localhost' || host.endsWith('.localhost')) return null;
+    if ((/^[\d.]+$/.test(host) || host.startsWith('[')) && isBlockedAddress(host)) return null;
+    return safeMediaSrc(url.href);
   } catch {
     return null;
   }
@@ -137,7 +146,10 @@ function bareHost(hostname: string): string {
   return hostname.toLowerCase().replace(/^www\./, '');
 }
 
-/** The page's own `og:url` when it stays on the same site, otherwise the URL that was fetched. */
+/**
+ * The page's own `og:url` when it names the same host (ignoring `www.`), otherwise the URL that was fetched. A parent
+ * or sibling domain is never taken: on shared hosts such as `user.github.io`, those belong to someone else.
+ */
 function previewUrl(ogUrl: string | undefined, final: URL): string {
   if (ogUrl && ogUrl.length <= 2048) {
     try {
@@ -145,8 +157,7 @@ function previewUrl(ogUrl: string | undefined, final: URL): string {
       const safe = safeHttpUrl(candidate.href);
       const a = bareHost(candidate.hostname);
       const b = bareHost(final.hostname);
-      const sameSite = a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
-      if (safe && sameSite && !candidate.username && !candidate.password) return safe;
+      if (safe && a === b && !candidate.username && !candidate.password) return safe;
     } catch {
       // Fall through to the fetched URL.
     }
@@ -188,7 +199,7 @@ function buildPreview(html: string, final: URL): LinkPreview {
     favicon = mediaUrl(icon, final);
     if (favicon) break;
   }
-  favicon ??= safeMediaSrc(`${final.origin}/favicon.ico`);
+  favicon ??= mediaUrl('/favicon.ico', final);
   if (favicon) preview.favicon = favicon;
   return preview;
 }

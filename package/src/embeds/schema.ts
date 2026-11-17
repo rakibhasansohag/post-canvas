@@ -4,6 +4,7 @@ import { Node, type AnyExtension } from '@tiptap/core';
 import { builtInEmbedProviderNames } from '../core/features';
 import { createTranslator } from '../core/i18n';
 import type { Features } from '../core/types';
+import { safeHttpUrl } from '../core/url';
 import '../core/extension-fields';
 import en from '../locales/en/index';
 import {
@@ -19,7 +20,7 @@ import {
   videoDescriptionMax,
 } from './attrs';
 import { matchEmbedUrl, parseVideoUrl } from './providers/index';
-import { isVideoThumbnail } from './providers/video';
+import { defaultVideoThumbnail, isVideoThumbnail } from './providers/video';
 import { embedSpec, linkCardSpec, videoSpec, type EmbedRenderOptions } from './render-spec';
 
 /** Options of the `video`, `embed` and `linkCard` nodes. */
@@ -42,6 +43,12 @@ const idAttribute = {
     typeof attrs.id === 'string' && attrs.id ? { 'data-id': attrs.id } : {},
 };
 
+/** The host a link card shows when it has no title or site name, as `linkCardRender` derives it. */
+function hostOf(url: unknown): string | null {
+  const safe = safeHttpUrl(url);
+  return safe ? new URL(safe).hostname.replace(/^www\./, '') : null;
+}
+
 function childText(element: HTMLElement, selector: string): string {
   return element.querySelector(selector)?.textContent ?? '';
 }
@@ -59,7 +66,8 @@ function sourceOf(element: HTMLElement): string | null {
 function sourceRules(own: string, read: (element: HTMLElement) => Record<string, unknown> | false) {
   const getAttrs = (node: string | HTMLElement) => (typeof node === 'string' ? false : read(node));
   return [
-    { tag: own, getAttrs },
+    // Above the image node's generic `figure` rule, which would otherwise take a facade's thumbnail for a picture.
+    { tag: own, getAttrs, priority: 60 },
     { tag: 'iframe[src]', getAttrs },
     { tag: 'oembed[url]', getAttrs },
     { tag: 'div[data-oembed-url]', getAttrs },
@@ -100,7 +108,8 @@ export const Video = Node.create<EmbedNodeOptions>({
         ...video,
         title: cleanLine(childText(element, '.pc-embed-title') || element.getAttribute('title'), titleMax),
         description: cleanText(childText(element, '.pc-embed-description'), videoDescriptionMax),
-        thumbnailUrl: isVideoThumbnail(video.provider, thumb) ? thumb : null,
+        // The output shows the provider's default thumbnail when none is set; reading that back keeps it unset.
+        thumbnailUrl: isVideoThumbnail(video.provider, thumb) && thumb !== defaultVideoThumbnail(video) ? thumb : null,
       };
     });
   },
@@ -187,15 +196,23 @@ export const LinkCard = Node.create<EmbedNodeOptions>({
     return [
       {
         tag: 'div[data-pc-link-card]',
-        getAttrs: (element: HTMLElement) =>
-          sanitizeLinkCardAttrs({
-            url: element.getAttribute('data-url') ?? element.querySelector('a')?.getAttribute('href'),
-            title: childText(element, '.pc-link-card-title'),
-            description: cleanText(childText(element, '.pc-link-card-description'), linkDescriptionMax),
-            image: element.querySelector('img.pc-link-card-image')?.getAttribute('src') ?? null,
-            siteName: cleanLine(element.querySelector('.pc-link-card-site')?.textContent, siteNameMax),
-            favicon: element.querySelector('img.pc-link-card-favicon')?.getAttribute('src') ?? null,
-          }) ?? false,
+        getAttrs: (element: HTMLElement) => {
+          const url = element.getAttribute('data-url') ?? element.querySelector('a')?.getAttribute('href');
+          // The output shows the host where the title or site name is empty; reading that back keeps them empty.
+          const host = hostOf(url);
+          const title = childText(element, '.pc-link-card-title');
+          const siteName = cleanLine(element.querySelector('.pc-link-card-site')?.textContent, siteNameMax);
+          return (
+            sanitizeLinkCardAttrs({
+              url,
+              title: title === host ? '' : title,
+              description: cleanText(childText(element, '.pc-link-card-description'), linkDescriptionMax),
+              image: element.querySelector('img.pc-link-card-image')?.getAttribute('src') ?? null,
+              siteName: siteName === host ? null : siteName,
+              favicon: element.querySelector('img.pc-link-card-favicon')?.getAttribute('src') ?? null,
+            }) ?? false
+          );
+        },
       },
     ];
   },

@@ -3,8 +3,9 @@
 // menu, code highlighting, paste cleanup, placeholder, character count, cursors, undo and redo, insert items, limits
 // and problems.
 import { Extension, type AnyExtension, type Editor } from '@tiptap/core';
+import Link, { type LinkOptions } from '@tiptap/extension-link';
 import { ListKeymap } from '@tiptap/extension-list';
-import type { MentionOptions } from '@tiptap/extension-mention';
+import Mention, { type MentionOptions } from '@tiptap/extension-mention';
 import { Table } from '@tiptap/extension-table';
 import { CharacterCount, Dropcursor, Gapcursor, Placeholder, TrailingNode, UndoRedo } from '@tiptap/extensions';
 import type { Node as PmNode } from '@tiptap/pm/model';
@@ -20,7 +21,7 @@ import { filterInsertItems, textInsertItems } from './insert-items';
 import { isInsertCapped, limitProblems, maxMentions, type Limits } from './limits';
 import { createMenuStore, type MenuStore, type SuggestionEntry, type SuggestionKind } from './menu-store';
 import { PasteCleanup } from './paste';
-import { PcLink, PcMention, textExtensions } from './schema';
+import { linkSpec, mentionHTML, mentionSpec, mentionText, textExtensions } from './schema';
 import { getDocStats } from './stats';
 import { safeHref, safeHttpUrl } from '../core/url';
 import '../core/extension-fields';
@@ -213,6 +214,27 @@ export const PostCanvasText = Extension.create<Record<string, never>, PostCanvas
   },
 });
 
+/** The editor's `link`: Tiptap's `Link` (commands, autolinking, paste) with the schema's attributes and output. */
+const EditorLink = Link.extend({
+  ...linkSpec,
+  addOptions() {
+    return {
+      ...(this.parent?.() as LinkOptions),
+      openOnClick: false,
+      enableClickSelection: false,
+      defaultProtocol: 'https',
+      HTMLAttributes: {},
+      isAllowedUri: (url: string) => safeHref(url) !== null,
+    };
+  },
+});
+
+/** The editor's `mention`: Tiptap's `Mention` (suggestions, Backspace) with the schema's attributes and output. */
+const EditorMention = Mention.extend({ ...mentionSpec }).configure({
+  renderText: ({ node }) => mentionText(node.attrs),
+  renderHTML: ({ options, node }) => mentionHTML(options.HTMLAttributes, node.attrs),
+});
+
 /** The editor text extensions for a feature set. */
 export function textKit(features: Features): AnyExtension[] {
   const suggestions = [
@@ -220,7 +242,7 @@ export function textKit(features: Features): AnyExtension[] {
     ...(features.hashtag ? [mentionSuggestion('hashtag')] : []),
   ];
   const list = textExtensions(features, {
-    link: PcLink.configure({
+    link: EditorLink.configure({
       autolink: true,
       linkOnPaste: true,
       shouldAutoLink: (url: string) => safeHttpUrl(url.includes('://') ? url : `https://${url}`) !== null,
@@ -228,7 +250,7 @@ export function textKit(features: Features): AnyExtension[] {
     }),
     table: Table.configure({ resizable: true, allowTableNodeSelection: true }),
     // The mention node's options are typed for its own attrs; the entries carry them and the command builds the node.
-    mention: PcMention.configure({ suggestions: suggestions as unknown as MentionOptions['suggestions'] }),
+    mention: EditorMention.configure({ suggestions: suggestions as unknown as MentionOptions['suggestions'] }),
   });
   if (features.bulletList || features.orderedList || features.taskList) list.push(ListKeymap);
   if (features.codeBlock) list.push(CodeHighlight);

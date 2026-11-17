@@ -38,7 +38,7 @@ export function renderPost(content: JSONContent): string {
 }
 ```
 
-The result looks like `<div class="pc-view"><div class="pc-content">...</div></div>`. By default `renderToHTML()` runs `sanitizeDocument()` first, so a document that was tampered with cannot put a script or an unsafe link on the page. Player and iframe URLs are never stored in the JSON. They are built at render time from the provider and a validated id.
+The result looks like `<div class="pc-view" data-pc-theme="auto"><div class="pc-content">...</div></div>`. By default `renderToHTML()` runs `sanitizeDocument()` first, so a document that was tampered with cannot put a script or an unsafe link on the page. Player and iframe URLs are never stored in the JSON. They are built at render time from the provider and a validated id.
 
 <TypeTable path="output/html.ts" name="RenderHTMLOptions" />
 
@@ -46,17 +46,18 @@ The result looks like `<div class="pc-view"><div class="pc-content">...</div></d
 
 ### Dark mode for HTML output
 
-The wrapper that `renderToHTML()` adds has no `data-pc-theme` attribute, so it renders with the light tokens. To follow the reader's system setting, turn the wrapper off and write your own:
+The wrapper that `renderToHTML()` adds carries `data-pc-theme="auto"`, so the output follows the reader's system setting with no extra code. Pass `theme` to fix it to one palette:
 
 ```ts title="server/render-post.ts"
 import { renderToHTML } from 'post-canvas/server';
 import type { JSONContent } from 'post-canvas';
 
 export function renderPost(content: JSONContent): string {
-  const body = renderToHTML(content, { wrapper: false });
-  return `<div class="pc-view" data-pc-theme="auto"><div class="pc-content">${body}</div></div>`;
+  return renderToHTML(content, { theme: 'dark' }); // or 'light'; the default is 'auto'
 }
 ```
+
+With `wrapper: false` there is no wrapper, so put `data-pc-theme` on your own element.
 
 ## Render with React Server Components
 
@@ -83,7 +84,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 
 <TypeTable path="output/react-view.tsx" name="PostCanvasViewProps" />
 
-Use `views` to replace how one node type is drawn. Custom nodes need their own entry in `renderToHTML()`'s `extensions` option instead: `PostCanvasView` has no `extensions` prop. See [Headless usage](/docs/guides/headless).
+Use `views` to replace how one node type is drawn. For your own nodes and marks, pass `extensions`, the same as `renderToHTML()`'s `extensions` option. They replace built-in ones with the same name, and the sanitizer uses them too. Pass a stable array (a module constant) so the schema is built once. See [Headless usage](/docs/guides/headless).
 
 ## Embed modes
 
@@ -97,7 +98,7 @@ The `embeds` option decides how videos and social embeds appear in the output.
 
 A facade keeps third-party players and scripts off the page until a click. It does not remove every request: YouTube and Vimeo thumbnails still load from the providers' image hosts.
 
-Embeds from X, Instagram and CodePen use a fixed iframe height, because a player on another origin cannot report its size to the page.
+Embeds from Spotify, SoundCloud, X, Instagram and CodePen use a fixed iframe height, because a player on another origin cannot report its size to the page.
 
 In the editor the same choice is the `embedConsent` prop: `click` (default) or `auto`. See [Embeds and link previews](/docs/guides/embeds-and-link-previews).
 
@@ -141,7 +142,7 @@ Details of `activateEmbeds(root)`:
 - It listens for clicks under `root` and replaces the facade with the player, rebuilt from the provider and the id.
 - Facades added under `root` later also work. A click with Ctrl, Cmd or Shift, or with a non-primary button, keeps its normal link behaviour.
 - It returns a function that stops listening.
-- Custom embed providers must be registered on the page with `registerEmbedProvider()`.
+- Custom embed providers must be registered on the page, before you call it, with `registerEmbedProvider()` (`PostCanvas.registerEmbedProvider` on the CDN global).
 - It is exported from `post-canvas/render`, `post-canvas/vanilla` and the CDN global.
 
 ## Hydration
@@ -216,4 +217,6 @@ export function importHtml(html: string) {
   </Tab>
 </Tabs>
 
-Create the window once and reuse it. Without `window` on a server, `fromHTML()` throws an error that says so. Scripts in the HTML never run: it is parsed into an inert document. For moving content from another editor, see [Migrating from TinyMCE or Froala](/docs/guides/migrating-from-tinymce-froala).
+Create the window once and reuse it. Without `window` on a server, `fromHTML()` throws an error that says so. Scripts in the HTML never run: it is parsed into an inert document. Both libraries fit the `window` option as they are, with no cast.
+
+`fromHTML()` refuses input over `maxLength` (1,000,000 characters by default) and input nested deeper than 512 elements. It throws a `RangeError` before it parses anything, so wrap the call in `try`/`catch` on a server. Pass `onRemoved` to see what the import left out. See the [`fromHTML` reference](/docs/reference/render#fromhtml) and, for moving content from another editor, [Migrating from TinyMCE or Froala](/docs/guides/migrating-from-tinymce-froala).

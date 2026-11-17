@@ -25,6 +25,8 @@ import {
 
 Load `post-canvas/styles.css` where you show the output. The output is wrapped in `.pc-view > .pc-content` and styled by that file.
 
+The entry also exports `resolveFeatures`, `defaultFeatures` and `builtInEmbedProviderNames`, so a server can build the same feature set as the editor without importing the client entry. And it exports the embed registry: `registerEmbedProvider`, `defineEmbedProvider`, `getEmbedProvider` and `listEmbedProviders`. See [Embed providers](/docs/reference/embed-providers).
+
 ## renderToHTML
 
 ```ts
@@ -37,7 +39,7 @@ function renderToHTML(json: JSONContent, options?: RenderHTMLOptions): string;
 
 **Returns.** The HTML string.
 
-By default it sanitizes the document first, wraps the result in `.pc-view > .pc-content`, and shows videos and embeds as click-to-load facades. Run it on the server, or when the post is saved, and send readers the HTML: it needs Tiptap and ProseMirror, so calling it in the browser adds them to the page.
+By default it sanitizes the document first, wraps the result in `<div class="pc-view" data-pc-theme="auto"><div class="pc-content">`, and shows videos and embeds as click-to-load facades. The `theme` option (`'light'`, `'dark'` or `'auto'`, default `'auto'`) sets the `data-pc-theme` value, so the HTML follows the reader's light or dark setting without extra code. With `wrapper: false` there is no wrapper, and you put `data-pc-theme` on your own element. Run it on the server, or when the post is saved, and send readers the HTML: it needs Tiptap and ProseMirror, so calling it in the browser adds them to the page.
 
 <TypeTable path="output/html.ts" name="RenderHTMLOptions" />
 
@@ -169,7 +171,7 @@ These are pure walks over the JSON. They need no schema and no DOM, so they work
 | `toPlainText(json)`         | The document as plain text: blocks separated by blank lines, list items and table rows by line breaks. Images give their caption or alt text, files their name, videos, embeds and link cards their title and URL. |
 | `excerpt(json, max?)`       | The first paragraph or heading with words in it, on one line, cut at a word boundary to `max` characters (default 160) with an ellipsis. An empty string when there is no text.                                    |
 | `getCover(json)`            | The document's cover picture as a `CoverImage`: the first image, or first photo of a gallery, that has a known size, or else the first video thumbnail. `null` when there is neither.                              |
-| `hasTransientContent(json)` | `true` when the document still holds editor-only state: an open paste-a-link field, an upload that is running or failed (`uploadKey`), or a `blob:` source. Check it before saving.                                |
+| `hasTransientContent(json)` | `true` when the document still holds editor-only state: an open paste-a-link field, an upload that is running or failed (`uploadKey`), a `blob:` source, or the staged-upload marker. Check it before saving.      |
 
 ```ts
 const description = excerpt(post.content, 140);
@@ -178,7 +180,7 @@ const text = toPlainText(post.content);
 if (hasTransientContent(post.content)) throw new Error('Wait for uploads to finish.');
 ```
 
-`getCover` skips a picture whose `width` or `height` is `0` (unknown), because a `CoverImage` needs a size. `hasTransientContent` is also exported from `post-canvas` and `post-canvas/server`. The check `hasPendingUploads(json)` from `post-canvas` also covers the staged-upload marker source.
+`getCover` skips a picture whose `width` or `height` is `0` (unknown), because a `CoverImage` needs a size. `hasTransientContent` is also exported from `post-canvas` and `post-canvas/server`. `hasPendingUploads(json)`, from `post-canvas` and `post-canvas/server`, covers the same upload states for media nodes.
 
 ## fromHTML
 
@@ -188,25 +190,54 @@ function fromHTML(html: string, options?: FromHTMLOptions): JSONContent;
 
 `fromHTML` reads HTML into a sanitized document. Scripts never run: the HTML is parsed into an inert document, read through the schema's parse rules, and then cleaned by `sanitizeDocument()`. HTML from editors such as TinyMCE and Froala keeps its headings, lists, tables, links and formatting, and their YouTube, Vimeo and other player iframes become `video` and `embed` nodes.
 
-In a browser it uses `DOMParser`. On a server there is no `DOMParser`, so pass `{ window }` from a DOM library such as happy-dom or linkedom. The library is yours to install.
+In a browser it uses `DOMParser`. On a server there is no `DOMParser`, so pass `{ window }` from a DOM library such as happy-dom or linkedom. The library is yours to install. `h5` and `h6` become `h4`, the deepest heading the schema has.
 
 <TypeTable path="output/from-html.ts" name="FromHTMLOptions" />
 
-`HTMLParserHost` is the shape of that `window`: anything with a `DOMParser` class.
+`HTMLParserHost` is the shape of that `window`: anything with a `DOMParser` class whose `parseFromString` returns a document. The document is typed as `unknown`, so happy-dom's `Window` fits as it is, with no cast.
 
 <TypeTable path="output/from-html.ts" name="HTMLParserHost" />
 
 ```ts title="scripts/import-legacy.ts"
-import { fromHTML, type HTMLParserHost } from 'post-canvas/render';
+import { fromHTML } from 'post-canvas/render';
 import { Window } from 'happy-dom';
 
-const window = new Window() as unknown as HTMLParserHost;
+const window = new Window();
 const doc = fromHTML('<h2>Trip notes</h2><p>We left at <strong>dawn</strong>.</p>', { window });
 ```
 
-happy-dom's own types differ from the DOM library's, so TypeScript rejects its `Window` as an `HTMLParserHost` without the cast. At run time it works.
-
 If neither the global `DOMParser` nor `window` exists, `fromHTML` throws an error that says so.
+
+### Size limits
+
+`fromHTML` checks the input before it parses anything. HTML longer than `maxLength` (1,000,000 characters by default), or nested deeper than 512 elements, throws a `RangeError`. On a server, wrap the call in `try`/`catch`:
+
+```ts
+import { fromHTML, type HTMLParserHost } from 'post-canvas/render';
+
+export function importHtml(html: string, window: HTMLParserHost) {
+  try {
+    return fromHTML(html, { window, maxLength: 2_000_000 });
+  } catch (error) {
+    if (error instanceof RangeError) return null; // too long or too deeply nested
+    throw error;
+  }
+}
+```
+
+### What was left out
+
+`onRemoved(removed, omitted)` receives everything the import left out, so you can log it or show a warning. `removed` lists elements removed before parsing (`script`, `style`, `template`, `noscript`, `object` and `embed`), pictures and frames the schema refused (a relative or `data:` image, a player from an unknown site), and whatever `sanitizeDocument()` removed afterwards. At most 100 items are listed, and `omitted` counts the rest. Formatting the schema has no place for, such as fonts, sizes and colours outside the palette, is dropped without a record.
+
+```ts
+const doc = fromHTML(html, {
+  window,
+  onRemoved: (removed, omitted) => {
+    for (const item of removed) console.warn(`${item.type} left out (${item.reason}) at ${item.path}`);
+    if (omitted > 0) console.warn(`${omitted} more not listed`);
+  },
+});
+```
 
 ## sanitizeDocument
 
@@ -218,7 +249,7 @@ function sanitizeDocument(json: unknown, options?: SanitizeOptions): SanitizeRes
 
 - removes unknown nodes and marks (keeping the text of unknown inline wrappers),
 - runs each extension's `postCanvasSanitize` (which checks URLs and rebuilds embeds from their ids),
-- removes transient editor state: the paste-a-link field, upload keys and `blob:` sources,
+- removes transient editor state: the paste-a-link field, upload keys, `blob:` sources and the staged-upload marker,
 - cuts the document at the size caps,
 - rebuilds the result through the ProseMirror schema and checks it.
 

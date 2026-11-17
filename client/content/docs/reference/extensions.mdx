@@ -17,12 +17,21 @@ Types that appear in the signatures below are on the [types page](/docs/referenc
 ### postCanvasKit
 
 ```ts
-function postCanvasKit(features?: Features, core?: Partial<Omit<PostCanvasCoreOptions, 'features'>>): AnyExtension[];
+function postCanvasKit(features?: Features, options?: PostCanvasKitOptions): AnyExtension[];
 ```
 
-`postCanvasKit` returns every editor extension for a feature set, in order: `PostCanvasCore`, unique ids, then the text, media and embed kits. `features` defaults to `defaultFeatures` (the `full` preset). `core` sets the translator `t`, the `adapters` and the `notify` function. Build `features` with `resolveFeatures(preset, overrides, { adapters })`.
+`postCanvasKit` returns every editor extension for a feature set, in order: `PostCanvasCore`, unique ids, then the text, media and embed kits. `features` defaults to `defaultFeatures` (the `full` preset). Build `features` with `resolveFeatures(preset, overrides, { adapters })`.
 
-It uses the default embed consent (`click`). To change it, call `setEmbedConsent(editor, 'auto')` after the editor exists, or assemble the kits yourself and pass `embedsKit(features, { embedConsent })`.
+`options` is a `PostCanvasKitOptions`, exported from `post-canvas/extensions`. It sets the translator `t`, the `adapters` and the `notify` function (the core extension's options), and `embedConsent` (`click` or `auto`). The default is `click`: players load only after a click.
+
+| Option         | What it is                                                                        |
+| -------------- | --------------------------------------------------------------------------------- |
+| `t`            | The translator. Default: English.                                                 |
+| `adapters`     | The `Adapters` object: upload, mentions, hashtags, embeds, links, storage.        |
+| `notify`       | Receives every notice, as `(message, kind?)`.                                     |
+| `embedConsent` | `click` (default, a facade until clicked) or `auto` (players load straight away). |
+
+To change the consent later, call `setEmbedConsent(editor, 'auto')` after the editor exists.
 
 The node views are React components, so render the editor with `EditorContent` from `@tiptap/react`.
 
@@ -344,7 +353,7 @@ const { doc } = sanitizeDocument(json, { extensions: [...postCanvasSchema(featur
 const html = renderToHTML(doc, { features, extensions: [CalloutSchema] });
 ```
 
-`PostCanvas` does not take an `extensions` prop. Use `usePostCanvasEditor` with `extensions` for a custom node. `extensions` are added after the kit, and changing them does not rebuild the editor.
+`PostCanvas` and `usePostCanvasEditor` both take an `extensions` prop. `extensions` are added after the kit, and changing them does not rebuild the editor, so pass a stable array. `PostCanvasView` takes an `extensions` prop too, and the sanitizer uses it. On the read side you pass only your own extensions to `PostCanvasView` and `renderToHTML()`, which merge them into the built-in ones.
 
 ## Other exports
 

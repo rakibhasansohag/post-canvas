@@ -3,6 +3,7 @@
 // registry, so markup from anywhere else on the page can't choose an iframe URL, `allow` list or sandbox.
 import { matchEmbedUrl, parseVideoUrl, videoFrame, withAutoplay } from '../embeds/providers/index';
 import type { EmbedFrame } from '../embeds/providers/types';
+import { checkedFrame } from '../embeds/render-spec';
 
 const ready = new WeakSet<EventTarget>();
 
@@ -12,17 +13,19 @@ function playerFor(figure: Element): { frame: EmbedFrame; autoplay: boolean } | 
   const provider = figure.getAttribute('data-provider');
   if (figure.hasAttribute('data-pc-video')) {
     const video = parseVideoUrl(url);
-    return video && video.provider === provider ? { frame: videoFrame(video), autoplay: true } : null;
+    const frame = video && video.provider === provider ? checkedFrame(videoFrame(video)) : null;
+    return frame ? { frame, autoplay: true } : null;
   }
   const match = provider ? matchEmbedUrl(url, [provider]) : null;
-  return match ? { frame: match.provider.frame(match.ref), autoplay: false } : null;
+  const frame = match ? checkedFrame(match.provider.frame(match.ref)) : null;
+  return frame ? { frame, autoplay: false } : null;
 }
 
 /**
  * Makes every video and embed facade under `root` load its player when clicked, instead of following the link to the
  * provider. Call it once after inserting `renderToHTML()` output; facades added later under the same root work too.
- * Custom providers must be registered with `registerEmbedProvider()` on the page. Returns a function that stops
- * listening.
+ * Custom providers must be registered with `registerEmbedProvider()` on the page (it's in `post-canvas/render`,
+ * `post-canvas/vanilla` and the CDN global). Returns a function that stops listening.
  *
  * @example
  * ```ts

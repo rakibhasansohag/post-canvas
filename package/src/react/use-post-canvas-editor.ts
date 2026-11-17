@@ -4,7 +4,14 @@
 // (read once per rebuild), and the editor's own storage is updated in place. The React Compiler rules below don't
 // model that, so they're off for this file.
 /* eslint-disable react-hooks/refs, react-hooks/preserve-manual-memoization, react-hooks/immutability */
-import { Extension, type AnyExtension, type Editor, type FocusPosition, type JSONContent } from '@tiptap/core';
+import {
+  Extension,
+  getSchema,
+  type AnyExtension,
+  type Editor,
+  type FocusPosition,
+  type JSONContent,
+} from '@tiptap/core';
 import { Markdown } from '@tiptap/markdown';
 import { useEditor } from '@tiptap/react';
 import { useEffect, useMemo, useRef } from 'react';
@@ -12,8 +19,10 @@ import { updatePostCanvasCore } from '../core/extension';
 import { resolveFeatures } from '../core/features';
 import { createTranslator } from '../core/i18n';
 import { postCanvasKit } from '../core/kit';
+import { postCanvasSchema } from '../core/schema';
 import type { Adapters, FeatureOverrides, Features, Locale, NotifyKind, PresetName, Translator } from '../core/types';
 import en from '../locales/en/index';
+import { sanitizeDocument } from '../output/sanitize';
 import type { Classifier } from '../text/classify';
 import type { Limits } from '../text/limits';
 import { presets } from '../text/presets';
@@ -41,7 +50,10 @@ export interface UsePostCanvasEditorOptions {
   onChange?: (change: PostCanvasChange, editor: Editor) => void;
   /** The starting feature set. Default `full`. */
   preset?: PresetName;
-  /** Changes to the preset's features. Changing them rebuilds the editor and keeps the content. */
+  /**
+   * Changes to the preset's features. Changing them rebuilds the editor and keeps the content; nodes and marks the new
+   * features don't have are cleaned out (their text stays).
+   */
   features?: FeatureOverrides;
   adapters?: Adapters;
   /** Default English. */
@@ -78,6 +90,21 @@ export interface PostCanvasEditorState {
 }
 
 const noAdapters: Adapters = {};
+
+/**
+ * The document a rebuilt editor starts from. When it still fits the new features' schema it's kept exactly, uploads in
+ * flight included. When it doesn't (the new features drop a node or mark it uses), Tiptap would refuse all of it and
+ * start empty, so it's cleaned for the new schema instead: unknown wrappers keep their text.
+ */
+function fitDocument(json: JSONContent, features: Features, extra: AnyExtension[] | undefined): JSONContent {
+  const extensions = [...postCanvasSchema(features), ...(extra ?? [])];
+  try {
+    getSchema(extensions).nodeFromJSON(json).check();
+    return json;
+  } catch {
+    return sanitizeDocument(json, { features, extensions }).doc;
+  }
+}
 
 /** Calls `onSubmit` on Enter while `submitOnEnter` is on and no suggestion list is open. */
 function submitExtension(latest: { current: UsePostCanvasEditorOptions }) {
@@ -138,7 +165,14 @@ export function usePostCanvasEditor(options: UsePostCanvasEditorOptions = {}): P
   const content = useRef<JSONContent | null>(null);
   const frame = useRef(0);
   const submit = useMemo(() => submitExtension(latest), []);
-  const markdown = typeof defaultContent === 'string' && contentFormat === 'markdown';
+  // The features each editor instance was built with. A features change returns the old instance for one more render
+  // before the rebuilt one arrives, and the UI must not offer the new features' commands against the old schema.
+  const builtWith = useRef(new WeakMap<Editor, Features>());
+  // Worked out once per feature set: a features change is the only time the editor is rebuilt from `content`.
+  const startContent = useMemo(
+    () => (content.current ? fitDocument(content.current, resolved, latest.current.extensions) : null),
+    [resolved],
+  );
 
   const editor = useEditor(
     {
@@ -149,11 +183,16 @@ export function usePostCanvasEditor(options: UsePostCanvasEditorOptions = {}): P
           notify: (message, kind) => (latest.current.notify ?? consoleNotify)(message, kind),
         }),
         submit,
-        ...(markdown ? [Markdown] : []),
+        // Always loaded, so `setContent(markdown, { contentType: 'markdown' })` parses Markdown on every editor.
+        Markdown,
         ...(latest.current.extensions ?? []),
       ],
-      content: content.current ?? defaultContent ?? '',
-      contentType: content.current ? 'json' : markdown ? 'markdown' : undefined,
+      content: startContent ?? defaultContent ?? '',
+      contentType: startContent
+        ? 'json'
+        : typeof defaultContent === 'string' && contentFormat === 'markdown'
+          ? 'markdown'
+          : undefined,
       editable: !readOnly,
       autofocus,
       immediatelyRender: false,
@@ -166,7 +205,15 @@ export function usePostCanvasEditor(options: UsePostCanvasEditorOptions = {}): P
           'aria-label': t('core.editor.label'),
         },
       },
+      onBeforeCreate: ({ editor: created }) => {
+        builtWith.current.set(created, resolved);
+      },
       onCreate: ({ editor: created }) => {
+        // A rebuild that had to clean the document reports the cleaned one, so the app's copy matches the editor.
+        if (startContent && content.current && startContent !== content.current) {
+          content.current = created.getJSON();
+          latest.current.onChange?.({ json: content.current, editor: created }, created);
+        }
         const storage = created.storage.postCanvasText;
         if (storage) {
           storage.limits = limits;
@@ -189,13 +236,15 @@ export function usePostCanvasEditor(options: UsePostCanvasEditorOptions = {}): P
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
+  const current = (editor && builtWith.current.get(editor)) ?? resolved;
+
   useEffect(() => {
     if (editor && editor.isEditable === readOnly) editor.setEditable(!readOnly);
   }, [editor, readOnly]);
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
-    updatePostCanvasCore(editor, { t, adapters, features: resolved });
+    updatePostCanvasCore(editor, { t, adapters, features: current });
     const storage = editor.storage.postCanvasText;
     if (storage) {
       storage.limits = limits;
@@ -205,9 +254,9 @@ export function usePostCanvasEditor(options: UsePostCanvasEditorOptions = {}): P
     editor.view.dom.setAttribute('aria-label', t('core.editor.label'));
     // A meta transaction, so the placeholder, problems and status bar pick up the new values.
     editor.view.dispatch(editor.state.tr.setMeta('postCanvasOptions', true).setMeta('addToHistory', false));
-  }, [editor, t, adapters, resolved, limits, classifier, placeholder]);
+  }, [editor, t, adapters, current, limits, classifier, placeholder]);
 
-  return { editor, features: resolved, t, adapters, limits, classifier };
+  return { editor, features: current, t, adapters, limits, classifier };
 }
 
 function consoleNotify(message: string, kind: NotifyKind = 'info'): void {

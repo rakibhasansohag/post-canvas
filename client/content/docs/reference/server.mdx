@@ -142,7 +142,7 @@ Pass the provider names your editor's `embed` feature allows in `providers`, so 
 function createLinkPreviewResolver(options?: LinkPreviewResolverOptions): LinkPreviewResolver;
 ```
 
-`createLinkPreviewResolver` returns the function you pass as `adapters.links`. It fetches the page with every SSRF check in place: http and https only, allowed ports only, no user names or passwords, every resolved address public, the connection pinned to an address that was checked, and every redirect checked again. It reads at most `maxBytes` of HTML and returns the title, description, image, site name and icon, with each URL checked.
+`createLinkPreviewResolver` returns the function you pass as `adapters.links`. It fetches the page with every SSRF check in place: http and https only, allowed ports only, no user names or passwords, every resolved address public, the connection pinned to an address that was checked, and every redirect checked again. It reads at most `maxBytes` of HTML and returns the title, description, image, site name and icon, with each URL checked. An image or icon is kept only when it is an `https` address that does not name a private or local address, and the page's `og:url` is used only when it names the same host as the page you fetched.
 
 **Parameters.** `options` is a `LinkPreviewResolverOptions` object.
 
@@ -243,6 +243,7 @@ type LookupFunction = (
 - `sanitizeDocument`, `defaultLimits` and the types `SanitizeOptions`, `SanitizeResult`, `SanitizeRemoval`, `SanitizeReason`, `DocumentLimits`
 - `renderToHTML` and `RenderHTMLOptions`
 - `fromHTML`, `FromHTMLOptions` and `HTMLParserHost`
-- `hasTransientContent`
+- `hasTransientContent` and `hasPendingUploads`
+- `resolveFeatures`, `defaultFeatures` and `builtInEmbedProviderNames`, so a server file can build the feature set of its editor from one import
 - `registerEmbedProvider`, `defineEmbedProvider` and the type `EmbedProvider`. Register custom providers on the server too, so `sanitizeDocument` and `createEmbedResolver` know them. See [Embed providers](/docs/reference/embed-providers).
 - the type `EmbedRenderMode`

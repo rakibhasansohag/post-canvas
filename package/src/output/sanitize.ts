@@ -7,7 +7,7 @@ import { defaultFeatures } from '../core/features';
 import { sanitizersFor } from '../core/registry';
 import { postCanvasSchema } from '../core/schema';
 import type { AttrsSanitizer, Features } from '../core/types';
-import { safeHref, safeMediaSrc } from '../core/url';
+import { hasDangerousScheme, isStagedSrc, safeHref, safeMediaSrc } from '../core/url';
 
 /** Size caps for a document. Anything over a cap is cut and reported. */
 export interface DocumentLimits {
@@ -112,9 +112,6 @@ const linkAttrs = new Set(['href', 'url', 'action', 'formaction', 'cite', 'xlink
 const sourceAttrs = new Set(['src', 'image', 'poster', 'favicon', 'thumbnailUrl', 'background', 'data', 'icon']);
 /** Attributes never kept from untrusted data on a node or mark without its own sanitizer. */
 const forbiddenAttrs = /^(?:on|style$|srcdoc$|srcset$|formaction$)/i;
-/** A string with no spaces that starts with a scheme, such as `javascript:alert(1)`. */
-// eslint-disable-next-line no-control-regex
-const schemeLike = /^[\s\u0000-\u001f]*[a-z][a-z0-9+.-]*:\S*$/i;
 
 type Plain = Record<string, unknown>;
 
@@ -205,13 +202,20 @@ function cleanAttrs(
     }
     const isLink = linkAttrs.has(name);
     const isSource = sourceAttrs.has(name);
-    if ((isLink || isSource) && typeof value === 'string' && /^\s*blob:/i.test(value)) {
+    if ((isLink || isSource) && typeof value === 'string' && (/^\s*blob:/i.test(value) || isStagedSrc(value))) {
       remove(walk, path, 'transient', type);
       return null;
     }
+    // Lists of sources, such as gallery photos: an item still uploading in the editor goes, the rest stay.
+    if (Array.isArray(value) && value.some((item) => isPlain(item) && isStagedSrc(item.src))) {
+      const kept = value.filter((item) => !(isPlain(item) && isStagedSrc(item.src)));
+      remove(walk, path, 'transient', type);
+      if (kept.length === 0) return null;
+      value = kept;
+    }
     if (isLink && value !== null) value = safeHref(value);
     else if (isSource && value !== null) value = safeMediaSrc(value);
-    else if (!sanitizer && typeof value === 'string' && schemeLike.test(value) && safeHref(value) === null) {
+    else if (!sanitizer && hasDangerousScheme(value)) {
       // A URL with a dangerous scheme in an attribute this sanitizer doesn't know: never keep it.
       value = null;
     }

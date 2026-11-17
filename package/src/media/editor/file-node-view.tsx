@@ -10,7 +10,8 @@ import { fileSpec } from '../html';
 import { openFilePicker } from '../upload/picker';
 import { uploadFiles } from '../upload/pipeline';
 import { specToReact } from '../view/spec-to-react';
-import { runFrameKey, useEditable, useUpload } from './node-view-utils';
+import { runFrameKey, useEditable } from '../../core/react/node-view';
+import { useUpload } from './node-view-utils';
 import { UploadStatus, uploadView } from './upload-status';
 
 /** The `file` block in the editor: its card, with tools to replace and remove it. Read-only, the card downloads it. */

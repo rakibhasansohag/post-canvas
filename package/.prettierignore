@@ -2,3 +2,6 @@ dist
 node_modules
 coverage
 package-lock.json
+
+# Verbatim clipboard captures: reformatting changes what a paste sees.
+playground/fixtures/

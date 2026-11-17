@@ -15,7 +15,9 @@ import { clampNumber, clampPlace, defaultMaxPhotos, maxDimension, maxPhotosCeili
 
 /** What a gallery may hold, from the features. */
 export interface GalleryLimits {
+  /** Most photos in one gallery. */
   maxPhotos: number;
+  /** The layouts a gallery may use. Another layout becomes the first one here. */
   layouts: readonly GalleryLayout[];
 }
 
@@ -126,9 +128,10 @@ export function cleanUploadId(value: unknown): string | null {
  * The shared picture fields. `null` when the source isn't an absolute http(s) URL: `javascript:`, `data:` and `blob:`
  * sources never survive. `uploadKey` is always cleared.
  *
- * One https source is transient but kept: the editor's staged-upload marker (`https://staged.post-canvas.invalid/…`,
+ * One https source is transient but kept here: the editor's staged-upload marker (`https://staged.post-canvas.invalid/…`,
  * a reserved domain that never loads anything). Pasted pictures travel as it through the editor's paste cleaning, which
- * runs these sanitizers. `hasPendingUploads` reports it, so a document holding one is never ready to save.
+ * runs these sanitizers. `hasPendingUploads` reports it, and `sanitizeDocument` (which runs these and then its own
+ * transient checks) removes it, so it never reaches a saved document.
  */
 export function sanitizeMediaSource(attrs: unknown): MediaSource | null {
   const raw = record(attrs);
@@ -170,8 +173,12 @@ export function normalizePlaces<T extends Pick<GalleryPhoto, 'place'>>(
 
 /** The limits from the features, held within the hard ceiling. */
 export function galleryLimitsFrom(gallery: false | { layouts: GalleryLayout[]; maxPhotos: number }): GalleryLimits {
-  if (!gallery) return defaultGalleryLimits;
-  const layouts = galleryLayouts.filter((layout) => gallery.layouts.includes(layout));
+  // Plain-JavaScript callers sometimes pass `true`: anything that isn't an object means the defaults.
+  if (!gallery || typeof gallery !== 'object') return defaultGalleryLimits;
+  const wanted: unknown = gallery.layouts;
+  const layouts = Array.isArray(wanted)
+    ? galleryLayouts.filter((layout) => wanted.includes(layout))
+    : [...galleryLayouts];
   return {
     maxPhotos: Math.round(clampNumber(gallery.maxPhotos, 1, maxPhotosCeiling, defaultMaxPhotos)),
     layouts: layouts.length > 0 ? layouts : ['carousel'],

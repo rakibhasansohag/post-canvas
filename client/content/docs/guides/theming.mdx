@@ -20,7 +20,7 @@ The `theme` prop takes `light`, `dark` or `auto`. The default is `auto`, which f
 <PostCanvas theme="dark" />
 ```
 
-`PostCanvasView` takes the same prop. The prop sets a `data-pc-theme` attribute on the root element (`.pc-root` for the editor, `.pc-view` for the read view), and the stylesheet reads that attribute. You can set it yourself when you write the wrapper by hand, for example around the output of `renderToHTML()`:
+`PostCanvasView` and `renderToHTML()` take the same option, and `auto` is their default too. The prop sets a `data-pc-theme` attribute on the root element (`.pc-root` for the editor, `.pc-view` for the read view), and the stylesheet reads that attribute. The wrapper that `renderToHTML()` adds already carries it. You only set it yourself when you write the wrapper by hand (`wrapper: false`):
 
 ```html
 <div class="pc-view" data-pc-theme="auto">

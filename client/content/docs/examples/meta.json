@@ -1,1 +1,4 @@
-{ "title": "Examples", "pages": ["social-composer", "article-editor", "comment-box", "vanilla-cdn"] }
+{
+  "title": "Examples",
+  "pages": ["index", "social-composer", "article-editor", "comment-box", "vanilla-cdn"]
+}

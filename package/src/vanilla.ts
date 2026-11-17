@@ -156,3 +156,4 @@ export const create = createPostCanvas;
 export { renderToHTML, type RenderHTMLOptions } from './output/html';
 export { activateEmbeds } from './output/activate-embeds';
 export { sanitizeDocument } from './output/sanitize';
+export { registerEmbedProvider, defineEmbedProvider, type EmbedProvider } from './embeds/providers/index';

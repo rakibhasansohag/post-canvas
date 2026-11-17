@@ -28,9 +28,17 @@
   outline: none;
 }
 
-/* How far wide and full pictures may reach past the text column. Apps with a wider page set these. */
+/*
+ * The three widths, visible with no setup: a centred picture keeps its own size up to 85% of the column (and 40rem),
+ * a wide one fills the column, and a full one also reaches into the editor's side padding, with square corners. Apps
+ * with room beside the column widen wide and full pictures with the two bleed variables.
+ */
 .pc-root .ProseMirror {
   --pc-media-bleed-full: var(--pc-space-4);
+}
+
+.pc-root[data-readonly] .ProseMirror {
+  --pc-media-bleed-full: 0px;
 }
 
 .pc-content > .pc-image--wide,
@@ -95,13 +103,21 @@
 .pc-image--center,
 .pc-node[data-pc-align='center'] .pc-frame--image {
   width: fit-content;
-  max-width: min(100%, var(--pc-media-center-width, 40rem));
+  max-width: min(100%, var(--pc-media-center-width, min(40rem, 85%)));
   margin-inline: auto;
 }
 
 .pc-image--center .pc-image__img {
   width: auto;
   max-width: 100%;
+}
+
+/* On a phone the column is narrow already: a centred picture may use all of it. */
+@media (max-width: 480px) {
+  .pc-image--center,
+  .pc-node[data-pc-align='center'] .pc-frame--image {
+    max-width: 100%;
+  }
 }
 
 .pc-image--full .pc-image__img {

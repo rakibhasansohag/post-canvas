@@ -418,7 +418,8 @@ export function sanitizeSlice(slice: Slice, sanitizers: Record<string, AttrsSani
       if (sanitize) attrs = sanitize({ ...node.attrs });
       // Only leaf nodes are dropped, so an open wrapper at the slice's edge is never lost.
       if (!attrs && node.isLeaf) return;
-      const merged = { ...node.attrs, ...known(attrs ?? {}, node.type.spec.attrs) };
+      // A wrapper its sanitizer refused keeps its content but none of its own attributes: the type's defaults instead.
+      const merged = attrs ? { ...node.attrs, ...known(attrs, node.type.spec.attrs) } : {};
       nodes.push(
         node.isText
           ? node.mark(cleanMarks(node.marks))

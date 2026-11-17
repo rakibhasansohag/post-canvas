@@ -151,6 +151,6 @@ If your server can render HTML (for example with `post-canvas/server` on Node), 
 - **Subresource Integrity.** A third-party CDN can be compromised. For production, add an `integrity` hash and `crossorigin="anonymous"` to the `link` and `script` tags (compute the hash from the pinned file), or host the two files yourself.
 - **Sanitize on your server.** The browser can send anything to your API. Run `sanitizeDocument` from `post-canvas/server` on the JSON before you store it. See [security](/docs/concepts/security).
 - **Fewer code languages.** To keep the single file smaller, the CDN bundle offers eight languages in code blocks: Bash, CSS, HTML, JavaScript, JSON, Python, SQL and TypeScript. The npm build has more and loads them on demand.
-- **The global is `PostCanvas`.** It holds `create`, `createPostCanvas`, `renderToHTML`, `activateEmbeds`, `sanitizeDocument` and `locales`. Do not name your own variable `PostCanvas`.
-- **Custom embed providers** need the npm build, because the registration functions are not part of the CDN global.
-- **Theme.** The editor has `theme`. The saved-post wrapper from `renderToHTML` has no theme attribute, so it follows the light palette unless you add `data-pc-theme="auto"` to the `.pc-view` element.
+- **The global is `PostCanvas`.** It holds `create`, `createPostCanvas`, `renderToHTML`, `activateEmbeds`, `sanitizeDocument`, `registerEmbedProvider`, `defineEmbedProvider` and `locales`. Do not name your own variable `PostCanvas`.
+- **Custom embed providers** work from the CDN too: call `PostCanvas.defineEmbedProvider(...)` and `PostCanvas.registerEmbedProvider(...)` before you create the editor or call `activateEmbeds`. See [Custom embed providers](/docs/guides/custom-embed-provider#from-a-cdn-page).
+- **Theme.** The editor has `theme`. The saved-post wrapper from `renderToHTML` carries `data-pc-theme="auto"` and follows the reader's system setting. Pass `{ theme: 'light' }` or `{ theme: 'dark' }` to fix it.

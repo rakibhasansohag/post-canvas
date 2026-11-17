@@ -281,7 +281,8 @@ function Overlay({
       },
       onDragEnd: end,
       onPinchStart: () => onSelect(),
-      // movement is [scale, turn] since the pinch began, for fingers, Safari's gesture events and trackpads alike.
+      // movement is [scale, turn] since the pinch began, for fingers and Safari's gesture events. A trackpad pinch in
+      // other browsers arrives as ctrl+wheel, handled below, because React's wheel listener can't stop the page zoom.
       onPinch: ({ movement: [scale, turn], memo }) => {
         const start = (memo as CollagePlace | undefined) ?? place;
         show({
@@ -293,8 +294,47 @@ function Overlay({
       },
       onPinchEnd: end,
     },
-    { drag: { filterTaps: true, pointer: { keys: false } } },
+    { drag: { filterTaps: true, pointer: { keys: false } }, pinch: { pinchOnWheel: false } },
   );
+
+  // Trackpad pinch (ctrl+wheel in Chrome, Edge and Firefox): resize the photo instead of zooming the page. The listener
+  // is native and not passive, so it can cancel the zoom; the step is committed once the wheel rests.
+  const layer = useRef<HTMLDivElement>(null);
+  const latest = useRef({ place, onSelect, show, end });
+  useEffect(() => {
+    latest.current = { place, onSelect, show, end };
+  });
+  useEffect(() => {
+    const element = layer.current;
+    if (!element) return;
+    let start: CollagePlace | null = null;
+    let scale = 1;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      const current = latest.current;
+      if (!start) {
+        current.onSelect();
+        start = current.place;
+        scale = 1;
+      }
+      // Kept inside the collage's size range, so pinching back responds at once after hitting a limit.
+      const w = Math.min(1, Math.max(collageMinWidth, start.w * scale * Math.exp(-event.deltaY * 0.01)));
+      scale = w / Math.max(start.w, 0.0001);
+      current.show({ ...start, w });
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        start = null;
+        latest.current.end();
+      }, 250);
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      element.removeEventListener('wheel', onWheel);
+      clearTimeout(timer);
+    };
+  }, []);
 
   /** The photo's centre on the page, for the handles. */
   const centre = () => {
@@ -339,6 +379,7 @@ function Overlay({
   return (
     <div
       {...bind()}
+      ref={layer}
       role="button"
       tabIndex={0}
       aria-pressed={selected}

@@ -37,16 +37,17 @@ function escapeLineStart(text: string): string {
   return text.replace(/^(\s*)([#>+-]|\d+[.)])(?=\s|$)/gm, (_, space: string, mark: string) => `${space}\\${mark}`);
 }
 
+/**
+ * A link destination with everything outside a URL-safe set percent-encoded. A backslash would otherwise escape the
+ * next character in Markdown (`javascript\:` reads as `javascript:`), and brackets, spaces and quotes would end it.
+ */
 function escapeUrl(url: string): string {
-  return url.replace(/[()<> ]/g, (ch) => encodeURIComponent(ch));
-}
-
-function escapeLinkText(text: string): string {
-  return text.replace(/([\\[\]])/g, '\\$1');
+  return url.replace(/[^A-Za-z0-9\-._~:/?#@!$&'*+,;=%]/g, (ch) => encodeURIComponent(ch));
 }
 
 function link(text: string, url: string): string {
-  return `[${escapeLinkText(text || url)}](${escapeUrl(url)})`;
+  // Link text is running text: `<` and `>` are escaped too, so a file name or title can't carry raw HTML.
+  return `[${escapeText(text || url)}](${escapeUrl(url)})`;
 }
 
 // The marks Markdown can show, outermost first. Code is innermost because nothing nests inside it.
@@ -131,7 +132,7 @@ function indent(text: string, by: string): string {
 
 function image(source: Attrs): string {
   const src = safeMediaSrc(source.src);
-  return src ? `![${escapeLinkText(str(source.alt))}](${escapeUrl(src)})` : '';
+  return src ? `![${escapeText(str(source.alt))}](${escapeUrl(src)})` : '';
 }
 
 function cellText(cell: JSONContent): string {
@@ -194,7 +195,9 @@ function block(node: JSONContent, tight: boolean): string {
       const code = kids(node)
         .map((child) => str(child.text))
         .join('');
-      const fence = /```/.test(code) ? '~~~~' : '```';
+      // One backtick longer than the longest run inside, so nothing in the code can close the fence (CommonMark).
+      const longest = Math.max(2, ...Array.from(code.matchAll(/`+/g), (run) => run[0].length));
+      const fence = '`'.repeat(longest + 1);
       const language = /^[a-z0-9+#-]{1,20}$/.test(str(attrs.language)) ? str(attrs.language) : '';
       return `${fence}${language}\n${code}\n${fence}`;
     }

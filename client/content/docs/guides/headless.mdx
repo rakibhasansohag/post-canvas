@@ -86,7 +86,7 @@ If you already run Tiptap and want to add Post Canvas to it, skip the hook and u
 
 | Export                                                      | What it is                                                                                          |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `postCanvasKit(features, core)`                             | Every editor extension for a feature set: core, unique ids, text, media and embeds, with node views |
+| `postCanvasKit(features, options)`                          | Every editor extension for a feature set: core, unique ids, text, media and embeds, with node views |
 | `postCanvasSchema(features)`                                | The same schema without node views, React or DOM: for servers, sanitizing and static rendering      |
 | `ImageNode`, `GalleryNode`, `FileNode`, `createGalleryNode` | The media nodes                                                                                     |
 | `Video`, `Embed`, `LinkCard`, `createEmbedNode`             | The embed nodes                                                                                     |
@@ -127,7 +127,7 @@ export function TiptapEditor() {
 }
 ```
 
-`resolveFeatures(preset, overrides, { adapters })` builds the full feature set. Pass the third argument to apply the rule that image, gallery and file are off without an upload adapter. `postCanvasKit(features, core)` takes the translator `t`, the `adapters` and `notify` in its second argument, and sets them in the core extension's storage.
+`resolveFeatures(preset, overrides, { adapters })` builds the full feature set. Pass the third argument to apply the rule that image, gallery and file are off without an upload adapter. `postCanvasKit(features, options)` takes the translator `t`, the `adapters`, `notify` and `embedConsent` in its second argument. The first three are set in the core extension's storage.
 
 On the server, build the schema from the same feature set so what you accept matches what the editor can make:
 
@@ -204,7 +204,18 @@ export function save(json: JSONContent) {
 }
 ```
 
-`renderToHTML()` merges the extensions you pass into its own, so pass only your own nodes there. `sanitizeDocument()` takes the complete list. `PostCanvasView` has no `extensions` prop, so a page that shows custom nodes should use `renderToHTML()`.
+`renderToHTML()` merges the extensions you pass into its own, so pass only your own nodes there. `sanitizeDocument()` takes the complete list. `PostCanvasView` takes the same `extensions` prop as `renderToHTML()`, so a React page can show custom nodes too. Pass a stable array (a module constant) so the schema is built once, and the sanitizer uses your extensions as well:
+
+```tsx title="app/posts/[slug]/page.tsx"
+import { PostCanvasView } from 'post-canvas/render';
+import { Callout } from '@/lib/callout';
+
+const extensions = [Callout]; // outside the component
+
+export default function Post({ content }: { content: JSONContent }) {
+  return <PostCanvasView content={content} extensions={extensions} />;
+}
+```
 
 ### Menu items and problems
 

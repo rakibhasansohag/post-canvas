@@ -113,10 +113,7 @@ export function ArticleEditor({ id, initialFields, initialContent }: Props) {
       setStatus('Wait for the uploads to finish.');
       return;
     }
-    if (!fields.title?.trim()) {
-      setStatus('Add a title first.');
-      return;
-    }
+    // The `article` preset reports a missing title as a problem, along with broken limits.
     const errors = getProblems(editor).filter((problem) => problem.severity === 'error');
     if (errors.length > 0) {
       setStatus(errors.map((problem) => problem.message).join(' '));
@@ -165,7 +162,7 @@ export function ArticleEditor({ id, initialFields, initialContent }: Props) {
 
 How the parts work:
 
-- **Title and cover.** The `article` preset turns both on. The title field holds up to 200 characters. The `article` preset shows the field but does not require it, so `save` checks the title itself. `getProblems()` still reports limit and upload problems. The cover picture goes through `adapters.upload`, so the cover field needs an upload adapter.
+- **Title and cover.** The `article` preset turns both on. The title field holds up to 200 characters. The `article` preset's classifier requires it: once the document has content, a missing title is a `title.missing` problem, so `getProblems()` reports it together with limit and upload problems. `save` only has to read the problems. The cover picture goes through `adapters.upload`, so the cover field needs an upload adapter.
 - **Controlled `fields`.** Passing `fields` makes the editor display exactly what you hold. Remember to update it in `onFieldsChange`, or the field will not change.
 - **Autosave.** `autosave` writes a draft to `localStorage` after the writer stops typing, under the key you give it, and brings it back on the next visit with a "restore" banner. Use one key per article. To store drafts elsewhere, set `adapters.storage`. See [Autosave](/docs/guides/autosave).
 - **`clearDraft()`** forgets the draft only. `clear()` would also empty the document and fields, which is what a "new article" button wants.

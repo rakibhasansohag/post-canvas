@@ -6,10 +6,15 @@ export const wordsPerMinute = 220;
 
 /** Media counts by kind. `image` and `gallery` count as `photo`, `linkCard` as `link`. */
 export interface MediaCounts {
+  /** Image and gallery blocks. */
   photo: number;
+  /** Video blocks. */
   video: number;
+  /** Embed blocks. */
   embed: number;
+  /** Link cards. */
   link: number;
+  /** File blocks. */
   file: number;
 }
 

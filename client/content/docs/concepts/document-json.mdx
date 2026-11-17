@@ -139,11 +139,11 @@ if (hasPendingUploads(json) || hasTransientContent(json)) {
 ```
 
 - `hasPendingUploads(json)` is `true` when an upload is running, failed or staged. It covers images, gallery photos and files, and counts `uploadKey` values, `blob:` sources and the staged marker. Do not save a document while it is `true`.
-- `hasTransientContent(json)` covers editor-only state: an open link field, a `blob:` source or an `uploadKey`. It does not report the staged marker.
+- `hasTransientContent(json)` covers editor-only state: an open link field, a `blob:` source, the staged marker or an `uploadKey`.
 
-`hasTransientContent` is also exported from `post-canvas/render` and `post-canvas/server`. `hasPendingUploads` is only in `post-canvas`, because it is for the editor side: call it before you send the document.
+`hasTransientContent` is also exported from `post-canvas/render` and `post-canvas/server`, and so is `hasPendingUploads`. Call them before you send the document, and again on the server if you want a check there.
 
-On the server, `sanitizeDocument` removes the upload keys, the link field and `blob:` pictures. It does not remove the staged marker, and neither does `validateDocument`: a picture with that address is a valid, harmless-looking image that never loads. The client check is what keeps it out of storage. If you want a server check as well, reject any `src` that starts with `https://staged.post-canvas.invalid/`.
+On the server, `sanitizeDocument` removes the upload keys, the link field, `blob:` pictures and pictures with the staged marker, and `validateDocument` refuses a document that holds any of them. The staged marker is never kept in a saved document. The client check still matters, because it tells the writer to wait instead of losing the picture.
 
 ## Where next
 

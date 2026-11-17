@@ -85,6 +85,11 @@ A media block takes focus when you click it. While it has focus:
 
 In the collage editor, each photo is a button. With a photo focused, the arrow keys move it (hold Shift for larger steps), `+` and `-` resize it, `[` and `]` rotate it (Shift for larger steps), PageUp and PageDown change its layer, Delete or Backspace removes it, and Escape deselects. Mod-Z and Mod-Shift-Z undo and redo inside the collage.
 
+## Paste
+
+- Mod-V pastes with formatting, cleaned by the paste rules. See [Migrating from TinyMCE or Froala](/docs/guides/migrating-from-tinymce-froala#paste-from-word-and-google-docs).
+- Mod-Shift-V pastes plain text. This also holds when the clipboard carries files next to the text, as an office app does when it puts a picture of the selection beside the copied text: the text is pasted and the files are ignored.
+
 ## Toolbar, menus and popovers
 
 - The toolbar is a single Tab stop. Once focus is in it, ArrowLeft and ArrowRight move between buttons, Home and End go to the first and last, and Tab leaves the toolbar. Buttons that do not fit move into a More panel with the same keys.
@@ -127,7 +132,6 @@ On touch devices (a coarse primary pointer) buttons and menu items grow to at le
 
 - **The `+` button** is for the mouse and for touch, and it is not in the tab order. Keyboard users insert with `/` or the toolbar's Insert button, and move, duplicate or delete blocks with the Alt-Shift shortcuts or the block handle's menu.
 - **Drag to reorder with a long press on touch** has not been tested on a real device. It is built on pointer events.
-- **Trackpad pinch (Ctrl and wheel) in the collage editor** zooms the page instead of the collage. Touch pinch and Safari's gesture events work.
 - **Right-to-left layout** is not supported yet.
 - **Spell check and grammar** are whatever the browser does for an editable area. There is no spell-check interface of our own.
 - **Screen reader testing.** The roles and live regions above are in the code. We have not published results from testing with specific screen readers, so test with the ones your readers use.

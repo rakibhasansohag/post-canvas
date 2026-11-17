@@ -33,9 +33,10 @@ Leave `sanitize` on. Turn it off only for a document that you sanitized when you
 
 ```tsx
 import { PostCanvasView } from 'post-canvas/render';
+import type { JSONContent } from 'post-canvas';
 import 'post-canvas/styles.css';
 
-export default function Post({ post }) {
+export default function Post({ post }: { post: { content: JSONContent } }) {
   return <PostCanvasView content={post.content} />;
 }
 ```
@@ -82,11 +83,11 @@ const stop = activateEmbeds(container);
 stop();
 ```
 
-`activateEmbeds` is also in `post-canvas/vanilla` and on the CDN global as `PostCanvas.activateEmbeds`. It builds the player address from the facade's stored link through the provider registry, so markup that came from somewhere else on the page cannot choose an iframe address. A custom provider must be registered on the page with `registerEmbedProvider()` for its facade to activate. A modifier key or a middle click still opens the provider's page in a new tab.
+`activateEmbeds` is also in `post-canvas/vanilla` and on the CDN global as `PostCanvas.activateEmbeds`. It builds the player address from the facade's stored link through the provider registry, so markup that came from somewhere else on the page cannot choose an iframe address. A custom provider must be registered on the page with `registerEmbedProvider()` (also in `post-canvas/vanilla` and on the CDN global) for its facade to activate. A modifier key or a middle click still opens the provider's page in a new tab.
 
 ### Sizes
 
-Most players keep an aspect ratio, so they scale with the column. Audio players (Spotify, SoundCloud) and X, Instagram and CodePen embeds use a fixed height, because a player from another site cannot tell your page how tall it is. Google Maps short links (`maps.app.goo.gl`) need a server lookup to find the place, so they become link cards.
+Most players keep an aspect ratio, so they scale with the column. Spotify, SoundCloud, X, Instagram and CodePen players use a fixed height, because a player from another site cannot tell your page how tall it is. Google Maps short links (`maps.app.goo.gl`) need a server lookup to find the place, so they become link cards.
 
 ### embedConsent in the editor
 
@@ -116,8 +117,8 @@ getCover(json); // The first image or gallery photo (or video thumbnail), or nul
 const doc = fromMarkdown('# Hello\n\nA **bold** idea.'); // sanitized JSON
 ```
 
-- **Markdown.** Galleries become a list of images. Videos, embeds and link cards become a link on their own line. Formatting that Markdown cannot hold, such as underline and colour, is left out. `fromMarkdown` sanitizes its result, and syntax for features that are off ends up as plain text.
-- **HTML in.** `fromHTML(html)` reads HTML from other editors (TinyMCE, Froala, Word, Google Docs) into a sanitized document. In a browser it uses `DOMParser`. On a server, pass a window from a DOM library: `fromHTML(html, { window: new (await import('happy-dom')).Window() })`.
+- **Markdown.** Galleries become a list of images. Videos, embeds and link cards become a link on their own line. Formatting that Markdown cannot hold, such as underline and colour, is left out. Link text and link addresses are escaped, and a code block gets a fence longer than any run of backticks inside it. `fromMarkdown` sanitizes its result, and syntax for features that are off ends up as plain text.
+- **HTML in.** `fromHTML(html)` reads HTML from other editors (TinyMCE, Froala, Word, Google Docs) into a sanitized document. In a browser it uses `DOMParser`. On a server, pass a window from a DOM library: `fromHTML(html, { window: new (await import('happy-dom')).Window() })`. It throws a `RangeError` for input over 1,000,000 characters or nested deeper than 512 elements, and `onRemoved` lists what it left out.
 - `getCover` skips pictures whose size is unknown (`width` or `height` of `0`).
 
 ## Styles
@@ -127,12 +128,13 @@ Two class names matter:
 - `.pc-view` is the root of a read-only view. It holds the design tokens (colours, fonts, spacing) as CSS variables.
 - `.pc-content` is the text column inside it, with the styling for paragraphs, lists, tables, galleries and embeds. The editor's text area has the same class, which is why a post looks the same in both.
 
-`PostCanvasView` takes `theme` (`light`, `dark` or `auto`) and sets `data-pc-theme` for you. The string from `renderToHTML` has no theme attribute, so it uses the light palette. To follow the reader's system setting, render with `wrapper: false` and wrap the output yourself:
+`PostCanvasView` and `renderToHTML` both take `theme` (`light`, `dark` or `auto`, default `auto`) and set `data-pc-theme` for you. The string from `renderToHTML` starts with `<div class="pc-view" data-pc-theme="auto"><div class="pc-content">`, so it follows the reader's system setting. Pass `theme: 'light'` or `'dark'` to fix the palette:
 
 ```ts
-const inner = renderToHTML(post.content, { wrapper: false });
-const html = `<div class="pc-view" data-pc-theme="auto"><div class="pc-content">${inner}</div></div>`;
+const html = renderToHTML(post.content, { theme: 'dark' });
 ```
+
+With `wrapper: false` there is no wrapper, so put `data-pc-theme` on your own element.
 
 You can override any `--pc-*` variable under `.pc-view` to match your brand. See [theming](/docs/guides/theming).
 

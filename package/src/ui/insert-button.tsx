@@ -102,8 +102,10 @@ export function InsertButton({ canvas }: { canvas: RefObject<HTMLDivElement | nu
     setMenu(null);
     if (!spot) return run();
     // Put the caret where the + stands, on a fresh line when that line has text.
-    const node = editor.state.doc.nodeAt(spot.pos);
-    if (!node) return run();
+    // The spot was found before the menu opened; the document may have changed since.
+    const inRange = spot.pos >= 0 && spot.pos < editor.state.doc.content.size;
+    const node = inRange ? editor.state.doc.nodeAt(spot.pos) : null;
+    if (!node || !node.isTextblock) return run();
     if (spot.empty) {
       editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, spot.pos + 1)));
     } else {

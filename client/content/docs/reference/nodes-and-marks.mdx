@@ -86,7 +86,7 @@ The `MediaSource` fields are `src`, `width`, `height`, `alt`, `srcset`, `placeho
 
 Rules for a picture (`image` and every gallery photo):
 
-- `src`: an absolute http or https URL. Without one the node (or photo) is dropped. `javascript:`, `data:` and `blob:` sources never survive. One https source is kept on purpose: the staged-upload marker `https://staged.post-canvas.invalid/<key>`, which the editor uses for a pasted picture on its way to upload. `hasPendingUploads(json)` reports it, so a document with one is not ready to save.
+- `src`: an absolute http or https URL. Without one the node (or photo) is dropped. `javascript:`, `data:` and `blob:` sources never survive. The staged-upload marker `https://staged.post-canvas.invalid/<key>`, which the editor uses for a pasted picture on its way to upload, is transient too: `sanitizeDocument` drops it, `validateDocument` refuses it, and `hasPendingUploads(json)` and `hasTransientContent(json)` report it, so a document with one is not ready to save.
 - `width`, `height`: whole pixels up to 100,000, or `0`. `0` means unknown. `renderHTML` leaves them out when they are `0`, and the editor measures the picture on load, outside the undo history.
 - `alt`: one line, up to 500 characters. Empty for decorative pictures.
 - `caption`: up to 1,000 characters, line breaks kept.

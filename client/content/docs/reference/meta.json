@@ -1,6 +1,7 @@
 {
   "title": "Reference",
   "pages": [
+    "index",
     "post-canvas",
     "hooks",
     "commands",

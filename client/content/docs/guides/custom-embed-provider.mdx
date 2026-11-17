@@ -29,7 +29,7 @@ import {
   defineEmbedProvider,
   registerEmbedProvider,
   resolveFeatures,
-} from 'post-canvas';
+} from 'post-canvas/render';
 
 const host = 'video.example.org';
 const videoId = /^[1-9A-HJ-NP-Za-km-z]{22}$/;
@@ -65,7 +65,8 @@ export const peertube = defineEmbedProvider({
   oembed: (ref) => `https://${host}/services/oembed?format=json&url=${encodeURIComponent(`https://${host}/w/${ref.id}`)}`,
 });
 
-// Register it, so the editor, the sanitizer and the renderers know it.
+// Register it, so the editor, the sanitizer and the renderers know it. `post-canvas/render` runs in the browser and
+// on the server, so this one module serves the editor page and your server routes.
 registerEmbedProvider(peertube);
 
 // The embed providers to allow: every built-in one, plus yours.
@@ -92,8 +93,9 @@ Writers can now paste a PeerTube link into an empty paragraph, or use the Embed 
 **The frame.**
 
 - `src` must be an absolute `https` URL. If it is not, the embed is not shown.
-- `sandbox` is the list of sandbox tokens for the iframe. Give the smallest set the player needs. Do not combine `allow-scripts` and `allow-same-origin` for a page on your own origin, because that lets the framed page remove its own sandbox. For another origin, as here, the combination is what most players need.
-- `allow` is the iframe's permission list (`fullscreen`, `autoplay` and so on). List only what the player uses.
+- `sandbox` is the list of sandbox tokens for the iframe. Give the smallest set the player needs. Post Canvas cuts the list to a short allowlist (`allow-scripts`, `allow-same-origin`, `allow-popups`, `allow-popups-to-escape-sandbox`, `allow-presentation`, `allow-forms`, `allow-modals`, `allow-orientation-lock` and `allow-pointer-lock`), so a token such as `allow-top-navigation` is dropped. Do not combine `allow-scripts` and `allow-same-origin` for a page on your own origin, because that lets the framed page remove its own sandbox. For another origin, as here, the combination is what most players need.
+- **The player must never live on your app's own origin.** Host it on the provider's own domain. A frame on your own origin with `allow-scripts allow-same-origin` could lift its own sandbox.
+- `allow` is the iframe's permission list, written as bare feature names (`fullscreen`, `autoplay` and so on). List only what the player uses. Only playback features are kept: `autoplay`, `clipboard-write`, `encrypted-media`, `fullscreen`, `picture-in-picture`, `web-share`, `accelerometer` and `gyroscope`. The camera, the microphone and the location are never granted, and origin lists are dropped.
 - Use `aspectRatio` for a player that scales (width divided by height, between 0.2 and 5), and `height` (in pixels, up to 2000) for one that has a fixed height. Set the other one to `null`. A ratio outside the range falls back to 16:9.
 - Every iframe also gets `referrerpolicy="strict-origin-when-cross-origin"`.
 
@@ -103,12 +105,12 @@ Writers can now paste a PeerTube link into an empty paragraph, or use the Embed 
 
 A provider is registered in memory, in each JavaScript runtime that uses it. Register it in every place that edits, sanitizes or renders documents, and let each place allow its name:
 
-| Place                    | Import `registerEmbedProvider` from | Also pass the provider name in                             |
-| ------------------------ | ----------------------------------- | ---------------------------------------------------------- |
-| The editor page          | `post-canvas`                       | `features.embed.providers`                                 |
-| The render page or route | `post-canvas/server`                | `features` of `renderToHTML()`                             |
-| The save route           | `post-canvas/server`                | `features` of `validateDocument()` or `sanitizeDocument()` |
-| The embed resolver route | `post-canvas/server`                | `providers` of `createEmbedResolver()`, if you set it      |
+| Place                    | Import `registerEmbedProvider` from                          | Also pass the provider name in                             |
+| ------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| The editor page          | `post-canvas`, `post-canvas/render` or `post-canvas/vanilla` | `features.embed.providers`                                 |
+| The render page or route | `post-canvas/server` or `post-canvas/render`                 | `features` of `renderToHTML()`                             |
+| The save route           | `post-canvas/server`                                         | `features` of `validateDocument()` or `sanitizeDocument()` |
+| The embed resolver route | `post-canvas/server`                                         | `providers` of `createEmbedResolver()`, if you set it      |
 
 A module that registers the provider and exports the list, like the one above, keeps this in one place. Import it in the editor and on the server:
 
@@ -149,13 +151,43 @@ export const renderPost = (content: JSONContent) => renderToHTML(content, { feat
 
 Without the provider's name in `features.embed.providers`, the sanitizer removes the embed, on the server and in the editor. If you use a preset other than `full`, pass the same preset to `resolveFeatures()` that you pass to `PostCanvas`, so both sides allow the same blocks.
 
-<Callout type="warn">
-  `resolveFeatures` and `builtInEmbedProviderNames` come from the main `post-canvas` entry. `post-canvas/server` does
-  not re-export them, so a server file that builds `features` imports the main entry too.
-</Callout>
+`resolveFeatures` and `builtInEmbedProviderNames` are exported from `post-canvas`, `post-canvas/server` and `post-canvas/render`, so a server file builds its `features` from the entry it already imports.
+
+## From a CDN page
+
+`post-canvas/vanilla` and the CDN global export `defineEmbedProvider` and `registerEmbedProvider`. Register the provider before you create the editor, and list the built-in names you want next to yours (the CDN global has no `builtInEmbedProviderNames`):
+
+```html
+<script>
+  const peertube = PostCanvas.defineEmbedProvider({
+    name: 'peertube',
+    label: 'PeerTube',
+    aspectRatio: 16 / 9,
+    match: (url) => {
+      const found = /^\/w\/([1-9A-HJ-NP-Za-km-z]{22})\/?$/.exec(url.pathname);
+      return url.hostname === 'video.example.org' && found ? { id: found[1] } : null;
+    },
+    frame: (ref) => ({
+      src: 'https://video.example.org/videos/embed/' + ref.id,
+      title: 'PeerTube video',
+      allow: 'fullscreen',
+      sandbox: 'allow-scripts allow-same-origin allow-presentation',
+      aspectRatio: 16 / 9,
+      height: null,
+    }),
+    canonicalUrl: (ref) => 'https://video.example.org/w/' + ref.id,
+  });
+  PostCanvas.registerEmbedProvider(peertube);
+
+  PostCanvas.create(document.getElementById('editor'), {
+    features: { embed: { providers: ['spotify', 'soundcloud', 'peertube'] } },
+  });
+</script>
+```
+
+On a page that only shows saved posts, register the provider before you call `PostCanvas.activateEmbeds(container)`, so its facades can become players.
 
 ## Limits
 
-- Custom providers need the npm package. The CDN build of `post-canvas/vanilla` does not expose `registerEmbedProvider()`.
 - A custom provider has no `thumbnail` in the facade unless you define `thumbnail(ref)`. It must return a URL built from the ref. That host then gets an image request from any page that shows the facade.
 - Providers that need a server lookup to find the real address, like Google Maps short links, cannot be matched, because `match()` has no network access. Those links become link cards.

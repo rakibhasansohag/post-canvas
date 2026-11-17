@@ -75,7 +75,7 @@ const html = canvas.getHTML(); // sanitized HTML, without the .pc-view wrapper
 canvas.destroy();
 ```
 
-`setContent(content, format)` reads a string as HTML. The `'markdown'` format works only when the editor was created with `contentFormat: 'markdown'` and a string `defaultContent`, because that is what loads Tiptap's Markdown extension. To load Markdown into any editor, convert it first with `fromMarkdown` from `post-canvas/render` and pass the JSON.
+`setContent(content, format)` reads a string as HTML, or as Markdown with `'markdown'`. The editor always loads Tiptap's Markdown extension, so Markdown works on any editor, whatever it started from.
 
 `update()` merges the changes into the current options and renders again. A change to `features` or `preset` rebuilds the editor and keeps its content. `getJSON()` returns an empty document with one paragraph before the editor has mounted. `getHTML()` returns an empty string before then.
 
@@ -110,7 +110,7 @@ With a bundler, import one language only (for example `post-canvas/locales/de`) 
 
 ## renderToHTML, activateEmbeds and sanitizeDocument
 
-`post-canvas/vanilla` re-exports three functions from [`post-canvas/render`](/docs/reference/render), so a page without React can show saved posts too. In the CDN build they are `PostCanvas.renderToHTML`, `PostCanvas.activateEmbeds` and `PostCanvas.sanitizeDocument`. `RenderHTMLOptions` is exported as a type.
+`post-canvas/vanilla` re-exports three functions from [`post-canvas/render`](/docs/reference/render), so a page without React can show saved posts too. In the CDN build they are `PostCanvas.renderToHTML`, `PostCanvas.activateEmbeds` and `PostCanvas.sanitizeDocument`. `RenderHTMLOptions` is exported as a type. `renderToHTML` takes the same options as on the server, including `theme`: its wrapper carries `data-pc-theme="auto"` unless you pass `'light'` or `'dark'`.
 
 - `renderToHTML(json, options?)` renders a document to sanitized HTML. It bundles Tiptap and ProseMirror, so on a public page prefer to render on your server (or when the post is saved) and send only the HTML.
 - `activateEmbeds(root?)` makes click-to-load players work after you insert that HTML. It returns a function that stops listening.
@@ -123,3 +123,11 @@ const stop = PostCanvas.activateEmbeds(document.getElementById('post'));
 ```
 
 Without `activateEmbeds`, a click on a video or embed facade follows its link to the provider.
+
+## registerEmbedProvider and defineEmbedProvider
+
+`post-canvas/vanilla` and the CDN global also export `registerEmbedProvider` and `defineEmbedProvider`, so a page without a bundler can add its own embed provider. Register it before you create the editor or call `activateEmbeds`, and list its name in `features.embed.providers`. See [Custom embed providers](/docs/guides/custom-embed-provider#from-a-cdn-page).
+
+```js
+PostCanvas.registerEmbedProvider(PostCanvas.defineEmbedProvider(myProvider));
+```

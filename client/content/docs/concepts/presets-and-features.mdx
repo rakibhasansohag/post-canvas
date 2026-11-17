@@ -14,7 +14,7 @@ The editor is one component with many switches. A **feature** is one switch, suc
 | Preset    | For                            | What it does                                                                                                                                                                                                                                                            |
 | --------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `full`    | A general editor (the default) | Every text feature, media, embeds and all the editor chrome. No title or cover field.                                                                                                                                                                                   |
-| `article` | Blog posts and articles        | Everything in `full`, plus the title and cover fields.                                                                                                                                                                                                                  |
+| `article` | Blog posts and articles        | Everything in `full`, plus the title and cover fields. A document with content needs a title. The status bar shows an "Article" badge with the word count and read time.                                                                                                |
 | `social`  | A post composer                | Bold, italic, links, lists, mentions, hashtags, photos, galleries, video, embeds and link cards. No headings, tables, code, quotes, colours or task lists. No file blocks. The status bar shows the post kind. Title and cover appear once the post becomes an article. |
 | `comment` | A comment box                  | Paragraphs, bold, italic, links and mentions. No toolbar, `+` button, `/` menu, block handle or status bar: only the selection menu stays. A limit of 2,000 characters.                                                                                                 |
 
@@ -40,10 +40,10 @@ Image, gallery and file blocks need somewhere to put files. If you do not pass `
 To keep one on without an adapter, set it explicitly:
 
 ```tsx
-<PostCanvas preset="article" features={{ image: true, gallery: true }} />
+<PostCanvas preset="article" features={{ image: true, file: true }} />
 ```
 
-An explicit `true` keeps the node in the schema, so a document that already holds images still opens and renders. The editor still cannot upload a new file without an adapter. See [adapters](/docs/concepts/adapters).
+An explicit `true` keeps the node in the schema, so a document that already holds images still opens and renders. The editor still cannot upload a new file without an adapter. `gallery` takes an options object instead of `true`, so write `gallery: { layouts: ['grid', 'carousel'], maxPhotos: 6 }` to keep it. See [adapters](/docs/concepts/adapters).
 
 ## Change features
 
@@ -85,8 +85,7 @@ features.image; // false
 Use it on your server so the sanitizer accepts exactly what the editor allows. A document from a `comment` editor should not be allowed to contain a gallery:
 
 ```ts
-import { sanitizeDocument } from 'post-canvas/server';
-import { resolveFeatures } from 'post-canvas';
+import { resolveFeatures, sanitizeDocument } from 'post-canvas/server';
 
 const features = resolveFeatures('comment');
 const { doc } = sanitizeDocument(body.content, { features });
@@ -94,7 +93,7 @@ const { doc } = sanitizeDocument(body.content, { features });
 
 Call it without the third argument on the server. The third argument, `{ adapters }`, applies the upload rule above, and your server has no upload adapter in that sense. `sanitizeDocument` and `renderToHTML` use every feature by default, which is the wider choice.
 
-The package also exports `defaultFeatures` (the `full` set), `builtInEmbedProviderNames`, and `presets` with each preset's changes, limits and classifier.
+The package also exports `defaultFeatures` (the `full` set) and `builtInEmbedProviderNames`. Like `resolveFeatures`, both come from `post-canvas`, `post-canvas/server` and `post-canvas/render`, so a server file needs no import from the client entry. `presets`, with each preset's changes, limits and classifier, is exported from `post-canvas`.
 
 ## Limits
 
@@ -108,7 +107,7 @@ Limits do not stop typing or cut text. A broken limit becomes a **problem** (an 
 
 ## Classify: post or article
 
-A classifier looks at the document and decides what kind of thing it is. The `social` preset has one. Its rule is:
+A classifier looks at the document and decides what kind of thing it is. The `social` and `article` presets each have one. The `social` rule is:
 
 - A **post** is at most one run of text plus at most one media block, and up to 500 words. It is a `text`, `photo`, `video` or `embed` post.
 - Anything more is an **article**: more than 500 words, more than one media block, or text on both sides of a media block.
@@ -139,7 +138,7 @@ A classifier receives `{ json, stats, t }` (the document, its statistics and the
 
 <TypeTable path="text/classify.ts" name="Classification" />
 
-The `article` preset has no classifier, so its title and cover are always visible and a missing title is not a problem. If you want articles to require a title, pass a classifier that sets `requireTitle`. To read the social rules in your own code, `classifySocial(json, t)`, `socialKind(stats)` and `getDocStats(json)` are exported from `post-canvas`.
+The `article` preset uses `articleClassifier`: everything is an article. The title and cover always show, a document with content needs a title (a missing one is a `title.missing` problem), and the status bar shows an "Article · N words · M min read" badge. An empty document needs nothing. Both classifiers are exported from `post-canvas` as `socialClassifier` and `articleClassifier`, so you can reuse or wrap them in your own `classify`. To read the social rules in your own code, `classifySocial(json, t)`, `socialKind(stats)` and `getDocStats(json)` are exported too.
 
 ## Next steps
 

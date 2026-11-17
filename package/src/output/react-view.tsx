@@ -1,13 +1,13 @@
 // The read-only React view of a document. No hooks and no "use client", so it renders in React Server Components; the
 // interactive parts (the video facades, the carousel) are client components inside the node views.
-import type { JSONContent } from '@tiptap/core';
+import type { AnyExtension, JSONContent } from '@tiptap/core';
 import { renderToReactElement } from '@tiptap/static-renderer/pm/react';
 import type { ReactNode } from 'react';
 import type { Features, Locale, ViewMap } from '../core/types';
 import type { EmbedRenderMode } from '../embeds/render-spec';
 import { embedViews } from '../embeds/view/index';
 import { mediaViews } from '../media/view/index';
-import { renderExtensions } from './render-extensions';
+import { mergedFor, renderExtensions } from './render-extensions';
 import { sanitizeDocument, type DocumentLimits } from './sanitize';
 
 /** Props of `PostCanvasView`. */
@@ -33,6 +33,11 @@ export interface PostCanvasViewProps {
   limits?: Partial<DocumentLimits>;
   /** Your own views by node type. They replace the built-in ones. */
   views?: ViewMap;
+  /**
+   * Extra schema extensions, for your own nodes and marks. They replace built-in ones with the same name, and the
+   * sanitizer uses them too. Pass the same array on every render (a module constant), so the schema is built once.
+   */
+  extensions?: AnyExtension[];
 }
 
 /**
@@ -41,7 +46,7 @@ export interface PostCanvasViewProps {
  *
  * **Render it on the server.** In a React Server Component the schema, the sanitizer and Tiptap stay on the server, and
  * the browser gets only the small client parts (the click-to-load player and the carousel): about 1.5 KB gzipped on
- * top of React. Rendered in the browser, it carries Tiptap and ProseMirror: about 150 KB gzipped. For pages without
+ * top of React. Rendered in the browser, it carries Tiptap and ProseMirror: about 145 KB gzipped. For pages without
  * React on the server, store the output of `renderToHTML()` when the post is saved instead.
  *
  * @example
@@ -63,9 +68,13 @@ export function PostCanvasView({
   sanitize = true,
   limits,
   views,
+  extensions: extra,
 }: PostCanvasViewProps): ReactNode {
-  const { extensions, t } = renderExtensions(features, embeds, locale);
-  const doc = sanitize ? sanitizeDocument(content, { features, limits }).doc : content;
+  const { extensions: base, t } = renderExtensions(features, embeds, locale);
+  const extensions = extra?.length ? mergedFor(base, extra) : base;
+  const doc = sanitize
+    ? sanitizeDocument(content, { features, limits, ...(extra?.length ? { extensions } : {}) }).doc
+    : content;
   const map: ViewMap = { ...mediaViews, ...(embeds === 'facade' ? embedViews : {}), ...views };
   const nodeMapping = Object.fromEntries(
     Object.entries(map).flatMap(([type, View]) =>
