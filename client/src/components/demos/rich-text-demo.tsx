@@ -24,7 +24,11 @@ const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:
 const paragraph = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
 const row = (type: 'tableHeader' | 'tableCell', cells: string[]) => ({
   type: 'tableRow',
-  content: cells.map((text) => ({ type, attrs: { colspan: 1, rowspan: 1, colwidth: null }, content: [paragraph(text)] })),
+  content: cells.map((text) => ({
+    type,
+    attrs: { colspan: 1, rowspan: 1, colwidth: null },
+    content: [paragraph(text)],
+  })),
 });
 const table = {
   type: 'table',
@@ -108,7 +112,7 @@ export function RichTextDemo() {
   const [last, setLast] = useState<string | null>(null);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
       <ul className="grid content-start gap-2.5 sm:grid-cols-2 lg:grid-cols-1" aria-label="Writing tools">
         {tools.map((tool) => (
           <li key={tool.title}>
@@ -137,7 +141,11 @@ export function RichTextDemo() {
           </li>
         ))}
       </ul>
-      <LazyStage minHeight={['27rem', '26rem']} className="site-stage self-start lg:sticky lg:top-20" fallback={<StageFallback />}>
+      <LazyStage
+        minHeight={['27rem', '26rem']}
+        className="site-stage self-start lg:sticky lg:top-20"
+        fallback={<StageFallback />}
+      >
         <PostCanvas ref={handle} defaultContent={content} preset="full" adapters={adapters} theme={theme} />
       </LazyStage>
     </div>

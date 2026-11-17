@@ -12,7 +12,13 @@ interface ButtonLinkProps {
 }
 
 /** A 48px button link with an icon tile. External links open in the same tab. */
-export function ButtonLink({ href, children, variant = 'primary', icon: Icon = ArrowRight, className }: ButtonLinkProps) {
+export function ButtonLink({
+  href,
+  children,
+  variant = 'primary',
+  icon: Icon = ArrowRight,
+  className,
+}: ButtonLinkProps) {
   const classes = cn('site-btn', variant === 'primary' ? 'site-btn-primary' : 'site-btn-secondary', className);
   const inner = (
     <>

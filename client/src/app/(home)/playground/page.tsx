@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PlaygroundPage() {
   return (
-    <main className="site-col flex-1 pt-10 sm:pt-14">
+    <div className="site-col flex-1 pt-10 sm:pt-14">
       <div className="mb-8 flex flex-col gap-3 md:mb-10">
         <p className="site-label">Playground</p>
         <h1 className="site-h2">Try every switch</h1>
@@ -20,6 +20,6 @@ export default function PlaygroundPage() {
         </p>
       </div>
       <PlaygroundEditor />
-    </main>
+    </div>
   );
 }

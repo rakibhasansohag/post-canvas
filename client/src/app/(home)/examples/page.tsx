@@ -27,7 +27,11 @@ const examples: {
     file: 'social-composer.tsx',
     title: 'A social composer',
     body: 'Write a post, add photos or paste a link, and post it to the feed below. The Post button waits for uploads to finish.',
-    points: ['preset="social"', 'hasPendingUploads before posting', 'sanitizeDocument, then PostCanvasView in the feed'],
+    points: [
+      'preset="social"',
+      'hasPendingUploads before posting',
+      'sanitizeDocument, then PostCanvasView in the feed',
+    ],
     minHeight: ['18rem', '17rem'],
     docs: { label: 'Saving and loading', href: '/docs/guides/saving-and-loading' },
   },
@@ -58,7 +62,7 @@ async function source(file: string) {
 export default async function ExamplesPage() {
   const sources = await Promise.all(examples.map((example) => source(example.file)));
   return (
-    <main className="site-sections flex-1">
+    <div className="site-sections flex-1">
       <section className="site-col pt-12 sm:pt-16 lg:pt-20" aria-labelledby="examples-title">
         <p className="site-label mb-4">Examples</p>
         <h1 id="examples-title" className="site-display max-w-[16ch]">
@@ -84,7 +88,7 @@ export default async function ExamplesPage() {
           aria-labelledby={`${example.name}-title`}
           className="site-col scroll-mt-20 pt-20 md:pt-28"
         >
-          <div className={index % 2 === 1 ? 'site-panel px-5 py-10 sm:px-10 md:py-14 lg:px-14' : ''}>
+          <div className={index % 2 === 1 ? 'site-panel site-bleed px-5 py-10 sm:px-10 md:py-14 lg:px-14' : ''}>
             <div className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-end" data-reveal>
               <div>
                 <p className="site-label mb-3" data-numbered="">
@@ -106,8 +110,8 @@ export default async function ExamplesPage() {
                 ))}
               </ul>
             </div>
-            <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
-              <div className="site-stage site-dots self-start p-3 sm:p-5">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+              <div className="site-stage site-dots p-3 sm:p-5">
                 <ExampleStage name={example.name} minHeight={example.minHeight} />
               </div>
               <div className="flex min-w-0 flex-col gap-3">
@@ -129,6 +133,6 @@ export default async function ExamplesPage() {
           </div>
         </section>
       ))}
-    </main>
+    </div>
   );
 }

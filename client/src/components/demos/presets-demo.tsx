@@ -213,7 +213,7 @@ export function PresetsDemo() {
         role="tabpanel"
         id={`${id}-panel`}
         aria-labelledby={`${id}-${active}`}
-        className="grid gap-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-10"
+        className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-10"
       >
         {presets.map((preset) => (
           <div key={preset.id} hidden={preset.id !== active} className="site-swap flex flex-col gap-3">

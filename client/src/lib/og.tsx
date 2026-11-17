@@ -27,10 +27,7 @@ function Mark({ size }: { size: number }) {
       <rect x="8" y="7.5" width="12" height="3" rx="1.5" fill="#0e1320" />
       <rect x="8" y="13.5" width="16" height="11" rx="2.5" fill="#0e1320" />
       <circle cx="20" cy="17" r="1.6" fill="#7aa2f7" />
-      <path
-        d="M8 22.2 12.6 18l3.4 3 2.4-1.9 5.6 4.2V22a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 8 22Z"
-        fill="#7aa2f7"
-      />
+      <path d="M8 22.2 12.6 18l3.4 3 2.4-1.9 5.6 4.2V22a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 8 22Z" fill="#7aa2f7" />
     </svg>
   );
 }
@@ -102,7 +99,13 @@ export async function renderOgImage({
               {mark && word.startsWith(mark) ? (
                 <>
                   <span
-                    style={{ background: '#fbf1c2', color: '#1c1d1f', borderRadius: 10, padding: '0 8px', margin: '0 -4px' }}
+                    style={{
+                      background: '#fbf1c2',
+                      color: '#1c1d1f',
+                      borderRadius: 10,
+                      padding: '0 8px',
+                      margin: '0 -4px',
+                    }}
                   >
                     {mark}
                   </span>

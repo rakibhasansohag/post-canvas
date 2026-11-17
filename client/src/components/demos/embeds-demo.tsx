@@ -15,7 +15,12 @@ const samples: { label: string; kind: string; url: string; icon: LucideIcon }[] 
   { label: 'X post', kind: 'Social', url: 'https://x.com/jack/status/20', icon: MessageSquareQuote },
   { label: 'SoundCloud', kind: 'Audio', url: 'https://soundcloud.com/forss/flickermood', icon: Music },
   { label: 'Google Maps', kind: 'Map', url: 'https://www.google.com/maps/place/Eden+Project', icon: MapPin },
-  { label: 'Any article', kind: 'Link card', url: 'https://tiptap.dev/docs/editor/getting-started/overview', icon: Newspaper },
+  {
+    label: 'Any article',
+    kind: 'Link card',
+    url: 'https://tiptap.dev/docs/editor/getting-started/overview',
+    icon: Newspaper,
+  },
 ];
 
 const features: FeatureOverrides = { statusBar: false, insertButton: false };
@@ -57,7 +62,7 @@ export function EmbedsDemo() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
       <div className="flex flex-col gap-6">
         <ul className="grid grid-cols-2 gap-2.5" aria-label="Sample links">
           {samples.map((sample) => (

@@ -44,7 +44,7 @@ export function FormatsDemo() {
 
   const panel = 'h-[22rem] md:h-[26rem]';
   return (
-    <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
       <LazyStage minHeight={['24rem', '28.5rem']} className="site-stage" fallback={<StageFallback />}>
         {start && (
           <PostCanvas
@@ -110,7 +110,7 @@ export function SanitizerDemo() {
   }, [deferred]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
       <div className="flex flex-col gap-3">
         <label htmlFor={inputId} className="flex items-center gap-2 font-semibold">
           <TriangleAlert size={18} className="text-site-danger" aria-hidden="true" />

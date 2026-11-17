@@ -37,7 +37,13 @@ const comparison: { feature: string; values: [string, string, string, string, st
   },
   {
     feature: 'Sanitizer for saved content on your server',
-    values: ['Yes, the same schema as the editor', 'Bring your own', 'Bring your own', 'Bring your own', 'Bring your own'],
+    values: [
+      'Yes, the same schema as the editor',
+      'Bring your own',
+      'Bring your own',
+      'Bring your own',
+      'Bring your own',
+    ],
   },
   {
     feature: 'Real-time collaboration',
@@ -168,14 +174,14 @@ const jsonLd = {
 const callouts = [
   { label: 'Toolbar', side: 'left', top: '4.6rem' },
   { label: 'Mentions and hashtags', side: 'right', top: '7.4rem' },
-  { label: 'Collage you arrange by hand', side: 'left', top: '17rem' },
+  { label: 'Collage you arrange by hand', side: 'left', top: '11.5rem' },
 ] as const;
 
 function Hero() {
   return (
     <section aria-labelledby="hero-title" className="site-col pt-3 sm:pt-4">
-      <div className="site-deep site-dots px-6 pt-12 pb-[13rem] sm:px-10 sm:pt-16 md:pb-[17rem] lg:px-14 lg:pt-20">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-end lg:gap-12">
+      <div className="site-deep site-dots site-bleed px-6 pt-12 pb-[13rem] sm:px-10 sm:pt-16 md:pb-[17rem] lg:px-14 lg:pt-20">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-end lg:gap-12">
           <div>
             <p className="site-label site-rise mb-6 [--i:0]">Open-source React editor</p>
             <h1 id="hero-title" className="site-display site-rise max-w-[13ch] [--i:1]">
@@ -224,7 +230,7 @@ function Hero() {
               Live
             </span>
           </div>
-          <div className="min-h-[24rem] sm:min-h-[32rem] lg:min-h-[38rem]">
+          <div className="min-h-[33rem] sm:min-h-[38rem] md:min-h-[41rem] lg:min-h-[51.5rem]">
             <HeroEditor />
           </div>
         </div>
@@ -265,7 +271,7 @@ function Hero() {
 
 export default function HomePage() {
   return (
-    <main className="site-sections flex-1">
+    <div className="site-sections flex-1">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
@@ -281,7 +287,7 @@ export default function HomePage() {
       </section>
 
       <section aria-labelledby="galleries" className="site-col pt-24 md:pt-32">
-        <div className="site-panel px-5 py-12 sm:px-10 md:py-16 lg:px-14">
+        <div className="site-panel site-bleed px-5 py-12 sm:px-10 md:py-16 lg:px-14">
           <SectionHead id="galleries" label="Galleries" numbered title="Four layouts for the same photos">
             Upload a few photos and choose how they sit. Alt text, captions, reordering and upload progress are built
             in, and the reader sees the same layout.
@@ -299,10 +305,10 @@ export default function HomePage() {
       </section>
 
       <section aria-labelledby="presets" className="site-col pt-24 md:pt-32">
-        <div className="site-deep site-dots px-5 py-12 sm:px-10 md:py-16 lg:px-14">
+        <div className="site-deep site-dots site-bleed px-5 py-12 sm:px-10 md:py-16 lg:px-14">
           <SectionHead id="presets" label="Presets" numbered title="One editor, shaped for the job">
-            A preset sets the features, limits and checks for a social post, an article or a comment box. Override
-            any of it with the features prop.
+            A preset sets the features, limits and checks for a social post, an article or a comment box. Override any
+            of it with the features prop.
           </SectionHead>
           <PresetsDemo />
         </div>
@@ -324,10 +330,10 @@ export default function HomePage() {
       </section>
 
       <section aria-labelledby="compare" className="site-col pt-24 md:pt-32">
-        <div className="site-panel px-5 py-12 sm:px-10 md:py-16 lg:px-14">
+        <div className="site-panel site-bleed px-5 py-12 sm:px-10 md:py-16 lg:px-14">
           <SectionHead id="compare" label="Compare" title="How it compares">
-            Post Canvas is young, and the table says where it is behind. The other columns summarise each
-            project&apos;s public documentation as of November 2026; check them before you decide.
+            Post Canvas is young, and the table says where it is behind. The other columns summarise each project&apos;s
+            public documentation as of November 2026; check them before you decide.
           </SectionHead>
           <div
             className="-mx-5 overflow-x-auto px-5 sm:-mx-10 sm:px-10 lg:mx-0 lg:px-0"
@@ -373,10 +379,10 @@ export default function HomePage() {
 
       <section aria-labelledby="start" className="site-col pt-24 md:pt-32">
         <SectionHead id="start" label="Quick start" title="Up and running in a few lines">
-          Install from npm, import the stylesheet and render the editor. Or add the CDN build to any page, with no
-          build step.
+          Install from npm, import the stylesheet and render the editor. Or add the CDN build to any page, with no build
+          step.
         </SectionHead>
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-10">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-10">
           <ol className="flex flex-col gap-6">
             {[
               ['Install', 'One package. React 18.2 or 19 is the only peer dependency.'],
@@ -410,7 +416,7 @@ export default function HomePage() {
       </section>
 
       <section aria-labelledby="faq" className="site-col pt-24 md:pt-32">
-        <div className="grid gap-8 border-t border-site-border pt-16 md:pt-20 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-10">
+        <div className="grid grid-cols-1 gap-8 border-t border-site-border pt-16 md:pt-20 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-10">
           <SectionHead id="faq" label="FAQ" title="Questions" className="lg:mb-0 lg:block">
             Something else?{' '}
             <a href={`${repoUrl}/issues`} className="text-site-accent underline-offset-4 hover:underline">
@@ -433,14 +439,14 @@ export default function HomePage() {
       </section>
 
       <section aria-labelledby="cta" className="site-col pt-24 md:pt-32">
-        <div className="site-cta flex flex-col gap-8 overflow-hidden px-6 py-12 sm:px-10 md:py-16 lg:flex-row lg:items-end lg:justify-between lg:px-14">
+        <div className="site-cta site-bleed flex flex-col gap-8 overflow-hidden px-6 py-12 sm:px-10 md:py-16 lg:flex-row lg:items-end lg:justify-between lg:px-14">
           <div className="max-w-[40rem]" data-reveal>
             <h2 id="cta" className="site-h2">
               Try it with your own content
             </h2>
             <p className="mt-4 text-[1.1rem] text-white/85">
-              Switch presets, languages and features in the playground, then read the docs when you are ready to wire
-              it up.
+              Switch presets, languages and features in the playground, then read the docs when you are ready to wire it
+              up.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -453,6 +459,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

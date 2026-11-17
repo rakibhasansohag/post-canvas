@@ -75,7 +75,9 @@ export function createSampleContent(
   if (options.closing !== false) {
     content.push(
       paragraph(
-        text('Drag a block by its handle to move it. Press / to insert an image, a video or a link card, or paste a link and the editor picks the right block. Read the '),
+        text(
+          'Drag a block by its handle to move it. Press / to insert an image, a video or a link card, or paste a link and the editor picks the right block. Read the ',
+        ),
         text('docs', link(`${basePath}/docs/`)),
         text('.'),
       ),
@@ -168,10 +170,16 @@ export function articleSample(origin: string) {
       type: 'doc',
       content: [
         paragraph(
-          text('The palm house opens at nine, and for the first hour it is almost empty. The air is warm and wet, and the only sound is the drip from the roof.'),
+          text(
+            'The palm house opens at nine, and for the first hour it is almost empty. The air is warm and wet, and the only sound is the drip from the roof.',
+          ),
         ),
         { type: 'heading', attrs: { level: 2, textAlign: null }, content: [text('What to see first')] },
-        paragraph(text('Start with the tree ferns by the north door, then climb the spiral stair to the gallery for the view over the canopy.')),
+        paragraph(
+          text(
+            'Start with the tree ferns by the north door, then climb the spiral stair to the gallery for the view over the canopy.',
+          ),
+        ),
       ],
     } satisfies JSONContent,
   };
@@ -193,7 +201,9 @@ export function socialSample(origin: string): JSONContent {
 
 /** A second paragraph for the social demo, which turns the post into an article. */
 export const socialSecondParagraph: JSONContent = paragraph(
-  text('We stayed until the tide turned, then walked back over the dunes for chips at the harbour. Next time: the long route over the headland, and a flask of tea.'),
+  text(
+    'We stayed until the tide turned, then walked back over the dunes for chips at the harbour. Next time: the long route over the headland, and a flask of tea.',
+  ),
 );
 
 /** The output demo: a short document with formatting, a link, a list and a photo. */
@@ -218,7 +228,10 @@ export function outputContent(origin: string): JSONContent {
           { type: 'listItem', content: [paragraph(text('A photo near the top'))] },
         ],
       },
-      { type: 'image', attrs: { ...photoSource(origin, 'desk', { lean: true }), caption: 'The desk by the window', align: 'center' } },
+      {
+        type: 'image',
+        attrs: { ...photoSource(origin, 'desk', { lean: true }), caption: 'The desk by the window', align: 'center' },
+      },
     ],
   };
 }
@@ -231,11 +244,18 @@ export const hostileSample = {
       type: 'paragraph',
       attrs: { style: 'position:fixed;inset:0' },
       content: [
-        { type: 'text', text: 'Claim your prize', marks: [{ type: 'link', attrs: { href: 'java\nscript:alert(document.cookie)' } }] },
+        {
+          type: 'text',
+          text: 'Claim your prize',
+          marks: [{ type: 'link', attrs: { href: 'java\nscript:alert(document.cookie)' } }],
+        },
         { type: 'text', text: ' <img src=x onerror=alert(1)>' },
       ],
     },
-    { type: 'image', attrs: { src: 'javascript:alert(1)', alt: 'A photo', width: 800, height: 600, onerror: 'alert(1)' } },
+    {
+      type: 'image',
+      attrs: { src: 'javascript:alert(1)', alt: 'A photo', width: 800, height: 600, onerror: 'alert(1)' },
+    },
     { type: 'iframe', attrs: { src: 'https://evil.example/login' } },
     {
       type: 'video',

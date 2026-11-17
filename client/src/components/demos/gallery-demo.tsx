@@ -66,8 +66,12 @@ export function GalleryDemo() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-8">
-      <div role="radiogroup" aria-label="Gallery layout" className="grid content-start gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-8">
+      <div
+        role="radiogroup"
+        aria-label="Gallery layout"
+        className="grid content-start gap-2.5 sm:grid-cols-2 lg:grid-cols-1"
+      >
         {layouts.map((item) => (
           <button
             key={item.id}

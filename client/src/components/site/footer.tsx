@@ -51,11 +51,11 @@ function FooterLink({ href, children }: { href: string; children: string }) {
 export function SiteFooter() {
   return (
     <footer className="site-col mt-auto pt-16 pb-4 sm:pb-6">
-      <div className="site-deep overflow-hidden px-6 pt-12 pb-6 sm:px-10 lg:px-14 lg:pt-16">
+      <div className="site-deep site-bleed overflow-hidden px-6 pt-12 pb-6 sm:px-10 lg:px-14 lg:pt-16">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="flex flex-col items-start gap-5">
             <Link href="/" className="inline-flex items-center gap-2.5" aria-label="Post Canvas home">
-              <LogoMark className="size-9 [--site-accent-text:#0e1320] [--site-accent:#7aa2f7]" />
+              <LogoMark className="size-9 [--site-accent-text:#0e1320] [--site-accent:#ffffff]" />
               <span className="font-display text-[1.45rem] font-bold tracking-[-0.02em]">Post Canvas</span>
             </Link>
             <p className="max-w-[26rem] text-site-deep-muted">
@@ -64,10 +64,10 @@ export function SiteFooter() {
             <InstallCommand className="w-full max-w-[22rem] text-white" />
           </div>
           <nav aria-label="Footer" className="grid grid-cols-2 gap-8 sm:grid-cols-3">
-            {columns.map((column) => (
-              <div key={column.title}>
+            {columns.map((column, index) => (
+              <div key={column.title} className={index === 2 ? 'col-span-2 sm:col-span-1' : undefined}>
                 <p className="mb-3 font-mono text-[0.75rem] tracking-[0.14em] text-white uppercase">{column.title}</p>
-                <ul>
+                <ul className={index === 2 ? 'columns-2 gap-8 sm:columns-1' : undefined}>
                   {column.links.map((link) => (
                     <li key={link.label}>
                       <FooterLink href={link.href}>{link.label}</FooterLink>

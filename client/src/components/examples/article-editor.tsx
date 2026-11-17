@@ -22,13 +22,7 @@ interface Article {
 }
 
 /** An article editor with a title and a cover. Publish shows the article as a reader would see it. */
-export function ArticleEditor({
-  theme = 'auto',
-  initial,
-}: {
-  theme?: PostCanvasTheme;
-  initial: Article;
-}) {
+export function ArticleEditor({ theme = 'auto', initial }: { theme?: PostCanvasTheme; initial: Article }) {
   const [fields, setFields] = useState<PostFields>(initial.fields);
   const [content, setContent] = useState<JSONContent>(initial.content);
   const [published, setPublished] = useState<Article | null>(null);

@@ -5,7 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 
 /** A copyable shell command, such as `npm install post-canvas`. */
-export function InstallCommand({ command = 'npm install post-canvas', className }: { command?: string; className?: string }) {
+export function InstallCommand({
+  command = 'npm install post-canvas',
+  className,
+}: {
+  command?: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);

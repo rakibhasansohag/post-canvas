@@ -66,14 +66,19 @@ function Segmented<T extends string>({
   return (
     <fieldset className="flex min-w-0 flex-col gap-2">
       <legend className="mb-2 font-mono text-[0.72rem] tracking-[0.14em] text-site-muted uppercase">{label}</legend>
-      <div className="site-seg w-full" role="radiogroup" aria-label={label}>
+      <div
+        className="site-seg grid w-full"
+        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+        role="radiogroup"
+        aria-label={label}
+      >
         {options.map((option) => (
           <button
             key={option}
             type="button"
             role="radio"
             aria-checked={value === option}
-            className="site-seg-btn flex-1 justify-center px-3"
+            className="site-seg-btn justify-center px-1.5"
             onClick={() => onChange(option)}
           >
             {names?.[option] ?? option}
@@ -145,7 +150,7 @@ export function PlaygroundEditor() {
                   role="switch"
                   aria-checked={on}
                   onClick={() => toggle(key)}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 font-mono text-[0.8rem] transition-colors duration-200 aria-checked:border-site-accent aria-checked:bg-site-accent-soft aria-checked:text-site-ink border-site-border text-site-muted hover:text-site-ink pointer-coarse:min-h-11"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-site-border px-3 font-mono text-[0.8rem] text-site-muted transition-colors duration-200 hover:text-site-ink aria-checked:border-site-accent aria-checked:bg-site-accent-soft aria-checked:text-site-ink pointer-coarse:min-h-11"
                 >
                   <span
                     aria-hidden="true"
@@ -164,8 +169,11 @@ export function PlaygroundEditor() {
   );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[19rem_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[21rem_minmax(0,1fr)]">
-      <aside aria-label="Editor options" className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pe-1">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[24rem_minmax(0,1fr)]">
+      <aside
+        aria-label="Editor options"
+        className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pe-1"
+      >
         <div className="flex flex-col gap-6 rounded-[22px] border border-site-border bg-site-surface p-4 sm:p-5">
           <Segmented
             label="Preset"
@@ -181,14 +189,14 @@ export function PlaygroundEditor() {
             <legend className="mb-2 font-mono text-[0.72rem] tracking-[0.14em] text-site-muted uppercase">
               Language
             </legend>
-            <div className="site-seg grid grid-cols-3" role="radiogroup" aria-label="Language">
+            <div className="site-seg grid grid-cols-6" role="radiogroup" aria-label="Language">
               {Object.keys(locales).map((code) => (
                 <button
                   key={code}
                   type="button"
                   role="radio"
                   aria-checked={localeCode === code}
-                  className="site-seg-btn justify-center px-2"
+                  className="site-seg-btn justify-center px-0"
                   onClick={() => setLocaleCode(code)}
                 >
                   <span aria-hidden="true" className="font-mono text-[0.78rem] uppercase">
@@ -254,7 +262,7 @@ export function PlaygroundEditor() {
       </aside>
 
       <div className="flex min-w-0 flex-col gap-6">
-        <div className="site-stage min-h-[22rem]">
+        <div className="site-stage site-fill">
           <PostCanvas
             ref={handle}
             defaultContent={mountContent}
