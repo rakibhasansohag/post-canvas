@@ -138,3 +138,13 @@ dist
 # Post Canvas: internal plan files and chat locks (this repo is public)
 docs/plan/
 .locks/
+
+# Post Canvas: build output, caches and local tool settings
+dist/
+*.tgz
+coverage/
+.next/
+.source/
+out/
+node_modules/.vite*
+.claude/settings.local.json

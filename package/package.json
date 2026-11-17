@@ -1,0 +1,144 @@
+{
+  "name": "post-canvas",
+  "version": "0.1.0",
+  "description": "A rich-text editor for posts and articles, built on Tiptap: formatting, tables and code, plus photo galleries (carousel, grid, masonry, collage), video and social embeds, link cards and drag-to-reorder blocks.",
+  "keywords": [
+    "editor",
+    "rich-text",
+    "wysiwyg",
+    "tiptap",
+    "prosemirror",
+    "react",
+    "gallery",
+    "collage",
+    "embed",
+    "blog",
+    "social"
+  ],
+  "author": "Saimul Islam",
+  "license": "MIT",
+  "homepage": "https://github.com/saimulft/post-canvas#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saimulft/post-canvas.git",
+    "directory": "package"
+  },
+  "bugs": {
+    "url": "https://github.com/saimulft/post-canvas/issues"
+  },
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./extensions": {
+      "types": "./dist/extensions.d.ts",
+      "import": "./dist/extensions.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "import": "./dist/render.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./vanilla": {
+      "types": "./dist/vanilla.d.ts",
+      "import": "./dist/vanilla.js"
+    },
+    "./locales/*": {
+      "types": "./dist/locales/*/index.d.ts",
+      "import": "./dist/locales/*/index.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "lint": "eslint . && npm run lint:names",
+    "lint:names": "ls-lint --config ../.ls-lint.yml --workdir ..",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "build": "tsdown && node scripts/build-css.js",
+    "playground": "vite"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0 || ^19.0.0",
+    "react-dom": "^18.2.0 || ^19.0.0"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@tiptap/core": "^3.34.0",
+    "@tiptap/extension-bubble-menu": "^3.34.0",
+    "@tiptap/extension-code-block": "^3.34.0",
+    "@tiptap/extension-code-block-lowlight": "^3.34.0",
+    "@tiptap/extension-collaboration": "^3.34.0",
+    "@tiptap/extension-drag-handle": "^3.34.0",
+    "@tiptap/extension-drag-handle-react": "^3.34.0",
+    "@tiptap/extension-file-handler": "^3.34.0",
+    "@tiptap/extension-floating-menu": "^3.34.0",
+    "@tiptap/extension-highlight": "^3.34.0",
+    "@tiptap/extension-list": "^3.34.0",
+    "@tiptap/extension-mention": "^3.34.0",
+    "@tiptap/extension-node-range": "^3.34.0",
+    "@tiptap/extension-subscript": "^3.34.0",
+    "@tiptap/extension-superscript": "^3.34.0",
+    "@tiptap/extension-table": "^3.34.0",
+    "@tiptap/extension-text-align": "^3.34.0",
+    "@tiptap/extension-text-style": "^3.34.0",
+    "@tiptap/extension-unique-id": "^3.34.0",
+    "@tiptap/extensions": "^3.34.0",
+    "@tiptap/html": "^3.34.0",
+    "@tiptap/markdown": "^3.34.0",
+    "@tiptap/pm": "^3.34.0",
+    "@tiptap/react": "^3.34.0",
+    "@tiptap/starter-kit": "^3.34.0",
+    "@tiptap/static-renderer": "^3.34.0",
+    "@tiptap/suggestion": "^3.34.0",
+    "@tiptap/y-tiptap": "^3.3.0",
+    "@use-gesture/react": "^10.3.1",
+    "highlight.js": "^11.12.0",
+    "lowlight": "^3.3.0",
+    "lucide-react": "^1.74.0",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.33"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@ls-lint/ls-lint": "^2.3.2",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "happy-dom": "^21.0.4",
+    "lightningcss": "^1.33.0",
+    "prettier": "^3.10.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsdown": "^0.23.7",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

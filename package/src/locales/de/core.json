@@ -1,0 +1,11 @@
+{
+  "core.editor.label": "Beitragseditor",
+  "core.editor.placeholder": "Schreib etwas …",
+  "core.frame.handle": "Verschieben oder entfernen: {label}",
+  "core.frame.menu": "Aktionen: {label}",
+  "core.frame.tools": "Werkzeuge: {label}",
+  "core.frame.moveUp": "Nach oben",
+  "core.frame.moveDown": "Nach unten",
+  "core.frame.remove": "Entfernen",
+  "core.popover.close": "Schließen"
+}

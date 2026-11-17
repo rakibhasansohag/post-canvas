@@ -1,0 +1,11 @@
+{
+  "core.editor.label": "Editor de publicaciones",
+  "core.editor.placeholder": "Escribe algo…",
+  "core.frame.handle": "Mover o quitar: {label}",
+  "core.frame.menu": "Acciones: {label}",
+  "core.frame.tools": "Herramientas: {label}",
+  "core.frame.moveUp": "Subir",
+  "core.frame.moveDown": "Bajar",
+  "core.frame.remove": "Quitar",
+  "core.popover.close": "Cerrar"
+}

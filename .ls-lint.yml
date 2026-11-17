@@ -1,0 +1,21 @@
+# File and folder names: lowercase kebab-case.
+# Exceptions: Next.js dynamic routes ([slug], [...path], [[...slug]]) and route groups ((home)), route folders named
+# after the file they serve (feed.xml, llms.txt), the .well-known folder and upper-case docs (README.md, LICENSE).
+ls:
+  .dir: kebab-case | regex:\[(\.\.\.)?[a-z]+\] | regex:\[\[\.\.\.[a-z]+\]\] | regex:\([a-z-]+\) | regex:[a-z0-9-]+\.(txt|xml) | regex:\.well-known
+  .*: kebab-case
+  .md: kebab-case | screamingsnakecase
+  .mdx: kebab-case
+
+ignore:
+  - .git
+  - .claude
+  - .github
+  - .locks
+  - docs/plan
+  - package/node_modules
+  - package/dist
+  - client/node_modules
+  - client/.next
+  - client/.source
+  - client/out

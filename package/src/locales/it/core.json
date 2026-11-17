@@ -1,0 +1,11 @@
+{
+  "core.editor.label": "Editor del post",
+  "core.editor.placeholder": "Scrivi qualcosa…",
+  "core.frame.handle": "Sposta o rimuovi: {label}",
+  "core.frame.menu": "Azioni: {label}",
+  "core.frame.tools": "Strumenti: {label}",
+  "core.frame.moveUp": "Sposta su",
+  "core.frame.moveDown": "Sposta giù",
+  "core.frame.remove": "Rimuovi",
+  "core.popover.close": "Chiudi"
+}

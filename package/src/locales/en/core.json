@@ -1,0 +1,11 @@
+{
+  "core.editor.label": "Post editor",
+  "core.editor.placeholder": "Write something…",
+  "core.frame.handle": "Move or remove: {label}",
+  "core.frame.menu": "Actions: {label}",
+  "core.frame.tools": "Tools: {label}",
+  "core.frame.moveUp": "Move up",
+  "core.frame.moveDown": "Move down",
+  "core.frame.remove": "Remove",
+  "core.popover.close": "Close"
+}
