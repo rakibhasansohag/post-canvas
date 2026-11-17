@@ -259,7 +259,7 @@ export interface UploadContext {
   /** Aborted when the user cancels or removes the block. */
   signal: AbortSignal;
   /** Report progress from 0 to 1. */
-  onProgress(fraction: number): void;
+  onProgress: (fraction: number) => void;
 }
 
 /** Uploads files to the app's storage. Without one, image, gallery and file are off unless set explicitly. */

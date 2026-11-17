@@ -1,0 +1,78 @@
+/* Playground page chrome only. Not part of the package. */
+:root {
+  color-scheme: light dark;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: Canvas;
+  color: CanvasText;
+}
+
+.pg-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.pg-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+
+.pg-bar h1 {
+  margin: 0 auto 0 0;
+  font-size: 1.125rem;
+}
+
+.pg-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pg-links a {
+  color: inherit;
+}
+
+.pg-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 900px) {
+  .pg-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+.pg-panel {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pg-json {
+  margin: 0;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 12px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pg-dark {
+  background: #111214;
+  color: #ececea;
+  color-scheme: dark;
+}

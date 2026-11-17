@@ -1,0 +1,7 @@
+/* Post Canvas default theme. Order matters: tokens, base, then each area. */
+@import './tokens.css';
+@import './base.css';
+@import './text.css';
+@import './ui.css';
+@import './media.css';
+@import './embeds.css';

@@ -26,3 +26,8 @@ export function usePostCanvasContext(): PostCanvasContextValue {
   if (!value) throw new Error('[post-canvas] usePostCanvasContext() must be used inside <PostCanvasProvider>.');
   return value;
 }
+
+/** Reads the nearest `PostCanvasProvider`, or `null` outside one. */
+export function useOptionalPostCanvasContext(): PostCanvasContextValue | null {
+  return useContext(PostCanvasContext);
+}

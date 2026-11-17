@@ -148,7 +148,8 @@ export function createTranslator(locale: Locale, fallback: Locale = en): Transla
         warnOnce(`missing:${key}`, `Missing message "${key}".`);
         return key;
       }
-      if (locale.code !== fallback.code) warnOnce(`fallback:${locale.code}:${key}`, `"${key}" isn't in ${locale.code}.`);
+      if (locale.code !== fallback.code)
+        warnOnce(`fallback:${locale.code}:${key}`, `"${key}" isn't in ${locale.code}.`);
     }
     return render(compile(message), values, null);
   };

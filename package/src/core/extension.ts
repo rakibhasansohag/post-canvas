@@ -1,4 +1,4 @@
-import { Extension } from '@tiptap/core';
+import { Extension, type Editor } from '@tiptap/core';
 import en from '../locales/en/index';
 import { defaultFeatures } from './features';
 import { createTranslator } from './i18n';
@@ -47,3 +47,11 @@ export const PostCanvasCore = Extension.create<PostCanvasCoreOptions, PostCanvas
     };
   },
 });
+
+/**
+ * Updates the shared state in `editor.storage.postCanvasCore`, for example when `PostCanvas`'s props change. Extensions
+ * read the storage when they run, so they see the new values on their next call.
+ */
+export function updatePostCanvasCore(editor: Editor, values: Partial<PostCanvasCoreStorage>): void {
+  Object.assign(editor.storage.postCanvasCore, values);
+}

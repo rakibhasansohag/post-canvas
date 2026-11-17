@@ -1,3 +1,4 @@
+import { presets } from '../text/presets';
 import { warnOnce } from './dev';
 import type { Adapters, FeatureOverrides, Features, PresetName } from './types';
 
@@ -53,13 +54,8 @@ export const defaultFeatures: Features = {
   cover: false,
 };
 
-// What each preset changes from `full`. Chat B replaces this with the presets from `text/presets.ts`.
-const presetOverrides: Record<PresetName, FeatureOverrides> = {
-  full: {},
-  article: {},
-  social: {},
-  comment: {},
-};
+// What each preset changes from `full`, from `text/presets.ts`.
+const presetOverrides = (preset: PresetName): FeatureOverrides => presets[preset]?.features ?? {};
 
 const uploadFeatures = ['image', 'gallery', 'file'] as const;
 
@@ -82,7 +78,7 @@ export function resolveFeatures(
       if (value !== undefined) (resolved as Record<keyof Features, unknown>)[key] = value;
     }
   };
-  apply(presetOverrides[preset]);
+  apply(presetOverrides(preset));
   apply(overrides);
 
   if (context && !context.adapters?.upload) {

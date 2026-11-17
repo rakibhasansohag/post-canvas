@@ -1,0 +1,357 @@
+/* Post Canvas base: the root, ProseMirror essentials, focus rings and the shared frame, menu and popover primitives. */
+
+.pc-root,
+.pc-view {
+  color: var(--pc-text);
+  background: var(--pc-background);
+  font-family: var(--pc-font-body);
+  font-size: var(--pc-font-size);
+  line-height: var(--pc-line-height);
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+
+.pc-root[data-pc-theme='dark'],
+.pc-view[data-pc-theme='dark'] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pc-root[data-pc-theme='auto'],
+  .pc-view[data-pc-theme='auto'] {
+    color-scheme: dark;
+  }
+}
+
+.pc-root *,
+.pc-view * {
+  box-sizing: border-box;
+}
+
+/* ProseMirror essentials. */
+.pc-root .ProseMirror {
+  position: relative;
+  min-height: 8rem;
+  padding: var(--pc-space-4);
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  font-variant-ligatures: none;
+  font-feature-settings: 'liga' 0;
+  -webkit-font-variant-ligatures: none;
+}
+
+.pc-root .ProseMirror pre {
+  white-space: pre;
+}
+
+.pc-root .ProseMirror [contenteditable='false'] {
+  white-space: normal;
+}
+
+.pc-root .ProseMirror ::selection {
+  background: var(--pc-selection);
+}
+
+.pc-root .ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+
+.pc-root .ProseMirror-hideselection {
+  caret-color: transparent;
+}
+
+.pc-root .ProseMirror-selectednode {
+  outline: 2px solid var(--pc-accent);
+  outline-offset: 2px;
+}
+
+.pc-root .ProseMirror-gapcursor {
+  display: none;
+  position: absolute;
+  pointer-events: none;
+}
+
+.pc-root .ProseMirror-gapcursor::after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  border-top: 1px solid var(--pc-text);
+  animation: pc-cursor-blink 1.1s steps(2, start) infinite;
+}
+
+.pc-root .ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}
+
+@keyframes pc-cursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* The drop cursor plugin draws an absolutely positioned element; give it the accent. */
+.pc-root .ProseMirror-dropcursor,
+.pc-drop-cursor {
+  background: var(--pc-accent);
+}
+
+/* Placeholder in an empty document or block. */
+.pc-root .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--pc-muted);
+  pointer-events: none;
+}
+
+/* Basic block rhythm until the text styles land. */
+.pc-content > * + * {
+  margin-top: 0.75em;
+}
+
+.pc-content > :first-child {
+  margin-top: 0;
+}
+
+/* Focus rings: visible for keyboard focus only. */
+.pc-root :focus-visible,
+.pc-view :focus-visible {
+  outline: none;
+  box-shadow: var(--pc-focus-ring);
+}
+
+.pc-root .ProseMirror:focus-visible {
+  box-shadow: none;
+}
+
+html.pc-dragging,
+html.pc-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* The frame around a media or embed block. */
+.pc-frame {
+  position: relative;
+  margin-block: var(--pc-space-2);
+  border-radius: var(--pc-radius);
+  outline: none;
+  transition: opacity var(--pc-duration) ease;
+}
+
+.pc-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--pc-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pc-frame:focus-within::after,
+.pc-frame[data-selected]::after,
+.pc-frame[data-highlighted]::after {
+  opacity: 1;
+}
+
+.pc-frame:focus-visible {
+  box-shadow: none;
+}
+
+.pc-frame[data-dimmed] {
+  opacity: 0.4;
+}
+
+/* Overlay controls: shown while the frame is hovered with a mouse, selected, or has focus inside. */
+.pc-frame__reveal {
+  visibility: hidden;
+}
+
+.pc-frame:focus-within .pc-frame__reveal,
+.pc-frame[data-selected] .pc-frame__reveal,
+.pc-frame[data-menu-open] .pc-frame__reveal {
+  visibility: visible;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pc-frame:hover .pc-frame__reveal {
+    visibility: visible;
+  }
+}
+
+.pc-frame__handle {
+  position: absolute;
+  top: var(--pc-space-2);
+  left: var(--pc-space-2);
+  z-index: 2;
+}
+
+.pc-frame__toolbar {
+  position: absolute;
+  top: var(--pc-space-2);
+  right: var(--pc-space-2);
+  z-index: 2;
+}
+
+.pc-frame__grip,
+.pc-tool-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pc-radius-full);
+  color: var(--pc-text);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--pc-duration) ease,
+    color var(--pc-duration) ease;
+}
+
+.pc-frame__grip {
+  background: var(--pc-overlay);
+  backdrop-filter: blur(6px);
+  cursor: grab;
+  touch-action: none;
+}
+
+.pc-frame__grip:hover {
+  background: var(--pc-surface-raised);
+}
+
+.pc-tool-button:hover {
+  background: var(--pc-surface);
+}
+
+.pc-tool-button[aria-pressed='true'] {
+  color: var(--pc-accent-text);
+  background: var(--pc-accent);
+}
+
+.pc-tool-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pc-media-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-1);
+  padding: var(--pc-space-1);
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-overlay);
+  backdrop-filter: blur(6px);
+}
+
+/* Popover and menu. */
+.pc-popover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--pc-z-popover);
+  min-width: 12rem;
+  max-width: min(22rem, calc(100vw - 16px));
+  padding: var(--pc-space-1);
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius);
+  color: var(--pc-text);
+  background: var(--pc-surface-raised);
+  box-shadow: var(--pc-shadow);
+  outline: none;
+}
+
+.pc-menu__items {
+  display: flex;
+  flex-direction: column;
+}
+
+.pc-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-2);
+  min-height: 40px;
+  padding: 0 var(--pc-space-3);
+  border: 0;
+  border-radius: var(--pc-radius-sm);
+  color: var(--pc-text);
+  background: transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pc-menu__item svg {
+  color: var(--pc-muted);
+  flex: none;
+}
+
+.pc-menu__item:hover,
+.pc-menu__item:focus-visible {
+  background: var(--pc-surface);
+}
+
+.pc-menu__item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pc-menu__item:disabled:hover {
+  background: transparent;
+}
+
+/* Screen-reader-only text, such as live regions. */
+.pc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Touch targets: at least 44px on coarse pointers. */
+@media (pointer: coarse) {
+  .pc-frame__grip,
+  .pc-tool-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .pc-menu__item {
+    min-height: 44px;
+  }
+
+  /* On touch there's no hover, so the overlay controls stay visible on every frame. */
+  .pc-frame__reveal {
+    visibility: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-root *,
+  .pc-root *::before,
+  .pc-root *::after,
+  .pc-view *,
+  .pc-view *::before,
+  .pc-view *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
