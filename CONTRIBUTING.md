@@ -159,9 +159,10 @@ These steps are for whoever publishes releases. The pipeline is in `.github/work
 
 3. **First version.** `package/package.json` starts at `0.0.0` and the repo has one changeset, so the first "Version
    packages" pull request produces `0.1.0`.
-4. **Docs site on GitHub Pages (optional).** Set Settings, Pages, Source to "GitHub Actions", then add a repository
-   variable named `ENABLE_PAGES` with the value `true`. Until then, `pages.yml` does nothing. The static export in
-   `client/out/` also works on any other static host.
+4. **The website.** The site at https://post-canvas.pages.dev is a Cloudflare Pages project connected to this repository.
+   Cloudflare builds `main` on every push and gives each pull request a preview URL; nothing in `.github/workflows`
+   deploys it. The build settings are in `client/README.md`. The static export in `client/out/` also works on any other
+   static host.
 
 ### Check a release by hand
 

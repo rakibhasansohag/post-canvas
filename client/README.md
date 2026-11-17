@@ -1,7 +1,8 @@
-# Post Canvas docs
+# Post Canvas site
 
-The docs site and live playground for [Post Canvas](../README.md), built with Next.js 16 and Fumadocs. It builds as a
-static export, so it runs on any static host.
+The website for [Post Canvas](../README.md): a home page made of live demos, three examples with their source, a
+playground and the docs. It is built with Next.js 16 and Fumadocs, and builds as a static export, so it runs on any
+static host. It is live at https://post-canvas.pages.dev.
 
 ## Run it
 
@@ -14,7 +15,21 @@ npm ci
 npm run dev
 ```
 
-The site runs on http://localhost:3100. The editor is at `/playground`, and the pages are in `content/docs/`.
+The site runs on http://localhost:3100. The docs pages are in `content/docs/`.
+
+## What is where
+
+| Path                                             | What it is                                                                             |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `src/app/(home)/page.tsx`                        | The home page. Every section's copy is in this file, so it is in the HTML              |
+| `src/components/demos/`                          | The live demos on the home page. Each mounts its editor when it scrolls into view      |
+| `src/components/examples/`                       | The three examples. The Examples page shows each file's own source beside it           |
+| `src/components/playground-*.tsx`                | The playground                                                                         |
+| `src/components/site/`                           | Shared pieces: logo, buttons, folder tabs, the lazy stage, the footer                  |
+| `src/lib/sample-content.ts`, `src/lib/photos.ts` | Sample documents and the sample photos' sizes, alt text and placeholders               |
+| `public/samples/`                                | The sample photos, 640 and 1280 wide WebP, generated for this site                     |
+| `src/assets/fonts/`                              | Static font files for the Open Graph images (OFL; licences beside them)                |
+| `public/_headers`                                | Cloudflare Pages headers: image types for the extension-less Open Graph image and icon |
 
 ## Build and host the static export
 
@@ -29,10 +44,10 @@ built at build time.
 
 Two environment variables, read at build time, set where the site lives:
 
-| Variable                | Default                 | Use                                                                             |
-| ----------------------- | ----------------------- | ------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_BASE_PATH` | empty                   | The sub-path the site is served from, such as `/post-canvas`. No trailing slash |
-| `NEXT_PUBLIC_SITE_URL`  | `http://localhost:3100` | The public origin, used in the sitemap, `robots.txt` and Open Graph tags        |
+| Variable                | Default                         | Use                                                                             |
+| ----------------------- | ------------------------------- | ------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_BASE_PATH` | empty                           | The sub-path the site is served from, such as `/post-canvas`. No trailing slash |
+| `NEXT_PUBLIC_SITE_URL`  | `https://post-canvas.pages.dev` | The public origin, used in the sitemap, `robots.txt` and Open Graph tags        |
 
 For example, for `https://example.com/post-canvas/`:
 
@@ -40,8 +55,15 @@ For example, for `https://example.com/post-canvas/`:
 NEXT_PUBLIC_BASE_PATH=/post-canvas NEXT_PUBLIC_SITE_URL=https://example.com npm run build
 ```
 
-The repo's `pages.yml` workflow does this for GitHub Pages. It stays inactive until you turn Pages on and set the
-repository variable `ENABLE_PAGES` to `true`.
+The live site is on Cloudflare Pages, connected to the GitHub repository. Each push to `main` builds and deploys it, and
+each pull request gets a preview URL. The project's build settings:
+
+| Setting          | Value                                                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Build command    | `npm --prefix package ci && npm --prefix package run build && npm --prefix client ci && npm --prefix client run build` |
+| Output directory | `client/out`                                                                                                           |
+| Root directory   | the repo root                                                                                                          |
+| Variables        | `NODE_VERSION=22`, `NEXT_PUBLIC_SITE_URL=https://post-canvas.pages.dev`                                                |
 
 ## How the local package is wired
 

@@ -80,7 +80,7 @@ export function SiteFooter() {
         </div>
         <p
           aria-hidden="true"
-          className="pointer-events-none mt-12 mb-1 text-center font-display text-[clamp(3.5rem,15.5vw,13.5rem)] leading-[0.82] font-bold tracking-[-0.045em] text-transparent select-none [-webkit-text-stroke:1px_rgb(255_255_255_/_0.22)]"
+          className="pointer-events-none mt-12 mb-1 text-center font-display text-[clamp(2.5rem,13vw,13.5rem)] leading-[0.82] font-bold tracking-[-0.045em] whitespace-nowrap text-transparent select-none [-webkit-text-stroke:1px_rgb(255_255_255_/_0.22)]"
         >
           Post Canvas
         </p>

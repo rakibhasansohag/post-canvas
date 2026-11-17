@@ -173,8 +173,8 @@ const jsonLd = {
 
 const callouts = [
   { label: 'Toolbar', side: 'left', top: '4.6rem' },
-  { label: 'Mentions and hashtags', side: 'right', top: '7.4rem' },
-  { label: 'Collage you arrange by hand', side: 'left', top: '11.5rem' },
+  { label: 'Mentions', side: 'right', top: '7.4rem' },
+  { label: 'Collage', side: 'left', top: '11.5rem' },
 ] as const;
 
 function Hero() {
@@ -216,7 +216,7 @@ function Hero() {
           ))}
         </dl>
       </div>
-      <div className="relative z-[1] mx-auto -mt-[11rem] max-w-[60rem] px-2 sm:px-6 md:-mt-[15rem]">
+      <div className="relative z-[1] mx-auto -mt-[11rem] max-w-[60rem] px-2 sm:px-6 md:-mt-[15rem] 2xl:max-w-[54rem]">
         <div className="site-window site-rise [--i:4]">
           <div className="site-window-bar">
             <span className="site-window-dots" aria-hidden="true">
@@ -230,7 +230,7 @@ function Hero() {
               Live
             </span>
           </div>
-          <div className="min-h-[33rem] sm:min-h-[38rem] md:min-h-[41rem] lg:min-h-[51.5rem]">
+          <div className="min-h-[33rem] sm:min-h-[38rem] md:min-h-[41rem] lg:min-h-[51.5rem] 2xl:min-h-[47rem] min-[160rem]:min-h-[43.75rem] min-[215rem]:min-h-[40.5rem] min-[240rem]:min-h-[38rem]">
             <HeroEditor />
           </div>
         </div>
@@ -249,7 +249,7 @@ function Hero() {
               <span className="font-mono text-[0.75rem] tracking-[0.14em] whitespace-nowrap text-white uppercase">
                 {callout.label}
               </span>
-              <svg width="72" height="10" viewBox="0 0 72 10" className="overflow-visible text-[#7aa2f7]">
+              <svg width="56" height="10" viewBox="0 0 72 10" className="overflow-visible text-[#7aa2f7]">
                 <path
                   d={callout.side === 'left' ? 'M0 5H66' : 'M72 5H6'}
                   pathLength={1}

@@ -188,7 +188,11 @@ export function PresetsDemo() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div role="tablist" aria-label="Presets" className="site-seg self-start">
+      <div
+        role="tablist"
+        aria-label="Presets"
+        className="site-seg grid w-full grid-cols-3 sm:inline-flex sm:w-auto sm:self-start"
+      >
         {presets.map((preset, index) => (
           <button
             key={preset.id}
@@ -201,7 +205,7 @@ export function PresetsDemo() {
             aria-selected={active === preset.id}
             aria-controls={`${id}-panel`}
             tabIndex={active === preset.id ? 0 : -1}
-            className="site-seg-btn"
+            className="site-seg-btn justify-center px-2 sm:px-4"
             onClick={() => setActive(preset.id)}
             onKeyDown={(event) => onKeyDown(event, index)}
           >
