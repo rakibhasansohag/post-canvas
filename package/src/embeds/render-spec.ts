@@ -10,15 +10,15 @@ import {
   embedRefFromVideoRef,
   isVideoThumbnail,
   videoProviders,
-  withAutoplay,
   type VideoRef,
 } from './providers/video';
 import { safeHttpUrl, safeMediaSrc } from '../core/url';
 
 /**
  * How the static HTML shows videos and embeds:
- * - `facade`: a thumbnail or placeholder that links to the provider. No third-party request until a reader clicks, and
- *   `activateEmbeds()` turns a click into the player.
+ * - `facade`: a thumbnail or placeholder that links to the provider. No player and no third-party script loads until
+ *   a reader clicks (YouTube and Vimeo thumbnails still load from their image hosts), and `activateEmbeds()` turns a
+ *   click into the player.
  * - `iframe`: the provider's player straight away.
  * - `link`: a plain link, for feeds and email.
  */
@@ -51,13 +51,19 @@ function frameStyle(frame: Pick<EmbedFrame, 'aspectRatio' | 'height'>): string {
 /** A child in a spec: a nested spec or text. */
 type Child = Spec | string;
 
-function compact(children: (Child | null | false | '')[]): Child[] {
+function compact(children: (Child | null | false)[]): Child[] {
   return children.filter((child): child is Child => Boolean(child));
 }
 
 /** An empty, hidden placeholder for a node that can't be rebuilt, so rendering never throws on bad data. */
 function invalid(extra: Attrs): Spec {
   return ['div', { ...extra, class: 'pc-embed pc-embed-invalid', hidden: 'hidden' }];
+}
+
+/** A provider's frame, kept only when its player URL is an absolute https URL. */
+function checkedFrame(frame: EmbedFrame): EmbedFrame | null {
+  const src = safeHttpUrl(frame.src);
+  return src && src.startsWith('https://') ? { ...frame, src } : null;
 }
 
 /** The `video` node's attributes as a checked ref, or `null`. */
@@ -91,10 +97,12 @@ export function videoRender(attrs: Attrs): VideoRender | null {
   if (!video) return null;
   const provider = videoProviders[video.provider];
   const ref = embedRefFromVideoRef(video);
+  const frame = checkedFrame(provider.frame(ref));
+  if (!frame) return null;
   return {
     video,
     provider,
-    frame: provider.frame(ref),
+    frame,
     canonical: provider.canonicalUrl(ref),
     thumbnail: isVideoThumbnail(video.provider, attrs.thumbnailUrl) ? attrs.thumbnailUrl : defaultVideoThumbnail(video),
     title: text(attrs.title),
@@ -117,7 +125,13 @@ export function embedRender(attrs: Attrs): EmbedRender | null {
   if (!provider) return null;
   const checked = verifyEmbedRef(provider, attrs.ref);
   if (!checked) return null;
-  const frame = provider.frame(checked.ref);
+  let frame: EmbedFrame | null;
+  try {
+    frame = checkedFrame(provider.frame(checked.ref));
+  } catch {
+    frame = null;
+  }
+  if (!frame) return null;
   const stored = typeof attrs.aspectRatio === 'number' && attrs.aspectRatio >= 0.2 && attrs.aspectRatio <= 5 ? attrs.aspectRatio : null;
   return {
     provider,
@@ -161,10 +175,7 @@ function facadeSpec(frame: EmbedFrame, options: {
     {
       class: 'pc-embed-frame',
       style: frameStyle(frame),
-      'data-pc-player': options.play ? withAutoplay(frame.src) : frame.src,
       'data-pc-player-title': options.playerTitle,
-      'data-pc-allow': frame.allow,
-      'data-pc-sandbox': frame.sandbox,
     },
     [
       'a',

@@ -1,1 +1,364 @@
-/* Owner: chat B (text and editor UI). Text typography under .pc-content. */
+/* Owner: chat B (text and editor UI). Text typography under .pc-content, shared by the editor and the output. */
+
+.pc-content {
+  color: var(--pc-text);
+  font-family: var(--pc-font-body);
+  font-size: var(--pc-font-size);
+  line-height: var(--pc-line-height);
+  overflow-wrap: break-word;
+}
+
+.pc-content > * + * {
+  margin-top: 0.85em;
+}
+
+.pc-content p {
+  margin: 0;
+}
+
+.pc-content p + p {
+  margin-top: 0.85em;
+}
+
+/* Headings */
+.pc-content h1,
+.pc-content h2,
+.pc-content h3,
+.pc-content h4 {
+  margin: 1.4em 0 0;
+  color: var(--pc-text);
+  font-family: var(--pc-font-display);
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.pc-content > :is(h1, h2, h3, h4):first-child {
+  margin-top: 0;
+}
+
+.pc-content h1 {
+  font-size: 2em;
+}
+
+.pc-content h2 {
+  font-size: 1.5em;
+}
+
+.pc-content h3 {
+  font-size: 1.25em;
+}
+
+.pc-content h4 {
+  font-size: 1.075em;
+}
+
+.pc-content :is(h1, h2, h3, h4) + * {
+  margin-top: 0.5em;
+}
+
+/* Inline marks */
+.pc-content strong {
+  font-weight: 700;
+}
+
+.pc-content code {
+  padding: 0.1em 0.35em;
+  border-radius: var(--pc-radius-sm);
+  background: var(--pc-surface);
+  font-family: var(--pc-font-mono);
+  font-size: 0.875em;
+}
+
+.pc-content sub,
+.pc-content sup {
+  font-size: 0.75em;
+  line-height: 0;
+}
+
+.pc-content a {
+  color: var(--pc-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.pc-content a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Palette colours and highlights, stored by name. */
+.pc-content mark {
+  padding: 0.05em 0.1em;
+  border-radius: 3px;
+  color: inherit;
+  background: var(--pc-highlight-yellow);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.pc-content .pc-color-gray {
+  color: var(--pc-color-gray);
+}
+.pc-content .pc-color-brown {
+  color: var(--pc-color-brown);
+}
+.pc-content .pc-color-orange {
+  color: var(--pc-color-orange);
+}
+.pc-content .pc-color-yellow {
+  color: var(--pc-color-yellow);
+}
+.pc-content .pc-color-green {
+  color: var(--pc-color-green);
+}
+.pc-content .pc-color-blue {
+  color: var(--pc-color-blue);
+}
+.pc-content .pc-color-purple {
+  color: var(--pc-color-purple);
+}
+.pc-content .pc-color-pink {
+  color: var(--pc-color-pink);
+}
+.pc-content .pc-color-red {
+  color: var(--pc-color-red);
+}
+
+.pc-content mark.pc-highlight-gray {
+  background: var(--pc-highlight-gray);
+}
+.pc-content mark.pc-highlight-brown {
+  background: var(--pc-highlight-brown);
+}
+.pc-content mark.pc-highlight-orange {
+  background: var(--pc-highlight-orange);
+}
+.pc-content mark.pc-highlight-yellow {
+  background: var(--pc-highlight-yellow);
+}
+.pc-content mark.pc-highlight-green {
+  background: var(--pc-highlight-green);
+}
+.pc-content mark.pc-highlight-blue {
+  background: var(--pc-highlight-blue);
+}
+.pc-content mark.pc-highlight-purple {
+  background: var(--pc-highlight-purple);
+}
+.pc-content mark.pc-highlight-pink {
+  background: var(--pc-highlight-pink);
+}
+.pc-content mark.pc-highlight-red {
+  background: var(--pc-highlight-red);
+}
+
+/* Lists */
+.pc-content ul,
+.pc-content ol {
+  margin: 0;
+  padding-inline-start: 1.6em;
+}
+
+.pc-content li + li,
+.pc-content li > :is(ul, ol) {
+  margin-top: 0.3em;
+}
+
+.pc-content li > p {
+  margin: 0;
+}
+
+.pc-content li::marker {
+  color: var(--pc-muted);
+}
+
+.pc-content ul[data-type='taskList'] {
+  padding-inline-start: 0.2em;
+  list-style: none;
+}
+
+.pc-content ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55em;
+}
+
+.pc-content ul[data-type='taskList'] li > label {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: calc(var(--pc-line-height) * 1em);
+  user-select: none;
+}
+
+.pc-content ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-content ul[data-type='taskList'] input[type='checkbox'] {
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0;
+  accent-color: var(--pc-accent);
+  cursor: pointer;
+}
+
+.pc-content ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: var(--pc-muted);
+  text-decoration: line-through;
+}
+
+/* Quotes and rules */
+.pc-content blockquote {
+  margin-inline: 0;
+  padding: 0.1em 0 0.1em 1em;
+  border-inline-start: 3px solid var(--pc-border-strong);
+  color: var(--pc-muted);
+}
+
+.pc-content hr {
+  height: 1px;
+  margin: 1.6em 0;
+  border: 0;
+  background: var(--pc-border-strong);
+}
+
+/* Code blocks, with highlight colours from the palette tokens. */
+.pc-content pre {
+  margin-inline: 0;
+  padding: var(--pc-space-3) var(--pc-space-4);
+  overflow-x: auto;
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface);
+  font-family: var(--pc-font-mono);
+  font-size: 0.875em;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.pc-content pre code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.pc-content .hljs-comment,
+.pc-content .hljs-quote {
+  color: var(--pc-muted);
+  font-style: italic;
+}
+
+.pc-content .hljs-keyword,
+.pc-content .hljs-selector-tag,
+.pc-content .hljs-doctag,
+.pc-content .hljs-meta .hljs-keyword {
+  color: var(--pc-color-purple);
+}
+
+.pc-content .hljs-string,
+.pc-content .hljs-regexp,
+.pc-content .hljs-addition,
+.pc-content .hljs-meta .hljs-string {
+  color: var(--pc-color-green);
+}
+
+.pc-content .hljs-number,
+.pc-content .hljs-literal,
+.pc-content .hljs-symbol,
+.pc-content .hljs-bullet {
+  color: var(--pc-color-orange);
+}
+
+.pc-content .hljs-title,
+.pc-content .hljs-section,
+.pc-content .hljs-function .hljs-title,
+.pc-content .hljs-title.function_ {
+  color: var(--pc-color-blue);
+}
+
+.pc-content .hljs-type,
+.pc-content .hljs-built_in,
+.pc-content .hljs-class .hljs-title,
+.pc-content .hljs-title.class_ {
+  color: var(--pc-color-brown);
+}
+
+.pc-content .hljs-attr,
+.pc-content .hljs-attribute,
+.pc-content .hljs-variable,
+.pc-content .hljs-template-variable,
+.pc-content .hljs-property {
+  color: var(--pc-color-red);
+}
+
+.pc-content .hljs-tag,
+.pc-content .hljs-name,
+.pc-content .hljs-selector-id,
+.pc-content .hljs-selector-class,
+.pc-content .hljs-meta {
+  color: var(--pc-color-pink);
+}
+
+.pc-content .hljs-deletion {
+  color: var(--pc-danger);
+}
+
+.pc-content .hljs-emphasis {
+  font-style: italic;
+}
+
+.pc-content .hljs-strong {
+  font-weight: 700;
+}
+
+/* Tables */
+.pc-content .tableWrapper {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.pc-content table {
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.pc-content th,
+.pc-content td {
+  position: relative;
+  min-width: 3em;
+  padding: var(--pc-space-2) var(--pc-space-3);
+  border: 1px solid var(--pc-border-strong);
+  text-align: start;
+  vertical-align: top;
+}
+
+.pc-content th {
+  background: var(--pc-surface);
+  font-weight: 700;
+}
+
+.pc-content :is(th, td) > * + * {
+  margin-top: 0.5em;
+}
+
+/* Mentions and hashtags */
+.pc-content .pc-mention,
+.pc-content .pc-hashtag {
+  padding: 0 0.15em;
+  border-radius: var(--pc-radius-sm);
+  color: var(--pc-accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pc-content .pc-mention {
+  background: var(--pc-accent-soft);
+}

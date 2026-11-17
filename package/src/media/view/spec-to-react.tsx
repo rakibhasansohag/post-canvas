@@ -4,7 +4,11 @@ import type { DOMOutputSpec } from '@tiptap/pm/model';
 import { createElement, type CSSProperties, type ReactNode } from 'react';
 
 /** Replaces one element while converting. Return `undefined` to keep the default. */
-export type SpecOverride = (tag: string, props: Record<string, unknown>, children: ReactNode[]) => ReactNode | undefined;
+export type SpecOverride = (
+  tag: string,
+  props: Record<string, unknown>,
+  children: ReactNode[],
+) => ReactNode | undefined;
 
 const propNames: Record<string, string> = {
   class: 'className',
@@ -26,14 +30,14 @@ function styleObject(style: string): CSSProperties {
     if (!name || !value) continue;
     out[name.replace(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase())] = value;
   }
-  return out as CSSProperties;
+  return out;
 }
 
 function toProps(attrs: Record<string, unknown>): Record<string, unknown> {
   const props: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(attrs)) {
     if (value === null || value === undefined || value === false) continue;
-    if (name === 'style') props.style = styleObject(String(value as string));
+    if (name === 'style') props.style = styleObject(typeof value === 'string' ? value : '');
     else props[propNames[name] ?? name] = value;
   }
   return props;

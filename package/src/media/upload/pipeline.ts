@@ -2,6 +2,7 @@
 // nodes where they were asked for. The upload itself starts once the node is in the document (see plugin.ts).
 import type { Editor, JSONContent } from '@tiptap/core';
 import type { Node as PMNode } from '@tiptap/pm/model';
+import { NodeSelection } from '@tiptap/pm/state';
 import { createKey } from '../../core/ids';
 import type { Features, GalleryAttrs, GalleryLayout, GalleryPhoto } from '../../core/types';
 import { formatBytes } from '../rules';
@@ -20,7 +21,6 @@ export type UploadTarget =
   | { type: 'gallery'; nodeId: string }
   /** Replaces the picture or file of the image or file node with this id. */
   | { type: 'replace'; nodeId: string };
-
 
 /** A node and its position. */
 export interface Found {
@@ -98,7 +98,11 @@ function takePosition(editor: Editor, id: string): number | null {
 }
 
 /** A new gallery photo for a staged upload. */
-export function stagedPhoto(picture: { width: number; height: number }, preview: string, uploadKey: string): GalleryPhoto {
+export function stagedPhoto(
+  picture: { width: number; height: number },
+  preview: string,
+  uploadKey: string,
+): GalleryPhoto {
   return {
     key: createKey('p'),
     src: preview,
@@ -126,7 +130,8 @@ export function firstLayout(features: Features): GalleryLayout {
 export async function uploadFiles(editor: Editor, files: readonly File[], target: UploadTarget): Promise<void> {
   const core = editor.storage.postCanvasCore;
   const manager = editor.storage.postCanvasMedia?.manager;
-  const { t, notify, features } = core;
+  const { t, features } = core;
+  const notify = (message: string, kind: 'info' | 'error') => core.notify(message, kind);
   const adapter = core.adapters.upload;
   if (files.length === 0 || !manager || editor.isDestroyed) return;
   if (!adapter) {
@@ -138,7 +143,9 @@ export async function uploadFiles(editor: Editor, files: readonly File[], target
   const imagesOnly = target.type === 'gallery' || as === 'image' || as === 'gallery';
   let markers: [string, string] | null = null;
   if (target.type === 'cursor') {
-    const { from, to } = editor.state.selection;
+    const { selection } = editor.state;
+    // A selected block (a picture, say) stays: the new media goes after it instead of replacing it.
+    const { from, to } = selection instanceof NodeSelection ? { from: selection.to, to: selection.to } : selection;
     markers = [trackPosition(editor, from), trackPosition(editor, to)];
   } else if (target.type === 'at') {
     const id = trackPosition(editor, target.pos);
@@ -149,7 +156,8 @@ export async function uploadFiles(editor: Editor, files: readonly File[], target
   const attachments: { index: number; file: File }[] = [];
   const refused: Refused[] = [];
   const replacing = target.type === 'replace' ? findNode(editor.state.doc, target.nodeId) : null;
-  const wantsFile = replacing?.node.type.name === 'file';
+  // Replacing a file block, or the File item: everything is attached as it is, pictures included.
+  const wantsFile = replacing?.node.type.name === 'file' || as === 'file';
 
   await pool(wantsFile ? [] : files, 3, async (file, index) => {
     try {
@@ -175,8 +183,8 @@ export async function uploadFiles(editor: Editor, files: readonly File[], target
   pictures.sort((a, b) => a.index - b.index);
   attachments.sort((a, b) => a.index - b.index);
 
-  const positions = markers ? ([takePosition(editor, markers[0]), takePosition(editor, markers[1])] as const) : null;
   if (editor.isDestroyed) return;
+  const positions = markers ? ([takePosition(editor, markers[0]), takePosition(editor, markers[1])] as const) : null;
 
   const keepFile = (file: File) => {
     const max = adapter.maxBytes?.file;

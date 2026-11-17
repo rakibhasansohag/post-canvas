@@ -30,7 +30,14 @@ export interface UploadEntry {
   preview: string | null;
   /** The adapter's answer once done. */
   result: UploadResult | null;
+  /** Run the `prepare` step before uploading (pasted pictures, which skipped the picker's checks). */
+  prepare: boolean;
+  /** When it was staged, in ms, so files whose node never arrived can be let go. */
+  stagedAt: number;
 }
+
+/** How long a staged upload waits for its node before it's let go. */
+const stagedTimeout = 30_000;
 
 /** What the manager needs from the editor. */
 export interface UploadManagerOptions {
@@ -40,6 +47,8 @@ export interface UploadManagerOptions {
   concurrency?: number;
   /** Called whenever an upload changes status (not for progress). */
   onChange?: (entry: UploadEntry) => void;
+  /** Checks and converts a file staged with `prepare`, just before it uploads. Throwing fails the upload. */
+  prepare?: (file: File) => Promise<File>;
 }
 
 /** Keeps every upload of one editor. */
@@ -58,10 +67,21 @@ export class UploadManager {
   }
 
   /** Registers a file to upload once its node is in the document. Returns its `uploadKey`. */
-  stage(file: File, kind: 'image' | 'file', preview?: string | null): string {
+  stage(file: File, kind: 'image' | 'file', preview?: string | null, options: { prepare?: boolean } = {}): string {
     const key = createKey('u');
     const url = preview ?? (kind === 'image' ? URL.createObjectURL(file) : null);
-    this.set({ key, kind, file, status: 'staged', progress: 0, error: null, preview: url, result: null });
+    this.set({
+      key,
+      kind,
+      file,
+      status: 'staged',
+      progress: 0,
+      error: null,
+      preview: url,
+      result: null,
+      prepare: options.prepare ?? false,
+      stagedAt: Date.now(),
+    });
     return key;
   }
 
@@ -106,11 +126,22 @@ export class UploadManager {
    * or running ones whose node is gone stop.
    */
   sync(present: ReadonlySet<string>): void {
-    for (const entry of this.entries.values()) {
+    const now = Date.now();
+    for (const entry of [...this.entries.values()]) {
       const here = present.has(entry.key);
       if (here && (entry.status === 'staged' || entry.status === 'cancelled')) this.start(entry.key);
       else if (!here && (entry.status === 'queued' || entry.status === 'uploading')) this.cancel(entry.key);
+      else if (!here && entry.status === 'staged' && now - entry.stagedAt > stagedTimeout) this.release(entry.key);
     }
+  }
+
+  /** Forgets a staged upload whose node never reached the document (a paste that went elsewhere). */
+  private release(key: string): void {
+    const entry = this.entries.get(key);
+    if (!entry) return;
+    if (entry.preview) URL.revokeObjectURL(entry.preview);
+    this.entries.delete(key);
+    this.changes++;
   }
 
   /** True while any upload is staged, queued or running. */
@@ -118,6 +149,13 @@ export class UploadManager {
     for (const entry of this.entries.values()) {
       if (entry.status === 'queued' || entry.status === 'uploading') return true;
     }
+    return false;
+  }
+
+  /** True for a `blob:` URL this editor made: a preview, or an adapter result that is one (a local or test adapter). */
+  owns(url: string): boolean {
+    if (!url.startsWith('blob:')) return false;
+    for (const entry of this.entries.values()) if (entry.preview === url || entry.result?.src === url) return true;
     return false;
   }
 
@@ -166,7 +204,14 @@ export class UploadManager {
     this.set({ ...entry, status: 'uploading', progress: 0 }, true);
     let lastProgress = 0;
     try {
-      const result = await adapter.upload(entry.file, {
+      let file = entry.file;
+      if (entry.prepare && this.options.prepare) {
+        file = await this.options.prepare(file);
+        const current = this.entries.get(key);
+        if (!current || controller.signal.aborted) return;
+        this.set({ ...current, file, prepare: false });
+      }
+      const result = await adapter.upload(file, {
         kind: entry.kind,
         signal: controller.signal,
         onProgress: (fraction) => {

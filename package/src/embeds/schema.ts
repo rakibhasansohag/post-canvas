@@ -107,7 +107,7 @@ export const Video = Node.create<EmbedNodeOptions>({
 });
 
 /** Builds the `embed` node for a set of allowed providers. */
-function createEmbed(allowed: readonly string[]) {
+export function createEmbedNode(allowed: readonly string[]) {
   return Node.create<EmbedNodeOptions>({
     name: 'embed',
     group: 'block',
@@ -152,7 +152,7 @@ function createEmbed(allowed: readonly string[]) {
 }
 
 /** The `embed` node with every built-in provider allowed. Use `embedsSchema(features)` to follow the features. */
-export const Embed = createEmbed(builtInEmbedProviderNames);
+export const Embed = createEmbedNode(builtInEmbedProviderNames);
 
 /** The `linkCard` node: a preview of a web page. */
 export const LinkCard = Node.create<EmbedNodeOptions>({
@@ -242,7 +242,7 @@ export function embedsSchema(features: Features, options: Partial<EmbedNodeOptio
   const configured = { ...defaultRenderOptions(), ...options };
   const extensions: AnyExtension[] = [];
   if (features.video) extensions.push(Video.configure(configured));
-  if (features.embed) extensions.push(createEmbed(allowedEmbedProviders(features)).configure(configured));
+  if (features.embed) extensions.push(createEmbedNode(allowedEmbedProviders(features)).configure(configured));
   if (features.linkCard) extensions.push(LinkCard.configure(configured));
   if (features.video || features.embed || features.linkCard) extensions.push(EmbedInput);
   return extensions;

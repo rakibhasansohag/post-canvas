@@ -133,7 +133,8 @@ export function LinkBubble() {
   const { editor, t, openLink } = useEditorUi();
   const href = useEditorState({
     editor,
-    selector: ({ editor: e }) => (e.isActive('link') ? ((e.getAttributes('link').href as string | undefined) ?? '') : ''),
+    selector: ({ editor: e }) =>
+      e.isActive('link') ? ((e.getAttributes('link').href as string | undefined) ?? '') : '',
   });
   const safe = safeHref(href);
   return (

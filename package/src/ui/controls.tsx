@@ -47,7 +47,21 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigat
 export function shortcut(keys: string): string {
   return keys
     .split('-')
-    .map((key) => (key === 'Mod' ? (isMac ? '⌘' : 'Ctrl') : key === 'Shift' ? (isMac ? '⇧' : 'Shift') : key === 'Alt' ? (isMac ? '⌥' : 'Alt') : key))
+    .map((key) =>
+      key === 'Mod'
+        ? isMac
+          ? '⌘'
+          : 'Ctrl'
+        : key === 'Shift'
+          ? isMac
+            ? '⇧'
+            : 'Shift'
+          : key === 'Alt'
+            ? isMac
+              ? '⌥'
+              : 'Alt'
+            : key,
+    )
     .join(isMac ? '' : '+');
 }
 
@@ -187,7 +201,12 @@ export function turnIntoLabel(target: TurnIntoTarget, t: Translator): string {
 }
 
 /** Menu entries that turn the block at `pos` (or the selection's) into another kind of block. */
-export function turnIntoEntries(editor: Editor, t: Translator, current: TurnIntoTarget | null, pos?: number): MenuEntry[] {
+export function turnIntoEntries(
+  editor: Editor,
+  t: Translator,
+  current: TurnIntoTarget | null,
+  pos?: number,
+): MenuEntry[] {
   return turnIntoTargets(editor).map((target) => ({
     id: target,
     label: turnIntoLabel(target, t),
@@ -235,7 +254,9 @@ export function ColorMenu() {
     editor,
     selector: ({ editor: e }) => ({
       color: (e.getAttributes('textStyle').color as PaletteColor | null | undefined) ?? null,
-      highlight: e.isActive('highlight') ? ((e.getAttributes('highlight').color as PaletteColor | null) ?? 'default') : null,
+      highlight: e.isActive('highlight')
+        ? ((e.getAttributes('highlight').color as PaletteColor | null) ?? 'default')
+        : null,
     }),
   });
   const entries: MenuEntry[] = [];
@@ -246,7 +267,11 @@ export function ColorMenu() {
       group,
       label: t('ui.color.default'),
       checked: state.color === null,
-      swatch: <span className="pc-swatch pc-swatch--text" aria-hidden="true">A</span>,
+      swatch: (
+        <span className="pc-swatch pc-swatch--text" aria-hidden="true">
+          A
+        </span>
+      ),
       onSelect: () => void editor.chain().focus().setMark('textStyle', { color: null }).removeEmptyTextStyle().run(),
     });
     for (const color of paletteColors) {
@@ -381,7 +406,10 @@ export function ListButtons() {
 export const insertGroups: readonly InsertGroup[] = ['basic', 'lists', 'media', 'embeds', 'advanced'];
 
 /** Every insert item as menu entries, grouped, with media at the cap disabled. */
-export function useInsertEntries(onRun: (run: () => void) => void, source: 'toolbar' | 'insert-button'): () => MenuEntry[] {
+export function useInsertEntries(
+  onRun: (run: () => void) => void,
+  source: 'toolbar' | 'insert-button',
+): () => MenuEntry[] {
   const { editor, t, limits } = useEditorUi();
   return () => {
     const stats = getDocStats(editor.getJSON());
@@ -433,8 +461,20 @@ export function TableMenu() {
     { id: 'col-before', group: columns, label: t('ui.table.columnBefore'), onSelect: run((c) => c.addColumnBefore()) },
     { id: 'col-after', group: columns, label: t('ui.table.columnAfter'), onSelect: run((c) => c.addColumnAfter()) },
     { id: 'col-delete', group: columns, label: t('ui.table.columnDelete'), onSelect: run((c) => c.deleteColumn()) },
-    { id: 'merge', group: cells, label: t('ui.table.merge'), disabled: !can.merge, onSelect: run((c) => c.mergeCells()) },
-    { id: 'split', group: cells, label: t('ui.table.split'), disabled: !can.split, onSelect: run((c) => c.splitCell()) },
+    {
+      id: 'merge',
+      group: cells,
+      label: t('ui.table.merge'),
+      disabled: !can.merge,
+      onSelect: run((c) => c.mergeCells()),
+    },
+    {
+      id: 'split',
+      group: cells,
+      label: t('ui.table.split'),
+      disabled: !can.split,
+      onSelect: run((c) => c.splitCell()),
+    },
     { id: 'delete', group: cells, label: t('ui.table.delete'), onSelect: run((c) => c.deleteTable()) },
   ];
   return <MenuButton label={t('ui.table.label')} icon={Table2} entries={entries} />;

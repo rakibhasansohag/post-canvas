@@ -1,6 +1,6 @@
 // The render-safe text schema: node and mark names, attributes, parseHTML, renderHTML and sanitizers. No React, no DOM
 // access at import time and no node views, so it runs on the server. `text/kit.ts` extends these for the editor.
-import { mergeAttributes, type AnyExtension } from '@tiptap/core';
+import { mergeAttributes, type AnyExtension, type Attributes } from '@tiptap/core';
 import Blockquote from '@tiptap/extension-blockquote';
 import Bold from '@tiptap/extension-bold';
 import Code from '@tiptap/extension-code';
@@ -48,17 +48,62 @@ export const PcParagraph = Paragraph.extend({ postCanvasSanitize: sanitizeParagr
 /** `heading`, levels 1 to 4. */
 export const PcHeading = Heading.extend({ postCanvasSanitize: sanitizeHeading });
 
-/** `orderedList`, with a sanitized `start`. */
-export const PcOrderedList = OrderedList.extend({ postCanvasSanitize: sanitizeOrderedList });
+/** Wraps an attribute's parseHTML so the parsed value goes through a sanitizer. */
+function cleanedOnParse(
+  parent: Attributes | object | undefined,
+  sanitize: (attrs: Record<string, unknown>) => Record<string, unknown> | null,
+  names: string[],
+): Attributes {
+  const out: Attributes = { ...(parent as Attributes | undefined) };
+  for (const name of names) {
+    const spec = out[name] ?? {};
+    out[name] = {
+      ...spec,
+      parseHTML: (element: HTMLElement) => {
+        const raw: unknown = spec.parseHTML ? spec.parseHTML(element) : element.getAttribute(name);
+        return sanitize({ [name]: raw })?.[name] ?? null;
+      },
+    };
+  }
+  return out;
+}
+
+/** `orderedList`, with a sanitized `start` and `type`, also when parsed from HTML. */
+export const PcOrderedList = OrderedList.extend({
+  addAttributes() {
+    return cleanedOnParse(this.parent?.(), sanitizeOrderedList, ['start', 'type']);
+  },
+  postCanvasSanitize: sanitizeOrderedList,
+});
 
 /** `taskItem`, with a boolean `checked`. Items can nest. */
 export const PcTaskItem = TaskItem.extend({ postCanvasSanitize: sanitizeTaskItem }).configure({ nested: true });
 
+// Spans are clamped as they're parsed, so a pasted colspan="100000" can't make a table of millions of cells.
+const clampSpan = (attrs: Record<string, unknown>) => {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    const n = Number(value);
+    out[key] = Number.isFinite(n) ? Math.min(100, Math.max(1, Math.round(n))) : 1;
+  }
+  return out;
+};
+
 /** `tableCell`, with sanitized spans and widths. */
-export const PcTableCell = TableCell.extend({ postCanvasSanitize: sanitizeTableCell });
+export const PcTableCell = TableCell.extend({
+  addAttributes() {
+    return cleanedOnParse(this.parent?.(), clampSpan, ['colspan', 'rowspan']);
+  },
+  postCanvasSanitize: sanitizeTableCell,
+});
 
 /** `tableHeader`, with sanitized spans and widths. */
-export const PcTableHeader = TableHeader.extend({ postCanvasSanitize: sanitizeTableCell });
+export const PcTableHeader = TableHeader.extend({
+  addAttributes() {
+    return cleanedOnParse(this.parent?.(), clampSpan, ['colspan', 'rowspan']);
+  },
+  postCanvasSanitize: sanitizeTableCell,
+});
 
 /** `codeBlock`: the language comes from `class="language-…"` and must match the language pattern. */
 export const PcCodeBlock = CodeBlock.extend({
@@ -67,9 +112,13 @@ export const PcCodeBlock = CodeBlock.extend({
       language: {
         default: null,
         parseHTML: (element: HTMLElement) => {
-          const code = element.querySelector('code') ?? element;
-          const named = Array.from(code.classList).find((name) => name.startsWith('language-'));
-          return codeLanguage(named ? named.slice('language-'.length) : element.getAttribute('data-language'));
+          const named = (from: Element | null) =>
+            Array.from(from?.classList ?? [])
+              .find((name) => name.startsWith('language-'))
+              ?.slice('language-'.length);
+          return codeLanguage(
+            named(element.querySelector('code')) ?? named(element) ?? element.getAttribute('data-language'),
+          );
         },
         rendered: false,
       },
@@ -102,20 +151,19 @@ export const PcLink = Link.extend({
         default: null,
         parseHTML: (element: HTMLElement) => (element.getAttribute('target') === '_blank' ? '_blank' : null),
       },
-      rel: { default: null, parseHTML: (element: HTMLElement) => element.getAttribute('rel') },
+      rel: {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          linkRel(element.getAttribute('rel'), element.getAttribute('target') === '_blank' ? '_blank' : null),
+      },
     };
   },
   renderHTML({ HTMLAttributes }) {
+    // An unsafe href (from unsanitized JSON or a raw setMark) renders as plain text in an anchor without a link.
+    const href = safeHref(HTMLAttributes.href);
+    if (!href) return ['a', {}, 0];
     const target = HTMLAttributes.target === '_blank' ? '_blank' : null;
-    return [
-      'a',
-      {
-        href: safeHref(HTMLAttributes.href) ?? '',
-        target,
-        rel: linkRel(HTMLAttributes.rel, target),
-      },
-      0,
-    ];
+    return ['a', { href, target, rel: linkRel(HTMLAttributes.rel, target) }, 0];
   },
   postCanvasSanitize: sanitizeLink,
 });
@@ -168,7 +216,8 @@ export const PcHighlight = Highlight.extend({
 /** The text a mention shows: `@Ada Lovelace` or `#design`. */
 export function mentionText(attrs: Record<string, unknown>): string {
   const char = attrs.mentionSuggestionChar === '#' ? '#' : '@';
-  const label = typeof attrs.label === 'string' && attrs.label ? attrs.label : String(attrs.id ?? '');
+  const id = typeof attrs.id === 'string' || typeof attrs.id === 'number' ? String(attrs.id) : '';
+  const label = typeof attrs.label === 'string' && attrs.label ? attrs.label : id;
   return `${char}${label}`;
 }
 

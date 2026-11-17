@@ -1,5 +1,4 @@
 // Document validation for the app's server: is this JSON a clean, savable Post Canvas document? Pure, no DOM.
-import type { JSONContent } from '@tiptap/core';
 import type { Features } from '../core/types';
 import { hasTransientContent } from '../output/text';
 import { sanitizeDocument, sanitizerSetup, type DocumentLimits, type SanitizeReason } from '../output/sanitize';
@@ -80,10 +79,14 @@ function firstDifference(a: unknown, b: unknown, path: string): string | null {
  * ```
  */
 export function validateDocument(json: unknown, options: ValidateOptions = {}): ValidationResult {
-  const { doc, removed } = sanitizeDocument(json, options);
+  const { doc, removed, omitted } = sanitizeDocument(json, options);
   const errors = removed.map((item) => error(item.path, item.reason, item.type));
-  if (errors.every((item) => item.code !== 'transient') && json && typeof json === 'object') {
-    if (hasTransientContent(json as JSONContent)) errors.push(error('doc', 'transient'));
+  // The sanitizer lists at most 100 removals; say that there were more.
+  if (omitted > 0) errors.push({ ...error('doc', 'invalid-node'), message: `${omitted} more problems were not listed.` });
+  // hasTransientContent walks without recursion and skips anything malformed, so it is safe on raw input.
+  const flagged = errors.some((item) => item.code === 'transient');
+  if (!flagged && json && typeof json === 'object' && hasTransientContent(json)) {
+    errors.push(error('doc', 'transient'));
   }
   if (errors.length === 0) {
     const { schema } = sanitizerSetup(options);

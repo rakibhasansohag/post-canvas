@@ -1,12 +1,13 @@
 'use client';
 // The block handle: drag with a mouse to move a block (Tiptap's drag handle), or click it for a menu with move up, move
 // down, duplicate, delete and "turn into". On touch, the menu works, and a long press starts a drag.
+import { offset, type ComputePositionConfig } from '@floating-ui/dom';
 import type { Editor } from '@tiptap/core';
 import { DragHandle } from '@tiptap/extension-drag-handle-react';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import { NodeSelection } from '@tiptap/pm/state';
 import { ArrowDown, ArrowUp, Copy, GripVertical, Trash2 } from 'lucide-react';
-import { useRef, useState, type RefObject } from 'react';
+import { useMemo, useRef, useState, type RefObject } from 'react';
 import { Popover } from '../core/react/popover';
 import { usePointerDrag } from '../core/react/use-pointer-drag';
 import {
@@ -58,7 +59,7 @@ function moveBlockTo(editor: Editor, from: number, index: number): void {
 }
 
 /** The handle beside the hovered block. Render it inside the canvas element. */
-export function BlockHandle({ canvas }: { canvas: RefObject<HTMLDivElement | null> }) {
+export function BlockHandle({ canvas, narrow }: { canvas: RefObject<HTMLDivElement | null>; narrow: boolean }) {
   const { editor, t } = useEditorUi();
   const [target, setTarget] = useState<{ node: PmNode; pos: number } | null>(null);
   const [menu, setMenu] = useState(false);
@@ -66,6 +67,16 @@ export function BlockHandle({ canvas }: { canvas: RefObject<HTMLDivElement | nul
   const [drop, setDrop] = useState<number | null>(null);
   const dragFrom = useRef<number | null>(null);
   const dropIndex = useRef<number | null>(null);
+
+  // Left of the block, or in the right-hand gutter on narrow canvases. Memoized: a new object re-registers the plugin.
+  const position = useMemo<ComputePositionConfig>(
+    () => ({
+      placement: narrow ? 'right-start' : 'left-start',
+      strategy: 'absolute',
+      middleware: [offset(narrow ? 6 : 2)],
+    }),
+    [narrow],
+  );
 
   const lock = (locked: boolean) => {
     editor.view.dispatch(editor.state.tr.setMeta('lockDragHandle', locked).setMeta('addToHistory', false));
@@ -164,7 +175,7 @@ export function BlockHandle({ canvas }: { canvas: RefObject<HTMLDivElement | nul
       <DragHandle
         editor={editor}
         className="pc-handle"
-        computePositionConfig={{ placement: 'left-start', strategy: 'absolute' }}
+        computePositionConfig={position}
         onNodeChange={({ node, pos: at }) => {
           if (!menu) setTarget(node ? { node, pos: at } : null);
         }}

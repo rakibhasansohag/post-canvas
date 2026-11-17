@@ -56,8 +56,14 @@ export function imageParseRules(options: SourceOptions = {}) {
 }
 
 /** Parse rules for the `gallery` node. */
-export function galleryParseRules(options: SourceOptions = {}) {
-  return [{ tag: 'figure[data-pc-gallery]', priority: 65, getAttrs: (el: HTMLElement) => galleryFromFigure(el, options) }];
+export function galleryParseRules(options: SourceOptions = {}, limits: GalleryLimits = defaultGalleryLimits) {
+  return [
+    {
+      tag: 'figure[data-pc-gallery]',
+      priority: 65,
+      getAttrs: (el: HTMLElement) => galleryFromFigure(el, options, limits),
+    },
+  ];
 }
 
 /** Parse rules for the `file` node. */
@@ -105,7 +111,7 @@ export function createGalleryNode(limits: GalleryLimits = defaultGalleryLimits) 
       return { id: idAttr, layout: attr('carousel'), photos: attr<unknown[]>([]), caption: attr('') };
     },
     parseHTML() {
-      return galleryParseRules();
+      return galleryParseRules({}, this.options.limits);
     },
     renderHTML({ node, HTMLAttributes }) {
       return gallerySpec(galleryAttrsOf(node.attrs), HTMLAttributes);

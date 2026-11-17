@@ -31,3 +31,8 @@ export function openFilePicker({ accept, multiple = false }: FilePickerOptions =
     input.click();
   });
 }
+
+/** The `accept` string for picture pickers: the adapter's, or every format the editor takes. */
+export function imageAccept(accept: string | undefined): string {
+  return accept ?? 'image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic,image/heif,.heic,.heif';
+}

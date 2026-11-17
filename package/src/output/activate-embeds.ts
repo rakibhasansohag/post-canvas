@@ -1,12 +1,28 @@
 // Turns the static facades from `renderToHTML()` into players on click, for pages without React. Browser only; it
-// touches nothing until it is called.
+// touches nothing until it is called. The player is rebuilt from the figure's canonical URL through the provider
+// registry, so markup from anywhere else on the page can't choose an iframe URL, `allow` list or sandbox.
+import { matchEmbedUrl, parseVideoUrl, videoFrame, withAutoplay } from '../embeds/providers/index';
+import type { EmbedFrame } from '../embeds/providers/types';
 
-const ready = new WeakSet<Element>();
+const ready = new WeakSet<EventTarget>();
+
+/** The player for a facade's figure, rebuilt from its `data-url`, or `null` when nothing matches. */
+function playerFor(figure: Element): { frame: EmbedFrame; autoplay: boolean } | null {
+  const url = figure.getAttribute('data-url') ?? '';
+  const provider = figure.getAttribute('data-provider');
+  if (figure.hasAttribute('data-pc-video')) {
+    const video = parseVideoUrl(url);
+    return video && video.provider === provider ? { frame: videoFrame(video), autoplay: true } : null;
+  }
+  const match = provider ? matchEmbedUrl(url, [provider]) : null;
+  return match ? { frame: match.provider.frame(match.ref), autoplay: false } : null;
+}
 
 /**
  * Makes every video and embed facade under `root` load its player when clicked, instead of following the link to the
- * provider. Call it once after inserting `renderToHTML()` output; elements added later under the same root work too.
- * Returns a function that stops listening.
+ * provider. Call it once after inserting `renderToHTML()` output; facades added later under the same root work too.
+ * Custom providers must be registered with `registerEmbedProvider()` on the page. Returns a function that stops
+ * listening.
  *
  * @example
  * ```ts
@@ -16,36 +32,31 @@ const ready = new WeakSet<Element>();
  * ```
  */
 export function activateEmbeds(root: ParentNode & EventTarget = document): () => void {
-  if (root instanceof Element && ready.has(root)) return () => undefined;
+  if (ready.has(root)) return () => undefined;
   const onClick = (event: Event) => {
     const target = event.target instanceof Element ? event.target : null;
     const facade = target?.closest('a.pc-embed-facade');
-    const frame = facade?.parentElement;
-    if (!facade || !frame?.matches('.pc-embed-frame[data-pc-player]')) return;
+    const frameElement = facade?.parentElement;
+    const figure = frameElement?.closest('figure[data-pc-video], figure[data-pc-embed]');
+    if (!facade || !frameElement?.classList.contains('pc-embed-frame') || !figure) return;
     if (event instanceof MouseEvent && (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0)) return;
-    const src = frame.getAttribute('data-pc-player') ?? '';
-    let url: URL;
-    try {
-      url = new URL(src);
-    } catch {
-      return;
-    }
-    if (url.protocol !== 'https:') return;
+    const player = playerFor(figure);
+    if (!player?.frame.src.startsWith('https://')) return;
     event.preventDefault();
-    const iframe = frame.ownerDocument.createElement('iframe');
-    iframe.src = url.href;
-    iframe.title = frame.getAttribute('data-pc-player-title') ?? '';
-    iframe.setAttribute('allow', frame.getAttribute('data-pc-allow') ?? '');
-    iframe.setAttribute('sandbox', frame.getAttribute('data-pc-sandbox') ?? 'allow-scripts allow-same-origin');
+    const iframe = frameElement.ownerDocument.createElement('iframe');
+    iframe.src = player.autoplay ? withAutoplay(player.frame.src) : player.frame.src;
+    iframe.title = frameElement.getAttribute('data-pc-player-title') ?? player.frame.title;
+    iframe.setAttribute('allow', player.frame.allow);
+    iframe.setAttribute('sandbox', player.frame.sandbox);
     iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
     iframe.allowFullscreen = true;
     facade.replaceWith(iframe);
     iframe.focus();
   };
   root.addEventListener('click', onClick);
-  if (root instanceof Element) ready.add(root);
+  ready.add(root);
   return () => {
     root.removeEventListener('click', onClick);
-    if (root instanceof Element) ready.delete(root);
+    ready.delete(root);
   };
 }

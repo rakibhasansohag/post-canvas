@@ -1,10 +1,19 @@
 // The static HTML of the media nodes (renderHTML) and how it's read back (parseHTML). Render-safe: no React, and the DOM
 // is touched only through the element a parse rule hands over. The React views in `view/` draw the same markup.
 import type { DOMOutputSpec } from '@tiptap/pm/model';
-import type { FileAttrs, GalleryAttrs, GalleryPhoto, ImageAlign, ImageAttrs, MediaSource } from '../core/types';
+import type {
+  FileAttrs,
+  GalleryAttrs,
+  GalleryLayout,
+  GalleryPhoto,
+  ImageAlign,
+  ImageAttrs,
+  MediaSource,
+} from '../core/types';
 import { safeHttpUrl, safeMediaSrc } from '../core/url';
 import {
   boxToStyle,
+  clampPlace,
   collageFrameBox,
   collageItemBox,
   effectiveLayout,
@@ -14,22 +23,42 @@ import {
   frameRatio,
   photoSizes,
   placeOf,
+  textLimits,
 } from './rules';
-import { textLimits } from './rules';
-import { cleanLine, cleanPlaceholder, cleanSrcset, cleanText } from './sanitize';
+import {
+  cleanDimension,
+  cleanId,
+  cleanLine,
+  cleanMime,
+  cleanPlaceholder,
+  cleanSrcset,
+  cleanText,
+  cleanUploadId,
+  defaultGalleryLimits,
+  normalizePlaces,
+  type GalleryLimits,
+} from './sanitize';
 
 type Attrs = Record<string, string>;
 
 /** How parse rules treat sources that aren't plain http(s). */
 export interface SourceOptions {
-  /** Accept `blob:` previews (the editor, while an upload runs). */
-  allowBlob?: boolean;
   /**
    * Turns a pasted `data:` image into a source, usually by staging an upload. Return `null` to drop it. Without this,
    * `data:` images are dropped.
    */
   fromDataUrl?: (dataUrl: string, name: string) => { src: string; uploadKey: string } | null;
+  /** The local preview of an upload this editor already staged, for a `data-upload-key` it knows. */
+  previewOf?: (uploadKey: string) => string | null;
+  /** True for a `blob:` URL this editor made itself, which stays usable for as long as the page is open. */
+  ownsBlob?: (url: string) => boolean;
 }
+
+/**
+ * The placeholder source of a pasted picture that was staged for upload before the HTML was cleaned. The `.invalid`
+ * top-level domain never resolves, so the address can't load anything; the parse rule swaps it for the preview.
+ */
+export const stagedSrcPrefix = 'https://staged.post-canvas.invalid/';
 
 /** The `img` attributes shared by every picture. */
 export function imgAttrs(source: MediaSource, extra: { className: string; sizes?: string; style?: string }): Attrs {
@@ -50,6 +79,8 @@ export function imgAttrs(source: MediaSource, extra: { className: string; sizes?
   attrs.decoding = 'async';
   if (source.uploadId) attrs['data-upload-id'] = source.uploadId;
   if (source.uploadKey) attrs['data-upload-key'] = source.uploadKey;
+  // The one document value that reaches `style` as text: only a strict base64 JPEG, PNG or WebP data URL of at most
+  // about 2 KB passes cleanPlaceholder, so it can't close the url() or add a declaration.
   const placeholder = cleanPlaceholder(source.placeholder);
   const style = [extra.style, placeholder ? `background-image: url(${placeholder})` : ''].filter(Boolean).join('; ');
   if (style) attrs.style = style;
@@ -59,8 +90,8 @@ export function imgAttrs(source: MediaSource, extra: { className: string; sizes?
 const withRoot = (root: Attrs, html: Record<string, unknown>): Attrs => {
   const merged: Attrs = { ...root };
   for (const [key, value] of Object.entries(html)) {
-    if (key === 'class' || key === 'style' || value === null || value === undefined) continue;
-    if (!(key in merged)) merged[key] = String(value as string | number);
+    if (key === 'class' || key === 'style' || key in merged) continue;
+    if (typeof value === 'string' || typeof value === 'number') merged[key] = String(value);
   }
   return merged;
 };
@@ -69,7 +100,10 @@ const withRoot = (root: Attrs, html: Record<string, unknown>): Attrs => {
 export function imageSpec(attrs: ImageAttrs, html: Record<string, unknown> = {}): DOMOutputSpec {
   const root: Attrs = { class: `pc-image pc-image--${attrs.align}`, 'data-pc-image': '', 'data-align': attrs.align };
   if (attrs.id) root['data-id'] = attrs.id;
-  const img: DOMOutputSpec = ['img', imgAttrs(attrs, { className: 'pc-image__img', sizes: '(min-width: 760px) 720px, 100vw' })];
+  const img: DOMOutputSpec = [
+    'img',
+    imgAttrs(attrs, { className: 'pc-image__img', sizes: '(min-width: 760px) 720px, 100vw' }),
+  ];
   return attrs.caption
     ? ['figure', withRoot(root, html), img, ['figcaption', { class: 'pc-image__caption' }, attrs.caption]]
     : ['figure', withRoot(root, html), img];
@@ -82,7 +116,7 @@ function photoSpec(photo: GalleryPhoto, index: number, layout: string, count: nu
     if (index === 0) {
       li.class += ' pc-gallery__item--base';
     } else {
-      const place = placeOf(photo, index);
+      const place = clampPlace(placeOf(photo, index), index - 1);
       li.class += ' pc-gallery__item--layer';
       li['data-x'] = String(place.x);
       li['data-y'] = String(place.y);
@@ -152,49 +186,46 @@ export function fileSpec(attrs: FileAttrs, html: Record<string, unknown> = {}): 
 // Parsing
 // ---------------------------------------------------------------------------------------------------------------------
 
-const number = (value: string | null): number => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0;
-};
-
 /** The placeholder from an `img`'s `background-image` style. */
 function placeholderOf(img: Element): string | null {
-  const match = /url\(\s*["']?(data:image\/[a-z]+;base64,[a-z0-9+/=]+)["']?\s*\)/i.exec(img.getAttribute('style') ?? '');
+  const match = /url\(\s*["']?(data:image\/[a-z]+;base64,[a-z0-9+/=]+)["']?\s*\)/i.exec(
+    img.getAttribute('style') ?? '',
+  );
   return cleanPlaceholder(match?.[1] ?? null);
 }
 
 /**
- * A picture from an `img` element. `null` when its source isn't usable: http(s) always, `blob:` only with `allowBlob`
- * and a known upload key, `data:` only through `fromDataUrl`.
+ * A picture from an `img` element. `null` when its source isn't usable: http(s) always; a picture this editor is
+ * uploading (a `data-upload-key` that `previewOf` knows) as the staged marker; `data:` only through `fromDataUrl`.
  */
 export function sourceFromImg(img: Element, options: SourceOptions = {}): MediaSource | null {
   const raw = (img.getAttribute('src') ?? '').trim();
   let src = safeMediaSrc(raw);
   let uploadKey: string | null = null;
-  if (!src && options.allowBlob) {
-    const blob = safeMediaSrc(raw, { allowBlob: true });
-    const key = img.getAttribute('data-upload-key');
-    if (blob && key) {
-      src = blob;
-      uploadKey = key;
-    }
-  }
-  if (!src && options.fromDataUrl && /^data:image\//i.test(raw)) {
-    const staged = options.fromDataUrl(raw, cleanLine(img.getAttribute('alt'), 80) || 'image');
-    if (staged) {
-      src = staged.src;
-      uploadKey = staged.uploadKey;
+  const key = img.getAttribute('data-upload-key');
+  if (key && options.previewOf?.(key)) {
+    // A picture this editor is uploading (pasted, or copied within the editor): it travels as the staged marker, which
+    // survives any sanitizer on the way, and the upload plugin links it back to its preview.
+    src = `${stagedSrcPrefix}${key}`;
+    uploadKey = key;
+  } else if (!src && options.ownsBlob?.(raw)) {
+    src = raw;
+  } else if (!src && options.fromDataUrl && /^data:image\//i.test(raw)) {
+    const fromData = options.fromDataUrl(raw, cleanLine(img.getAttribute('alt'), 80) || 'image');
+    if (fromData) {
+      src = `${stagedSrcPrefix}${fromData.uploadKey}`;
+      uploadKey = fromData.uploadKey;
     }
   }
   if (!src) return null;
   return {
     src,
-    width: number(img.getAttribute('width')),
-    height: number(img.getAttribute('height')),
+    width: cleanDimension(img.getAttribute('width')),
+    height: cleanDimension(img.getAttribute('height')),
     alt: cleanLine(img.getAttribute('alt'), textLimits.alt),
     srcset: cleanSrcset(img.getAttribute('srcset')),
     placeholder: placeholderOf(img),
-    uploadId: img.getAttribute('data-upload-id'),
+    uploadId: cleanUploadId(img.getAttribute('data-upload-id')),
     uploadKey,
   };
 }
@@ -212,7 +243,7 @@ export function imageFromFigure(figure: HTMLElement, options: SourceOptions): Pa
   const caption = figure.querySelector(':scope > figcaption');
   return {
     ...source,
-    id: figure.getAttribute('data-id') ?? undefined,
+    id: cleanId(figure.getAttribute('data-id')) ?? undefined,
     caption: cleanText(caption?.textContent ?? '', textLimits.caption),
     align: alignOf(figure.getAttribute('data-align')),
   };
@@ -224,34 +255,45 @@ export function imageFromImg(img: HTMLElement, options: SourceOptions): Partial<
   return source ? { ...source, caption: '', align: 'center' } : false;
 }
 
-/** A `gallery` node from our own `figure[data-pc-gallery]`. */
-export function galleryFromFigure(figure: HTMLElement, options: SourceOptions): Partial<GalleryAttrs> | false {
+/**
+ * A `gallery` node from our own `figure[data-pc-gallery]`, held to the gallery's limits: at most `maxPhotos`, unique
+ * photo keys, an allowed layout and places that follow the collage rules.
+ */
+export function galleryFromFigure(
+  figure: HTMLElement,
+  options: SourceOptions,
+  limits: GalleryLimits = defaultGalleryLimits,
+): Partial<GalleryAttrs> | false {
   const photos: GalleryPhoto[] = [];
-  figure.querySelectorAll('li').forEach((li, index) => {
+  const keys = new Set<string>();
+  for (const li of Array.from(figure.querySelectorAll('li'))) {
+    if (photos.length >= limits.maxPhotos) break;
     const img = li.querySelector('img');
     const source = img ? sourceFromImg(img, options) : null;
-    if (!source) return;
-    const hasPlace = li.hasAttribute('data-x');
-    photos.push({
-      ...source,
-      key: li.getAttribute('data-key') || `p${index}`,
-      place: hasPlace
-        ? {
-            x: Number(li.getAttribute('data-x')),
-            y: Number(li.getAttribute('data-y')),
-            w: Number(li.getAttribute('data-w')),
-            r: Number(li.getAttribute('data-r')),
-          }
-        : null,
-    });
-  });
+    if (!source) continue;
+    const wanted = li.getAttribute('data-key') ?? '';
+    let key = /^[a-z0-9_-]{1,40}$/i.test(wanted) && !keys.has(wanted) ? wanted : '';
+    for (let n = photos.length; !key || keys.has(key); n++) key = `p${n}`;
+    keys.add(key);
+    const place = li.hasAttribute('data-x')
+      ? {
+          x: Number(li.getAttribute('data-x')),
+          y: Number(li.getAttribute('data-y')),
+          w: Number(li.getAttribute('data-w')),
+          r: Number(li.getAttribute('data-r')),
+        }
+      : null;
+    photos.push({ ...source, key, place });
+  }
   if (photos.length === 0) return false;
-  const layout = figure.getAttribute('data-layout');
+  const wantedLayout = figure.getAttribute('data-layout') as GalleryLayout | null;
+  const layout =
+    wantedLayout && limits.layouts.includes(wantedLayout) ? wantedLayout : (limits.layouts[0] ?? 'carousel');
   const caption = figure.querySelector(':scope > figcaption');
   return {
-    id: figure.getAttribute('data-id') ?? undefined,
-    layout: layout === 'grid' || layout === 'masonry' || layout === 'collage' ? layout : 'carousel',
-    photos,
+    id: cleanId(figure.getAttribute('data-id')) ?? undefined,
+    layout,
+    photos: normalizePlaces(photos, layout),
     caption: cleanText(caption?.textContent ?? '', textLimits.caption),
   };
 }
@@ -263,19 +305,21 @@ export function fileFromCard(card: HTMLElement, options: SourceOptions): Partial
   let src = safeHttpUrl(raw);
   let uploadKey: string | null = null;
   const key = card.getAttribute('data-upload-key');
-  if (!src && options.allowBlob && key) {
-    src = safeMediaSrc(raw, { allowBlob: true });
-    uploadKey = src ? key : null;
+  if (key && options.previewOf?.(key)) {
+    src = `${stagedSrcPrefix}${key}`;
+    uploadKey = key;
+  } else if (!src && options.ownsBlob?.(raw)) {
+    src = raw;
   }
   if (!src) return false;
-  const size = card.getAttribute('data-size');
+  const size = Number(card.getAttribute('data-size') ?? Number.NaN);
   return {
-    id: card.getAttribute('data-id') ?? undefined,
+    id: cleanId(card.getAttribute('data-id')) ?? undefined,
     src,
     name: cleanLine(card.getAttribute('data-name'), textLimits.name) || 'file',
-    size: size !== null && Number.isFinite(Number(size)) ? Math.max(0, Math.round(Number(size))) : null,
-    mimeType: card.getAttribute('data-mime'),
-    uploadId: link?.getAttribute('data-upload-id') ?? null,
+    size: Number.isFinite(size) && size >= 0 ? Math.min(1e13, Math.round(size)) : null,
+    mimeType: cleanMime(card.getAttribute('data-mime')),
+    uploadId: cleanUploadId(link?.getAttribute('data-upload-id')),
     uploadKey,
   };
 }

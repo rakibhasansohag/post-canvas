@@ -143,7 +143,7 @@ export function readHtmlMeta(html: string): HtmlMeta {
   const meta = new Map<string, string>();
   const icons: string[] = [];
   const touchIcons: string[] = [];
-  for (const match of source.matchAll(/<(meta|link)\b([^<>]*)>/gi)) {
+  for (const match of source.matchAll(/<(meta|link)\b((?:[^<>"']|"[^"]*"|'[^']*')*)>/gi)) {
     const attributes = parseAttributes(match[2] ?? '');
     if (match[1]?.toLowerCase() === 'meta') {
       const content = attributes.get('content');

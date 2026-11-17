@@ -1,1 +1,1300 @@
-/* Owner: chat A (media canvas). Image, gallery, file and cover. */
+/* Owner: chat A (media canvas). Image, gallery, file and cover: the saved output, the editor's node views, the photo
+   manager, the collage editor and the cover field. Tokens only, so light and dark both follow tokens.css. */
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   Spacing and alignment, shared by the output (figure and div as direct children) and the editor (the node wrapper).
+   --------------------------------------------------------------------------------------------------------------------- */
+
+.pc-content > .pc-image,
+.pc-content > .pc-gallery,
+.pc-content > .pc-file,
+.pc-content > .pc-node {
+  margin-block: 1.25em;
+}
+
+.pc-content > .pc-gallery,
+.pc-content > .pc-file,
+.pc-content > .pc-node--gallery,
+.pc-content > .pc-node--file {
+  clear: both;
+}
+
+.pc-root .pc-node .pc-frame {
+  margin-block: 0;
+}
+
+/* ProseMirror's own node outline would double the frame's ring. */
+.pc-root .pc-node.ProseMirror-selectednode {
+  outline: none;
+}
+
+/* How far wide and full pictures may reach past the text column. Apps with a wider page set these. */
+.pc-root .ProseMirror {
+  --pc-media-bleed-full: var(--pc-space-4);
+}
+
+.pc-content > .pc-image--wide,
+.pc-content > .pc-node[data-pc-align='wide'] {
+  margin-inline: calc(-1 * var(--pc-media-bleed-wide, 0px));
+}
+
+.pc-content > .pc-image--full,
+.pc-content > .pc-node[data-pc-align='full'] {
+  margin-inline: calc(-1 * var(--pc-media-bleed-full, 0px));
+}
+
+.pc-content > .pc-image--left,
+.pc-content > .pc-node[data-pc-align='left'] {
+  float: left;
+  width: min(50%, 22rem);
+  margin: 0.25em var(--pc-space-6) var(--pc-space-3) 0;
+}
+
+.pc-content > .pc-image--right,
+.pc-content > .pc-node[data-pc-align='right'] {
+  float: right;
+  width: min(50%, 22rem);
+  margin: 0.25em 0 var(--pc-space-3) var(--pc-space-6);
+}
+
+/* On a phone a floated picture would squeeze the text into a sliver, so it takes the full width. */
+@media (max-width: 480px) {
+  .pc-content > .pc-image--left,
+  .pc-content > .pc-image--right,
+  .pc-content > .pc-node[data-pc-align='left'],
+  .pc-content > .pc-node[data-pc-align='right'] {
+    float: none;
+    width: auto;
+    margin: 1.25em 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   Image
+   --------------------------------------------------------------------------------------------------------------------- */
+
+.pc-image {
+  position: relative;
+  margin: 0;
+}
+
+.pc-image__media {
+  position: relative;
+  display: block;
+}
+
+.pc-image__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface) center / cover no-repeat;
+}
+
+/* Center keeps the picture's own size, up to a comfortable width, in the middle of the column. */
+.pc-image--center,
+.pc-node[data-pc-align='center'] .pc-frame--image {
+  width: fit-content;
+  max-width: min(100%, var(--pc-media-center-width, 40rem));
+  margin-inline: auto;
+}
+
+.pc-image--center .pc-image__img {
+  width: auto;
+  max-width: 100%;
+}
+
+.pc-image--full .pc-image__img {
+  border-radius: 0;
+}
+
+.pc-image__caption,
+.pc-gallery__caption {
+  display: block;
+  margin: var(--pc-space-2) 0 0;
+  color: var(--pc-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   Gallery
+   --------------------------------------------------------------------------------------------------------------------- */
+
+.pc-gallery {
+  position: relative;
+  margin: 0;
+  container-type: inline-size;
+}
+
+.pc-gallery__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-gallery__item {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  background: var(--pc-surface);
+}
+
+.pc-gallery__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--pc-surface) center / cover no-repeat;
+}
+
+/* One photo fills the width, framed between 4:5 and 1.91:1 (the ratio is set inline). */
+.pc-gallery--single .pc-gallery__item {
+  max-height: 560px;
+  border-radius: var(--pc-radius);
+}
+
+/* Carousel: a strip at a fixed height, every photo at its own width, snapping without JavaScript. */
+.pc-gallery--carousel .pc-gallery__list {
+  display: flex;
+  gap: 2px;
+  height: 300px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  border-radius: var(--pc-radius);
+  user-select: none;
+}
+
+.pc-gallery--carousel .pc-gallery__list[data-dragging] {
+  scroll-snap-type: none;
+}
+
+.pc-gallery--carousel .pc-gallery__item {
+  flex: none;
+  height: 100%;
+  max-width: min(90%, 30rem);
+  scroll-snap-align: start;
+}
+
+.pc-gallery--carousel .pc-gallery__img {
+  width: auto;
+  max-width: 100%;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pc-gallery--carousel .pc-gallery__list[data-drag-scroll] {
+    cursor: grab;
+  }
+
+  .pc-gallery--carousel .pc-gallery__list[data-dragging] {
+    cursor: grabbing;
+  }
+}
+
+/* Grid: even square tiles; two photos side by side at 4:5, three with the first one tall. */
+.pc-gallery--grid .pc-gallery__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  overflow: hidden;
+  border-radius: var(--pc-radius);
+}
+
+.pc-gallery--grid .pc-gallery__item {
+  aspect-ratio: 1;
+}
+
+.pc-gallery--grid[data-count='2'] .pc-gallery__item {
+  aspect-ratio: 4 / 5;
+}
+
+.pc-gallery--grid[data-count='3'] .pc-gallery__item:first-child {
+  grid-row: span 2;
+  aspect-ratio: auto;
+}
+
+@container (min-width: 520px) {
+  .pc-gallery--grid .pc-gallery__list:has(> :nth-child(5)) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Masonry: columns of whole, uncropped photos. */
+.pc-gallery--masonry .pc-gallery__list {
+  columns: 2;
+  column-gap: 2px;
+  overflow: hidden;
+  border-radius: var(--pc-radius);
+}
+
+@container (min-width: 560px) {
+  .pc-gallery--masonry .pc-gallery__list:has(> :nth-child(5)) {
+    columns: 3;
+  }
+}
+
+.pc-gallery--masonry .pc-gallery__item {
+  margin-bottom: 2px;
+  break-inside: avoid;
+}
+
+.pc-gallery--masonry .pc-gallery__img {
+  height: auto;
+}
+
+/* Collage: the first photo fills the frame, every later one sits on it where it was placed (set inline). */
+.pc-gallery--collage {
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface);
+}
+
+.pc-gallery--collage .pc-gallery__list {
+  position: relative;
+  margin-inline: auto;
+  overflow: hidden;
+}
+
+.pc-gallery__item--base {
+  position: absolute;
+  inset: 0;
+}
+
+.pc-gallery__item--layer {
+  position: absolute;
+  border-radius: 3%;
+  box-shadow: var(--pc-shadow);
+  outline: 1px solid color-mix(in srgb, var(--pc-background) 70%, transparent);
+}
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   File
+   --------------------------------------------------------------------------------------------------------------------- */
+
+.pc-file .pc-file__link {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-3);
+  padding: var(--pc-space-3);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius);
+  color: var(--pc-text);
+  background: var(--pc-surface-raised);
+  text-decoration: none;
+  transition: border-color var(--pc-duration) ease;
+}
+
+.pc-file a.pc-file__link:hover {
+  border-color: var(--pc-accent);
+  color: var(--pc-text);
+  text-decoration: none;
+}
+
+.pc-file__badge {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  justify-content: center;
+  width: 40px;
+  height: 48px;
+  padding-bottom: 6px;
+  border-radius: var(--pc-radius-sm) 14px var(--pc-radius-sm) var(--pc-radius-sm);
+  color: var(--pc-background);
+  background: var(--pc-color-gray);
+  font: 700 0.625rem / 1 var(--pc-font-mono);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+}
+
+.pc-file[data-kind='text'] .pc-file__badge {
+  background: var(--pc-color-blue);
+}
+
+.pc-file[data-kind='sheet'] .pc-file__badge {
+  background: var(--pc-color-green);
+}
+
+.pc-file[data-kind='archive'] .pc-file__badge {
+  background: var(--pc-color-brown);
+}
+
+.pc-file[data-kind='code'] .pc-file__badge {
+  background: var(--pc-color-purple);
+}
+
+.pc-file[data-kind='image'] .pc-file__badge {
+  background: var(--pc-color-pink);
+}
+
+.pc-file[data-kind='video'] .pc-file__badge {
+  background: var(--pc-color-red);
+}
+
+.pc-file[data-kind='audio'] .pc-file__badge {
+  background: var(--pc-color-orange);
+}
+
+.pc-file__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pc-file__name {
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.pc-file__meta {
+  color: var(--pc-muted);
+  font-size: 0.8125rem;
+}
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   Editor: upload state, captions, panels and controls
+   --------------------------------------------------------------------------------------------------------------------- */
+
+.pc-gallery-stage,
+.pc-file-stage {
+  position: relative;
+}
+
+.pc-upload-status {
+  position: absolute;
+  bottom: var(--pc-space-2);
+  left: var(--pc-space-2);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-1);
+  min-width: 9rem;
+  max-width: calc(100% - 2 * var(--pc-space-2));
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--pc-radius-sm);
+  color: var(--pc-text);
+  background: var(--pc-overlay);
+  backdrop-filter: blur(6px);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.pc-upload-status--failed {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--pc-danger);
+}
+
+.pc-upload-status--button {
+  cursor: pointer;
+}
+
+.pc-gallery-status {
+  position: absolute;
+  bottom: var(--pc-space-2);
+  left: var(--pc-space-2);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.pc-gallery-status .pc-upload-status {
+  position: static;
+}
+
+.pc-file-stage .pc-upload-status {
+  position: static;
+  margin-top: var(--pc-space-2);
+  backdrop-filter: none;
+  background: var(--pc-surface);
+}
+
+.pc-media-progress {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-border);
+}
+
+.pc-media-progress__bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--pc-accent);
+  transition: width 300ms ease-out;
+}
+
+.pc-caption-field {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: var(--pc-space-2) 0 0;
+  padding: 2px var(--pc-space-1);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--pc-radius-sm);
+  color: var(--pc-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  text-align: center;
+  resize: none;
+}
+
+.pc-caption-field::placeholder {
+  color: var(--pc-muted);
+  opacity: 0.7;
+}
+
+.pc-caption-field:focus {
+  outline: none;
+  color: var(--pc-text);
+}
+
+/* An empty caption only shows its placeholder while the block is hovered, selected or focused. */
+.pc-frame:not(:focus-within):not([data-selected]) .pc-caption-field:placeholder-shown {
+  opacity: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pc-frame:hover .pc-caption-field:placeholder-shown {
+    opacity: 1;
+  }
+}
+
+.pc-media-anchor {
+  display: inline-flex;
+}
+
+.pc-media-divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin-inline: 2px;
+  background: var(--pc-border-strong);
+}
+
+.pc-frame--gallery {
+  container-type: inline-size;
+}
+
+.pc-frame--gallery .pc-media-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: calc(100% - 2 * var(--pc-space-2));
+}
+
+/* Wide galleries get a toggle per layout; narrow ones a single Layout menu, so the toolbar stays on one row. */
+.pc-layout-toggles {
+  display: contents;
+}
+
+.pc-layout-menu-button {
+  display: none;
+}
+
+@container (max-width: 560px) {
+  .pc-layout-toggles {
+    display: none;
+  }
+
+  .pc-layout-menu-button {
+    display: inline-flex;
+  }
+}
+
+.pc-gallery-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--pc-space-1);
+  padding: var(--pc-space-1) var(--pc-space-2);
+  border-bottom: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius) var(--pc-radius) 0 0;
+  background: var(--pc-surface);
+}
+
+.pc-media-panel {
+  width: min(22rem, calc(100vw - 16px));
+  padding: var(--pc-space-3);
+}
+
+.pc-media-panel--wide {
+  width: min(40rem, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: min(80vh, 46rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.pc-alt-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-2);
+}
+
+.pc-media-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pc-media-field__label {
+  margin: 0;
+  padding: 0;
+  color: var(--pc-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.pc-media-field__hint {
+  margin: 0;
+  color: var(--pc-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.pc-media-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--pc-space-3);
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius-sm);
+  color: var(--pc-text);
+  background: var(--pc-background);
+  font: inherit;
+  font-size: 1rem;
+  transition: border-color var(--pc-duration) ease;
+}
+
+.pc-media-input--area {
+  min-height: 5.5rem;
+  padding: 10px var(--pc-space-3);
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.pc-media-input:focus {
+  border-color: var(--pc-accent);
+  outline: none;
+}
+
+.pc-media-input::placeholder {
+  color: var(--pc-muted);
+}
+
+.pc-media-panel__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pc-media-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius-full);
+  color: var(--pc-text);
+  background: var(--pc-surface-raised);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--pc-duration) ease,
+    border-color var(--pc-duration) ease;
+}
+
+.pc-media-button:hover {
+  border-color: var(--pc-accent);
+}
+
+.pc-media-button--primary {
+  border-color: transparent;
+  color: var(--pc-accent-text);
+  background: var(--pc-accent);
+}
+
+.pc-media-button--primary:hover {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--pc-accent) 88%, var(--pc-text));
+}
+
+.pc-media-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pc-media-button:disabled:hover {
+  border-color: var(--pc-border-strong);
+}
+
+.pc-media-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 var(--pc-space-2);
+  border: 0;
+  border-radius: var(--pc-radius-full);
+  color: var(--pc-text);
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pc-media-text-button:hover {
+  color: var(--pc-accent);
+}
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   Photo manager
+   --------------------------------------------------------------------------------------------------------------------- */
+
+.pc-photo-manager {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-3);
+}
+
+.pc-photo-manager__header {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-3);
+  padding-bottom: var(--pc-space-3);
+  border-bottom: 1px solid var(--pc-border);
+}
+
+.pc-photo-manager__heading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pc-photo-manager__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.pc-photo-manager__status {
+  color: var(--pc-muted);
+  font-size: 0.75rem;
+}
+
+.pc-photo-manager__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: var(--pc-space-4) var(--pc-space-3);
+  margin: 0;
+  padding: var(--pc-space-2) 0 0;
+  list-style: none;
+}
+
+.pc-photo-manager__cell {
+  position: relative;
+  border-radius: var(--pc-radius);
+  transition: box-shadow 200ms ease-out;
+}
+
+.pc-photo-manager__cell[data-target] {
+  box-shadow: 0 0 0 3px var(--pc-accent);
+}
+
+.pc-photo-manager__add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pc-space-1);
+  width: 100%;
+  aspect-ratio: 1;
+  padding: var(--pc-space-2);
+  border: 1.5px dashed var(--pc-border-strong);
+  border-radius: var(--pc-radius);
+  color: var(--pc-text);
+  background: var(--pc-surface);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.pc-photo-manager__add:hover {
+  border-color: var(--pc-accent);
+}
+
+.pc-photo-manager__add svg {
+  color: var(--pc-accent);
+}
+
+.pc-photo-manager__selected {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-3);
+  padding: var(--pc-space-3);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface);
+}
+
+.pc-photo-manager__error {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-2);
+  margin: 0;
+  color: var(--pc-danger);
+  font-size: 0.8125rem;
+}
+
+.pc-photo-manager__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pc-space-2);
+}
+
+.pc-photo-manager__layouts {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pc-photo-manager__layouts legend {
+  margin-bottom: var(--pc-space-2);
+}
+
+.pc-photo-manager__layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--pc-space-2);
+}
+
+.pc-layout-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: var(--pc-space-2) var(--pc-space-3);
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius);
+  color: var(--pc-text);
+  background: var(--pc-surface-raised);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--pc-duration) ease,
+    background-color var(--pc-duration) ease;
+}
+
+.pc-layout-option:hover {
+  border-color: var(--pc-accent);
+}
+
+.pc-layout-option[aria-pressed='true'] {
+  border-color: var(--pc-accent);
+  background: var(--pc-accent-soft);
+}
+
+.pc-layout-option svg {
+  flex: none;
+}
+
+.pc-layout-option__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pc-layout-option__name {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.pc-layout-option__hint {
+  color: var(--pc-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+/* One photo tile in the manager. */
+.pc-tile {
+  position: relative;
+  transition: opacity 300ms ease-out;
+}
+
+.pc-tile[data-dragging] {
+  z-index: 10;
+  opacity: 0.8;
+}
+
+.pc-tile__button {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--pc-radius);
+  color: var(--pc-text);
+  background: var(--pc-surface);
+  font: inherit;
+  cursor: grab;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: box-shadow 200ms ease-out;
+}
+
+.pc-tile__button[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--pc-background),
+    0 0 0 4px var(--pc-accent);
+}
+
+.pc-tile__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.pc-tile__name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--pc-space-2);
+  color: var(--pc-muted);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.pc-tile__number {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-overlay);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-tile__badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border-radius: var(--pc-radius-full);
+  color: var(--pc-accent-text);
+  background: var(--pc-accent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-tile__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--pc-space-1);
+  padding: var(--pc-space-2);
+  background: color-mix(in srgb, var(--pc-background) 45%, transparent);
+}
+
+.pc-tile__overlay--failed {
+  align-items: center;
+  justify-content: center;
+  color: var(--pc-danger);
+  background: var(--pc-overlay);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.pc-tile__percent {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.pc-tile__remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius-full);
+  color: var(--pc-text);
+  background: var(--pc-surface-raised);
+  box-shadow: var(--pc-shadow);
+  cursor: pointer;
+  transition:
+    background-color var(--pc-duration) ease,
+    color var(--pc-duration) ease;
+}
+
+/* A bigger hit area than the dot it draws. */
+.pc-tile__remove::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+.pc-tile__remove:hover {
+  color: var(--pc-background);
+  background: var(--pc-danger);
+}
+
+.pc-tile__retry {
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--pc-space-1);
+}
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   Collage editor
+   --------------------------------------------------------------------------------------------------------------------- */
+
+.pc-collage-editor {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0 0 var(--pc-radius) var(--pc-radius);
+  background: var(--pc-surface);
+}
+
+.pc-collage-editor__stage {
+  display: flex;
+  justify-content: center;
+}
+
+.pc-collage-editor__frame {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.pc-collage-editor__base {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pc-collage-editor__layer {
+  position: absolute;
+  outline: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.pc-collage-editor__layer:active {
+  cursor: grabbing;
+}
+
+.pc-collage-editor__layer[data-selected] {
+  z-index: 10;
+}
+
+.pc-collage-editor__print {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 3%;
+  box-shadow: var(--pc-shadow);
+  outline: 1px solid color-mix(in srgb, var(--pc-background) 70%, transparent);
+  transition: box-shadow 200ms ease-out;
+}
+
+.pc-collage-editor__print img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.pc-collage-editor__layer[data-selected] .pc-collage-editor__print,
+.pc-collage-editor__layer:focus-visible .pc-collage-editor__print {
+  box-shadow:
+    0 0 0 2px var(--pc-accent),
+    var(--pc-shadow);
+}
+
+.pc-collage-editor__stem {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  width: 2px;
+  height: 28px;
+  background: var(--pc-accent);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.pc-collage-editor__turn {
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--pc-accent);
+  border-radius: var(--pc-radius-full);
+  color: var(--pc-accent);
+  background: var(--pc-background);
+  transform: translateX(-50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.pc-collage-editor__resize {
+  position: absolute;
+  right: -12px;
+  bottom: -12px;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--pc-accent);
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-background);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.pc-collage-editor__turn::before,
+.pc-collage-editor__resize::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+
+.pc-collage-editor__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pc-space-1);
+  padding: 6px var(--pc-space-2);
+  border-top: 1px solid var(--pc-border);
+}
+
+.pc-collage-editor__hint {
+  flex: 1 1 12rem;
+  min-width: 0;
+  padding: 0 var(--pc-space-2);
+  color: var(--pc-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.pc-collage-editor__spacer {
+  flex: 1 0 0;
+}
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   Cover field
+   --------------------------------------------------------------------------------------------------------------------- */
+
+.pc-cover {
+  margin: 0;
+}
+
+.pc-cover__add {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-3);
+  width: 100%;
+  padding: var(--pc-space-3) 14px;
+  border: 1.5px dashed var(--pc-border-strong);
+  border-radius: var(--pc-radius);
+  color: var(--pc-text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--pc-duration) ease;
+}
+
+.pc-cover__add:hover {
+  border-color: var(--pc-accent);
+}
+
+.pc-cover__add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pc-cover__add-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--pc-radius-sm);
+  color: var(--pc-accent);
+  background: var(--pc-accent-soft);
+}
+
+.pc-cover__add-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pc-cover__add-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.pc-cover__add-hint {
+  color: var(--pc-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.pc-cover__media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface);
+}
+
+.pc-cover__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pc-cover__badge {
+  position: absolute;
+  top: var(--pc-space-3);
+  left: var(--pc-space-3);
+  padding: 4px 10px;
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-overlay);
+  backdrop-filter: blur(6px);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.pc-cover__tools {
+  position: absolute;
+  top: var(--pc-space-2);
+  right: var(--pc-space-2);
+}
+
+.pc-cover__alt {
+  margin-top: var(--pc-space-2);
+}
+
+.pc-cover__alt-input {
+  border-color: transparent;
+  background: transparent;
+  color: var(--pc-muted);
+}
+
+.pc-cover__alt-input:hover {
+  border-color: var(--pc-border);
+}
+
+.pc-cover__alt-input:focus {
+  color: var(--pc-text);
+}
+
+.pc-cover__error {
+  margin: var(--pc-space-2) 0 0;
+  color: var(--pc-danger);
+  font-size: 0.8125rem;
+}
+
+/* ---------------------------------------------------------------------------------------------------------------------
+   Touch: 44 px targets, and the caption placeholder always visible (there's no hover).
+   --------------------------------------------------------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+  .pc-media-button,
+  .pc-media-text-button {
+    min-height: 44px;
+  }
+
+  .pc-tile__remove {
+    width: 32px;
+    height: 32px;
+  }
+
+  .pc-tile__remove::before {
+    inset: -6px;
+  }
+
+  .pc-collage-editor__turn {
+    width: 40px;
+    height: 40px;
+    top: -52px;
+  }
+
+  .pc-collage-editor__stem {
+    top: -32px;
+    height: 32px;
+  }
+
+  .pc-collage-editor__resize {
+    width: 32px;
+    height: 32px;
+    right: -16px;
+    bottom: -16px;
+  }
+
+  .pc-frame:not(:focus-within):not([data-selected]) .pc-caption-field:placeholder-shown {
+    opacity: 1;
+  }
+}

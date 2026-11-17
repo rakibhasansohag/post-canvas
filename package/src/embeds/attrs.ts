@@ -74,7 +74,8 @@ export function sanitizeVideoAttrs(attrs: Record<string, unknown>): Record<strin
     videoId: attrs.videoId,
     hash: provider === 'vimeo' ? hash : null,
     vertical: provider === 'youtube' && attrs.vertical === true,
-    start,
+    // A Short's canonical URL has no start time, so a vertical video never keeps one.
+    start: provider === 'youtube' && attrs.vertical === true ? null : start,
   };
   if (!verifyEmbedRef(videoProviders[provider], embedRefFromVideoRef(video))) return null;
   const clean: Omit<VideoAttrs, 'id'> & { id: string | null } = {

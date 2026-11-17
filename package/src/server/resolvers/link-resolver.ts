@@ -30,9 +30,10 @@ export interface LinkPreviewResolverOptions {
   /** The `user-agent` header sent with every request. */
   userAgent?: string;
   /**
-   * A `fetch` to use instead of undici's. It receives `redirect: 'manual'`; the resolver follows redirects itself. An
-   * injected `fetch` connects on its own, so the resolver can't pin its connection to the checked address: only inject
-   * one that resolves names the same way (or in tests).
+   * A `fetch` to use instead of undici's. It receives `redirect: 'manual'`; the resolver follows redirects itself.
+   * **An injected `fetch` is not safe against DNS rebinding:** it resolves the name again when it connects, so a host
+   * that answers the check with a public address and the connection with a private one gets through. Inject one only
+   * in tests or behind an egress proxy that blocks private networks itself.
    */
   fetch?: ResolverFetch;
   /** Resolves host names. Default `lookup` from `node:dns/promises`. */
@@ -84,7 +85,7 @@ function cancelBody(response: Response): void {
 }
 
 /** Reads at most `maxBytes` of a body, then cancels the rest. */
-async function readHead(body: ReadableStream<Uint8Array> | null, maxBytes: number): Promise<Uint8Array> {
+export async function readHead(body: ReadableStream<Uint8Array> | null, maxBytes: number): Promise<Uint8Array> {
   if (!body) return new Uint8Array(0);
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];

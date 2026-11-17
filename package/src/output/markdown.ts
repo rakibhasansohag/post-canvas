@@ -15,6 +15,14 @@ function attrsOf(node: { attrs?: Record<string, unknown> }): Attrs {
   return node.attrs && typeof node.attrs === 'object' ? node.attrs : {};
 }
 
+/** A node's children from untrusted JSON: plain objects from a real array only. */
+function kids(node: JSONContent): JSONContent[] {
+  const content: unknown = node.content;
+  return Array.isArray(content)
+    ? content.filter((child): child is JSONContent => !!child && typeof child === 'object' && !Array.isArray(child))
+    : [];
+}
+
 function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
@@ -89,7 +97,7 @@ function inline(nodes: readonly JSONContent[]): string {
     let common = 0;
     while (common < stack.length && common < marks.length && stack[common]?.key === marks[common]?.key) common++;
     closeTo(common);
-    let text = '';
+    let text: string;
     if (node.type === 'text') {
       text = marks.some((mark) => mark.type === 'code') ? str(node.text).replace(/`/g, "'") : escapeText(str(node.text));
     } else if (node.type === 'hardBreak') {
@@ -98,7 +106,7 @@ function inline(nodes: readonly JSONContent[]): string {
       const attrs = attrsOf(node);
       text = `${attrs.mentionSuggestionChar === '#' ? '#' : '@'}${escapeText(str(attrs.label) || str(attrs.id))}`;
     } else {
-      text = inline(node.content ?? []);
+      text = inline(kids(node));
     }
     const leading = marks.length > common ? (/^\s*/.exec(text)?.[0] ?? '') : '';
     out += leading;
@@ -125,15 +133,15 @@ function image(source: Attrs): string {
 }
 
 function cellText(cell: JSONContent): string {
-  return (cell.content ?? [])
-    .map((block) => inline(block.content ?? []))
+  return kids(cell)
+    .map((block) => inline(kids(block)))
     .join('<br>')
     .replace(/\|/g, '\\|')
     .replace(/\n/g, ' ');
 }
 
 function table(node: JSONContent): string {
-  const rows = (node.content ?? []).map((row) => (row.content ?? []).map(cellText));
+  const rows = kids(node).map((row) => kids(row).map(cellText));
   if (rows.length === 0) return '';
   const width = Math.max(...rows.map((row) => row.length), 1);
   const pad = (row: string[]) => [...row, ...Array<string>(width - row.length).fill('')];
@@ -147,11 +155,11 @@ function table(node: JSONContent): string {
 
 function list(node: JSONContent, ordered: boolean): string {
   const start = typeof attrsOf(node).start === 'number' ? (attrsOf(node).start as number) : 1;
-  return (node.content ?? [])
+  return kids(node)
     .map((item, index) => {
       const marker =
         item.type === 'taskItem' ? `- [${attrsOf(item).checked === true ? 'x' : ' '}] ` : ordered ? `${start + index}. ` : '- ';
-      const body = blocks(item.content ?? [], true);
+      const body = blocks(kids(item), true);
       return marker + indent(body, ' '.repeat(ordered ? marker.length : 2));
     })
     .join('\n');
@@ -161,13 +169,13 @@ function block(node: JSONContent, tight: boolean): string {
   const attrs = attrsOf(node);
   switch (node.type) {
     case 'paragraph':
-      return escapeLineStart(inline(node.content ?? []));
+      return escapeLineStart(inline(kids(node)));
     case 'heading': {
       const level = typeof attrs.level === 'number' ? Math.min(Math.max(attrs.level, 1), 6) : 2;
-      return `${'#'.repeat(level)} ${inline(node.content ?? [])}`;
+      return `${'#'.repeat(level)} ${inline(kids(node))}`;
     }
     case 'blockquote':
-      return blocks(node.content ?? [], false)
+      return blocks(kids(node), false)
         .split('\n')
         .map((line) => (line ? `> ${line}` : '>'))
         .join('\n');
@@ -177,7 +185,7 @@ function block(node: JSONContent, tight: boolean): string {
     case 'orderedList':
       return list(node, true);
     case 'codeBlock': {
-      const code = (node.content ?? []).map((child) => str(child.text)).join('');
+      const code = kids(node).map((child) => str(child.text)).join('');
       const fence = /```/.test(code) ? '~~~~' : '```';
       const language = /^[a-z0-9+#-]{1,20}$/.test(str(attrs.language)) ? str(attrs.language) : '';
       return `${fence}${language}\n${code}\n${fence}`;
@@ -217,8 +225,8 @@ function block(node: JSONContent, tight: boolean): string {
     case 'embedInput':
       return '';
     default:
-      if (node.content?.some((child) => child.type === 'text')) return inline(node.content);
-      return blocks(node.content ?? [], tight);
+      if (kids(node).some((child) => child.type === 'text')) return inline(kids(node));
+      return blocks(kids(node), tight);
   }
 }
 
@@ -235,7 +243,7 @@ function blocks(nodes: readonly JSONContent[], tight: boolean): string {
  * Markdown can't show, such as underline or colour, is left out.
  */
 export function toMarkdown(json: JSONContent): string {
-  return `${blocks(json.content ?? [], false).trim()}\n`;
+  return `${blocks(kids(json), false).trim()}\n`;
 }
 
 /** Options of `fromMarkdown()`. */

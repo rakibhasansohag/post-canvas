@@ -62,7 +62,11 @@ export function duplicateBlock(editor: Editor, pos: number): boolean {
   const block = blockAt(editor, pos);
   if (!block) return false;
   const node = editor.state.doc.child(block.index);
-  const copy = node.type.create(node.type.spec.attrs && 'id' in node.attrs ? { ...node.attrs, id: null } : node.attrs, node.content, node.marks);
+  const copy = node.type.create(
+    node.type.spec.attrs && 'id' in node.attrs ? { ...node.attrs, id: null } : node.attrs,
+    node.content,
+    node.marks,
+  );
   editor.view.dispatch(editor.state.tr.insert(block.pos + block.size, copy).scrollIntoView());
   return true;
 }

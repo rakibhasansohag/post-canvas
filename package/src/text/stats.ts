@@ -51,7 +51,10 @@ let segmenter: Intl.Segmenter | null | undefined;
 /** Characters as a reader counts them: grapheme clusters, so an emoji or an accented letter counts once. */
 export function countCharacters(text: string): number {
   if (segmenter === undefined) {
-    segmenter = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+    segmenter =
+      typeof Intl !== 'undefined' && 'Segmenter' in Intl
+        ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+        : null;
   }
   if (!segmenter) return Array.from(text).length;
   let count = 0;
@@ -95,8 +98,9 @@ function collectText(node: JSONContent, out: { text: string; mentions: number; h
     const hashtag = node.attrs?.mentionSuggestionChar === '#';
     if (hashtag) out.hashtags++;
     else out.mentions++;
-    const label = node.attrs?.label ?? node.attrs?.id ?? '';
-    out.text += `${hashtag ? '#' : '@'}${String(label).replace(/\s+/g, '_')}`;
+    const attrs = node.attrs ?? {};
+    const label: unknown = attrs.label || attrs.id;
+    out.text += `${hashtag ? '#' : '@'}${typeof label === 'string' ? label.replace(/\s+/g, '_') : ''}`;
     return;
   }
   if (node.type === 'hardBreak') {

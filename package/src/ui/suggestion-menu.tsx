@@ -5,9 +5,11 @@ import { autoUpdate, computePosition, flip, offset, shift, type VirtualElement }
 import { Hash } from 'lucide-react';
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { safeMediaSrc } from '../core/url';
-import type { SuggestionEntry, SuggestionState } from '../text/menu-store';
+import { createMenuStore, type MenuStore, type SuggestionEntry, type SuggestionState } from '../text/menu-store';
 import { insertGroups } from './controls';
 import { useEditorUi } from './ui-context';
+
+const emptyStore = createMenuStore();
 
 function initials(label: string): string {
   return Array.from(label.trim())
@@ -20,7 +22,8 @@ function initials(label: string): string {
 /** Renders the open suggestion list, if any. */
 export function SuggestionMenu() {
   const { editor, t } = useEditorUi();
-  const store = editor.storage.postCanvasText.menu;
+  // An editor built without the text kit has no store; an empty one keeps the hooks in order.
+  const store = (editor.storage.postCanvasText as { menu?: MenuStore } | undefined)?.menu ?? emptyStore;
   const state = useSyncExternalStore(store.subscribe, store.getSuggestion, () => null);
   const announcement = !state
     ? ''
@@ -47,11 +50,15 @@ function SuggestionList({ state }: { state: SuggestionState }) {
   const index = entries.length === 0 ? -1 : Math.min(active, entries.length - 1);
 
   // A new query starts at the top.
-  useEffect(() => setActive(0), [state.query]);
+  const [query, setQuery] = useState(state.query);
+  if (query !== state.query) {
+    setQuery(state.query);
+    setActive(0);
+  }
 
   // Keys arrive from the suggestion plugin while focus stays in the editor.
   useEffect(() => {
-    const store = editor.storage.postCanvasText.menu;
+    const store = (editor.storage.postCanvasText as { menu?: MenuStore } | undefined)?.menu ?? emptyStore;
     store.setKeyHandler((event) => {
       if (entries.length === 0) return false;
       if (event.key === 'ArrowDown') {
@@ -95,7 +102,9 @@ function SuggestionList({ state }: { state: SuggestionState }) {
   // Position under the typed trigger, and keep it there while the page scrolls.
   const panel = useRef<HTMLDivElement>(null);
   const rect = useRef(state.clientRect);
-  rect.current = state.clientRect;
+  useLayoutEffect(() => {
+    rect.current = state.clientRect;
+  });
   useLayoutEffect(() => {
     const floating = panel.current;
     if (!floating) return;

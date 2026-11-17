@@ -1,1 +1,515 @@
-/* Owner: chat C (output and embeds). Video, embeds, link cards and the paste-a-link field. */
+/* Owner: chat C (output and embeds). Video, embeds, link cards and the paste-a-link field. Tokens only. */
+
+/* ---------------------------------------------------------------------------------------------------------------- */
+/* Players                                                                                                           */
+/* ---------------------------------------------------------------------------------------------------------------- */
+
+.pc-content .pc-embed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-2);
+  margin: var(--pc-space-6) 0;
+  min-width: 0;
+}
+
+.pc-embed-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--pc-embed-ratio, 1.7778);
+  overflow: hidden;
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface);
+}
+
+.pc-embed-frame[style*='--pc-embed-height'] {
+  aspect-ratio: auto;
+  height: var(--pc-embed-height);
+}
+
+.pc-embed-vertical .pc-embed-frame {
+  width: auto;
+  height: min(560px, 70dvh);
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.pc-embed-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.pc-embed-x .pc-embed-frame,
+.pc-embed-instagram .pc-embed-frame,
+.pc-embed-tiktok .pc-embed-frame {
+  max-width: 550px;
+  margin-inline: auto;
+}
+
+.pc-embed-tiktok .pc-embed-frame {
+  width: auto;
+  height: min(740px, 80dvh);
+}
+
+/* The facade: a button in the editor and the views, a link in the static HTML. */
+.pc-embed-facade {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pc-space-2);
+  width: 100%;
+  height: 100%;
+  padding: var(--pc-space-4);
+  border: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--pc-text);
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pc-embed-facade:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px var(--pc-focus-ring);
+}
+
+.pc-embed-facade-plain {
+  background: var(--pc-surface);
+  border: 1px dashed var(--pc-border-strong);
+  border-radius: var(--pc-radius);
+}
+
+.pc-embed-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pc-embed-play {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-overlay);
+  color: var(--pc-background);
+  transition:
+    background-color var(--pc-duration) ease,
+    color var(--pc-duration) ease,
+    transform var(--pc-duration) ease;
+}
+
+.pc-embed-play::before {
+  content: '';
+  width: 22px;
+  height: 24px;
+  margin-inline-start: 4px;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.pc-embed-load {
+  width: 48px;
+  height: 48px;
+  background: var(--pc-accent);
+  color: var(--pc-accent-text);
+}
+
+.pc-embed-load::before {
+  width: 16px;
+  height: 18px;
+  margin-inline-start: 3px;
+}
+
+.pc-embed-facade:hover .pc-embed-play,
+.pc-embed-facade:focus-visible .pc-embed-play {
+  background: var(--pc-accent);
+  color: var(--pc-accent-text);
+  transform: scale(1.06);
+}
+
+.pc-embed-badge {
+  position: absolute;
+  top: var(--pc-space-3);
+  inset-inline-start: var(--pc-space-3);
+  padding: var(--pc-space-1) var(--pc-space-2);
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-surface-raised);
+  color: var(--pc-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.pc-embed-facade-plain .pc-embed-badge {
+  position: static;
+  font-size: 0.875rem;
+}
+
+.pc-embed-note {
+  max-width: 34ch;
+  color: var(--pc-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* Captions */
+.pc-embed-caption {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-1);
+  min-width: 0;
+}
+
+.pc-embed-title {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.pc-embed-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--pc-muted);
+  font-size: 0.9375rem;
+  white-space: pre-line;
+}
+
+.pc-content a.pc-embed-source {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 32px;
+  color: var(--pc-accent);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.pc-content a.pc-embed-source:hover {
+  text-decoration: underline;
+}
+
+.pc-embed-link {
+  margin: var(--pc-space-4) 0;
+}
+
+.pc-embed-status {
+  color: var(--pc-muted);
+  font-size: 0.8125rem;
+}
+
+/* Editable title and description in the editor */
+.pc-embed-fields input,
+.pc-embed-fields textarea {
+  display: block;
+  width: 100%;
+  padding: var(--pc-space-1) 0;
+  border: 0;
+  border-radius: var(--pc-radius-sm);
+  background: transparent;
+  color: var(--pc-text);
+  font: inherit;
+  resize: none;
+  overflow: hidden;
+}
+
+.pc-embed-fields .pc-embed-title-input {
+  font-weight: 700;
+}
+
+.pc-embed-fields .pc-embed-description-input {
+  color: var(--pc-muted);
+  font-size: 0.9375rem;
+}
+
+.pc-embed-fields input::placeholder,
+.pc-embed-fields textarea::placeholder {
+  color: var(--pc-muted);
+  opacity: 0.8;
+}
+
+.pc-embed-fields input:focus-visible,
+.pc-embed-fields textarea:focus-visible {
+  outline: 2px solid var(--pc-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------------------------------------------- */
+/* Link cards                                                                                                        */
+/* ---------------------------------------------------------------------------------------------------------------- */
+
+.pc-content .pc-link-card {
+  margin: var(--pc-space-6) 0;
+}
+
+.pc-content .pc-link-card-anchor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  text-decoration: none;
+  transition: border-color var(--pc-duration) ease;
+}
+
+.pc-content a.pc-link-card-anchor:hover {
+  border-color: var(--pc-border-strong);
+}
+
+.pc-content a.pc-link-card-anchor:focus-visible {
+  outline: 3px solid var(--pc-focus-ring);
+  outline-offset: 2px;
+}
+
+.pc-link-card-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.91;
+  object-fit: cover;
+  background: var(--pc-surface-raised);
+}
+
+.pc-link-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-1);
+  padding: var(--pc-space-3) var(--pc-space-4);
+  min-width: 0;
+}
+
+.pc-link-card-site {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-2);
+  color: var(--pc-muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.pc-link-card-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--pc-radius-sm);
+}
+
+.pc-link-card-title {
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.pc-link-card-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--pc-muted);
+  font-size: 0.9375rem;
+}
+
+@media (min-width: 560px) {
+  .pc-content .pc-link-card:not(.pc-link-card-text) .pc-link-card-anchor {
+    grid-template-columns: minmax(0, 1fr) 200px;
+  }
+
+  .pc-content .pc-link-card:not(.pc-link-card-text) .pc-link-card-image {
+    grid-column: 2;
+    grid-row: 1;
+    height: 100%;
+    aspect-ratio: auto;
+    min-height: 120px;
+  }
+
+  .pc-content .pc-link-card:not(.pc-link-card-text) .pc-link-card-body {
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: center;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------------------------- */
+/* The paste-a-link field                                                                                            */
+/* ---------------------------------------------------------------------------------------------------------------- */
+
+.pc-embed-input {
+  margin: var(--pc-space-4) 0;
+}
+
+.pc-embed-input-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-2);
+}
+
+.pc-embed-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-2);
+}
+
+.pc-embed-input-field {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pc-embed-input-icon {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: var(--pc-space-3);
+  color: var(--pc-accent);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.pc-embed-input-field input {
+  width: 100%;
+  height: 44px;
+  padding-inline: 40px var(--pc-space-3);
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font: inherit;
+}
+
+.pc-embed-input-field input:focus-visible {
+  border-color: var(--pc-accent);
+  outline: 2px solid var(--pc-focus-ring);
+  outline-offset: 1px;
+}
+
+.pc-embed-input-field input[aria-invalid='true'] {
+  border-color: var(--pc-danger);
+}
+
+.pc-embed-input-add,
+.pc-embed-input-cancel,
+.pc-embed-input-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pc-space-1);
+  flex: 0 0 auto;
+  height: 44px;
+  border: 0;
+  border-radius: var(--pc-radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pc-embed-input-add {
+  padding-inline: var(--pc-space-4);
+  background: var(--pc-accent);
+  color: var(--pc-accent-text);
+}
+
+.pc-embed-input-add:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.pc-embed-input-cancel {
+  width: 44px;
+  border-radius: var(--pc-radius-full);
+  background: transparent;
+  color: var(--pc-muted);
+}
+
+.pc-embed-input-cancel:hover {
+  background: var(--pc-surface);
+  color: var(--pc-text);
+}
+
+.pc-embed-input-add:focus-visible,
+.pc-embed-input-cancel:focus-visible,
+.pc-embed-input-actions button:focus-visible {
+  outline: 2px solid var(--pc-focus-ring);
+  outline-offset: 2px;
+}
+
+.pc-embed-input-status,
+.pc-embed-input-error {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.pc-embed-input-status {
+  color: var(--pc-muted);
+}
+
+.pc-embed-input-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pc-space-2);
+  color: var(--pc-danger);
+}
+
+.pc-embed-input-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--pc-space-2);
+}
+
+.pc-embed-input-actions button {
+  height: 32px;
+  padding-inline: var(--pc-space-3);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font-size: 0.8125rem;
+}
+
+.pc-spin {
+  animation: pc-spin 0.9s linear infinite;
+}
+
+@keyframes pc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (pointer: coarse) {
+  .pc-content a.pc-embed-source,
+  .pc-embed-input-actions button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pc-embed-input-add {
+    padding-inline: var(--pc-space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-embed-play,
+  .pc-content .pc-link-card-anchor {
+    transition: none;
+  }
+
+  .pc-embed-facade:hover .pc-embed-play {
+    transform: none;
+  }
+
+  .pc-spin {
+    animation: none;
+  }
+}

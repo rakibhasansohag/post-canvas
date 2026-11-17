@@ -59,9 +59,14 @@ export interface SanitizeOptions {
 export interface SanitizeResult {
   /** A clean document that fits the schema. Always a `doc`, with at least one block. */
   doc: JSONContent;
-  /** Everything that was removed or cut. Empty for a document that was already clean. */
+  /** What was removed or cut, at most the first 100 items. Empty for a document that was already clean. */
   removed: SanitizeRemoval[];
+  /** How many more removals there were beyond the first 100. */
+  omitted: number;
 }
+
+/** The most removals listed in a result; the rest are only counted, so a hostile document can't blow up the list. */
+export const maxRemovals = 100;
 
 interface Setup {
   schema: Schema;
@@ -101,6 +106,15 @@ const transientNodes = new Set(['embedInput']);
 const transientAttrs = new Set(['uploadKey']);
 /** Longest attribute string kept for nodes and marks without their own sanitizer. */
 const maxAttrString = 10_000;
+/** Attributes that hold a link: checked with `safeHref`. */
+const linkAttrs = new Set(['href', 'url', 'action', 'formaction', 'cite', 'xlink:href']);
+/** Attributes that load something: checked with `safeMediaSrc`. */
+const sourceAttrs = new Set(['src', 'image', 'poster', 'favicon', 'thumbnailUrl', 'background', 'data', 'icon']);
+/** Attributes never kept from untrusted data on a node or mark without its own sanitizer. */
+const forbiddenAttrs = /^(?:on|style$|srcdoc$|srcset$|formaction$)/i;
+/** A string with no spaces that starts with a scheme, such as `javascript:alert(1)`. */
+// eslint-disable-next-line no-control-regex
+const schemeLike = /^[\s\u0000-\u001f]*[a-z][a-z0-9+.-]*:\S*$/i;
 
 type Plain = Record<string, unknown>;
 
@@ -128,6 +142,7 @@ interface Walk {
   setup: Setup;
   limits: DocumentLimits;
   removed: SanitizeRemoval[];
+  omitted: number;
   nodes: number;
   text: number;
   hitNodes: boolean;
@@ -135,13 +150,19 @@ interface Walk {
 }
 
 function remove(walk: Walk, path: string, reason: SanitizeReason, type?: string): void {
+  if (walk.removed.length >= maxRemovals) {
+    walk.omitted++;
+    return;
+  }
   walk.removed.push(type ? { path, reason, type } : { path, reason });
 }
 
 /**
  * Cleans attributes against the declared attribute names. With a sanitizer, its output is trusted for types but still
- * copied and filtered; without one, only primitives and arrays of primitives are kept, and URL-like attributes are
- * checked. Returns `null` when the node or mark must go.
+ * copied and filtered, and link and source attributes are checked again. Without one, only primitives and arrays of
+ * primitives are kept; `on*`, `style`, `srcdoc` and `srcset` are dropped; link and source attributes (by name) are
+ * checked; and any other value that looks like a URL with a dangerous scheme becomes `null`. Custom nodes with
+ * attributes should still bring their own `postCanvasSanitize`. Returns `null` when the node or mark must go.
  */
 function cleanAttrs(
   walk: Walk,
@@ -178,13 +199,22 @@ function cleanAttrs(
       attrs[name] = null;
       continue;
     }
-    if (!sanitizer && !isPrimitive(value) && !(Array.isArray(value) && value.every(isPrimitive))) continue;
-    if (typeof value === 'string' && /^\s*blob:/i.test(value)) {
+    if (!sanitizer) {
+      if (forbiddenAttrs.test(name)) continue;
+      if (!isPrimitive(value) && !(Array.isArray(value) && value.every(isPrimitive))) continue;
+    }
+    const isLink = linkAttrs.has(name);
+    const isSource = sourceAttrs.has(name);
+    if ((isLink || isSource) && typeof value === 'string' && /^\s*blob:/i.test(value)) {
       remove(walk, path, 'transient', type);
       return null;
     }
-    if (name === 'href') value = safeHref(value);
-    else if (name === 'src') value = safeMediaSrc(value);
+    if (isLink && value !== null) value = safeHref(value);
+    else if (isSource && value !== null) value = safeMediaSrc(value);
+    else if (!sanitizer && typeof value === 'string' && schemeLike.test(value) && safeHref(value) === null) {
+      // A URL with a dangerous scheme in an attribute this sanitizer doesn't know: never keep it.
+      value = null;
+    }
     attrs[name] = value;
   }
   return { attrs, transient };
@@ -227,6 +257,13 @@ function cleanMarks(walk: Walk, raw: unknown, path: string, parent: NodeType): M
 /** Cleans one input node into zero or more PM nodes (unknown wrappers unwrap into their children). */
 function cleanNode(walk: Walk, raw: unknown, path: string, depth: number, parent: NodeType): PMNode[] {
   const { schema, sanitizers } = walk.setup;
+  // Every entry counts against the cap, valid or not, so junk can't make the walk or the removal list unbounded.
+  if (walk.nodes >= walk.limits.maxNodes) {
+    if (!walk.hitNodes) remove(walk, path, 'limit-nodes');
+    walk.hitNodes = true;
+    return [];
+  }
+  walk.nodes++;
   if (!isPlain(raw) || typeof raw.type !== 'string') {
     remove(walk, path, 'invalid-node');
     return [];
@@ -235,12 +272,6 @@ function cleanNode(walk: Walk, raw: unknown, path: string, depth: number, parent
     remove(walk, path, 'limit-depth', raw.type);
     return [];
   }
-  if (walk.nodes >= walk.limits.maxNodes) {
-    if (!walk.hitNodes) remove(walk, path, 'limit-nodes', raw.type);
-    walk.hitNodes = true;
-    return [];
-  }
-  walk.nodes++;
 
   if (raw.type === 'text') {
     if (typeof raw.text !== 'string' || raw.text === '') return [];
@@ -271,6 +302,7 @@ function cleanNode(walk: Walk, raw: unknown, path: string, depth: number, parent
   if (!cleaned) return [];
   if (cleaned.transient) remove(walk, path, 'transient', raw.type);
 
+  if (raw.content !== undefined && !Array.isArray(raw.content)) remove(walk, path, 'invalid-content', raw.type);
   const children = type.isLeaf || !Array.isArray(raw.content) ? [] : cleanChildren(walk, raw.content, path, depth, type);
   const node = fit(walk, type, cleaned.attrs, children, cleanMarks(walk, raw.marks, path, parent), path);
   return node ? [node] : [];
@@ -346,6 +378,7 @@ export function sanitizeDocument(json: unknown, options: SanitizeOptions = {}): 
     setup,
     limits: { ...defaultLimits, ...options.limits },
     removed: [],
+    omitted: 0,
     nodes: 0,
     text: 0,
     hitNodes: false,
@@ -357,6 +390,7 @@ export function sanitizeDocument(json: unknown, options: SanitizeOptions = {}): 
   let content: unknown[] = [];
   if (isPlain(json) && json.type === top.name) {
     content = Array.isArray(json.content) ? json.content : [];
+    if (json.content !== undefined && !Array.isArray(json.content)) remove(walk, 'doc', 'invalid-content');
   } else {
     remove(walk, 'doc', 'not-a-document', isPlain(json) && typeof json.type === 'string' ? json.type : undefined);
   }
@@ -380,5 +414,5 @@ export function sanitizeDocument(json: unknown, options: SanitizeOptions = {}): 
     doc = fit(walk, top, {}, passing, [], 'doc') ?? top.createAndFill() ?? doc;
     doc.check();
   }
-  return { doc: doc.toJSON() as JSONContent, removed: walk.removed };
+  return { doc: doc.toJSON() as JSONContent, removed: walk.removed, omitted: walk.omitted };
 }

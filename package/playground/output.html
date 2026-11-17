@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      .pg-pad {
+        padding: 12px;
+      }
+
+      .pg-note {
+        margin: 0 0 8px;
+        font-size: 13px;
+        opacity: 0.8;
+      }
+
+      .pg-h2 {
+        margin: 16px 0 8px;
+        font-size: 14px;
+      }
+
+      .pg-chips,
+      .pg-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .pg-tabs {
+        padding: 8px 12px 0;
+      }
+
+      .pg-tabs [aria-selected='true'] {
+        font-weight: 700;
+        text-decoration: underline;
+      }
+
+      .pg-textarea {
+        box-sizing: border-box;
+        width: 100%;
+        margin-bottom: 8px;
+        font: inherit;
+      }
+
+      .pg-mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+
+      .pg-frame {
+        box-sizing: border-box;
+        width: 100%;
+        height: 65vh;
+        border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+        border-radius: 8px;
+      }
+
+      .pg-section {
+        margin-bottom: 16px;
+      }
+    </style>
+    <title>Post Canvas playground: output and embeds</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./output.tsx"></script>
+  </body>
+</html>

@@ -8,10 +8,46 @@ export { sanitizersFor } from './core/registry';
 // --- end chat 0 ---
 
 // --- chat A: media ---
+export { ImageNode, GalleryNode, FileNode, createGalleryNode, mediaSchema, type GalleryNodeOptions } from './media/schema';
+export { mediaKit, MediaUploads } from './media/kit';
+export { sanitizeImageAttrs, sanitizeGalleryAttrs, sanitizeFileAttrs, type GalleryLimits } from './media/sanitize';
 // --- end chat A ---
 
 // --- chat B: text and UI ---
+export { textSchema, textExtensions, mentionText } from './text/schema';
+export {
+  PcParagraph,
+  PcHeading,
+  PcOrderedList,
+  PcTaskItem,
+  PcTableCell,
+  PcTableHeader,
+  PcCodeBlock,
+  PcLink,
+  PcTextStyle,
+  PcHighlight,
+  PcMention,
+} from './text/schema';
+export { textKit, PostCanvasText, countMentions, type PostCanvasTextStorage } from './text/kit';
+export { PasteCleanup, cleanPastedHTML, plainTextSlice } from './text/paste';
+export { CodeHighlight, codeLanguages, loadLowlight, resolveCodeLanguage } from './text/code-highlight';
+export { textInsertItems, filterInsertItems } from './text/insert-items';
+export {
+  moveBlock,
+  duplicateBlock,
+  deleteBlock,
+  turnInto,
+  turnIntoTargets,
+  canMoveBlock,
+  type TurnIntoTarget,
+} from './text/block-commands';
+export * from './text/sanitize';
+export type { MenuStore, SuggestionState, SuggestionEntry, SuggestionKind } from './text/menu-store';
 // --- end chat B ---
 
 // --- chat C: output and embeds ---
+export { Video, Embed, LinkCard, EmbedInput, createEmbedNode, embedsSchema, type EmbedNodeOptions } from './embeds/schema';
+export { embedsKit, EmbedPaste, type EmbedConsent, type EmbedsKitOptions } from './embeds/kit';
+export { setEmbedConsent } from './embeds/editor/storage';
+export { defineEmbedProvider, registerEmbedProvider, builtInProviders } from './embeds/providers/index';
 // --- end chat C ---

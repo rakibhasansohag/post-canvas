@@ -24,7 +24,8 @@ const blockSeparators: Record<string, string> = {
 
 const textBlocks = new Set(['paragraph', 'heading', 'codeBlock']);
 
-function inlineText(node: JSONContent): string {
+function inlineText(node: JSONContent, depth = 0): string {
+  if (depth > 100) return '';
   if (node.type === 'text') return str(node.text);
   if (node.type === 'hardBreak') return '\n';
   if (node.type === 'mention') {
@@ -32,7 +33,9 @@ function inlineText(node: JSONContent): string {
     const char = attrs.mentionSuggestionChar === '#' ? '#' : '@';
     return `${char}${str(attrs.label) || str(attrs.id)}`;
   }
-  return (node.content ?? []).map(inlineText).join('');
+  return childrenOf(node)
+    .map((child) => inlineText(child, depth + 1))
+    .join('');
 }
 
 /** The text a block-level media or embed node stands for, or `null` for any other node. */
@@ -65,11 +68,12 @@ function atomText(node: JSONContent): string | null {
   }
 }
 
-function blockText(node: JSONContent): string {
+function blockText(node: JSONContent, depth = 0): string {
+  if (depth > 100) return '';
   const atom = atomText(node);
   if (atom !== null) return atom;
   if (node.type && textBlocks.has(node.type)) return inlineText(node);
-  const children = node.content ?? [];
+  const children = childrenOf(node);
   if (children.length === 0) return node.type === 'text' ? str(node.text) : '';
   if (children.every((child) => child.type === 'text' || child.type === 'hardBreak' || child.type === 'mention')) {
     return inlineText(node);
@@ -77,7 +81,7 @@ function blockText(node: JSONContent): string {
   const separator = children[0]?.type ? (blockSeparators[children[0].type] ?? '\n\n') : '\n\n';
   return children
     .map((child) => {
-      const text = blockText(child);
+      const text = blockText(child, depth + 1);
       if (child.type === 'taskItem') return `[${attrsOf(child).checked === true ? 'x' : ' '}] ${text}`;
       return text;
     })
@@ -90,14 +94,15 @@ export function toPlainText(json: JSONContent): string {
   return blockText(json).replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function firstText(node: JSONContent): string | null {
+function firstText(node: JSONContent, depth = 0): string | null {
+  if (depth > 100) return null;
   if (node.type && textBlocks.has(node.type) && node.type !== 'codeBlock') {
     const text = inlineText(node).replace(/\s+/g, ' ').trim();
     if (/[\p{L}\p{N}]/u.test(text)) return text;
     return null;
   }
-  for (const child of node.content ?? []) {
-    const found = firstText(child);
+  for (const child of childrenOf(node)) {
+    const found = firstText(child, depth + 1);
     if (found) return found;
   }
   return null;
@@ -129,9 +134,26 @@ function coverFrom(source: Attrs): CoverImage | null {
   };
 }
 
+/** The child nodes of a node from untrusted JSON: only plain objects, only from a real array. */
+function childrenOf(node: JSONContent): JSONContent[] {
+  const content: unknown = node.content;
+  return Array.isArray(content)
+    ? content.filter((child): child is JSONContent => !!child && typeof child === 'object' && !Array.isArray(child))
+    : [];
+}
+
+/** Visits every node depth-first without recursion, so a hostile document can't overflow the stack. */
 function walk(node: JSONContent, visit: (node: JSONContent) => boolean | void): boolean {
-  if (visit(node) === true) return true;
-  for (const child of node.content ?? []) if (walk(child, visit)) return true;
+  const stack: JSONContent[] = [node];
+  let visited = 0;
+  while (stack.length > 0 && visited < 1_000_000) {
+    const current = stack.pop();
+    if (!current || typeof current !== 'object') continue;
+    visited++;
+    if (visit(current) === true) return true;
+    const children = childrenOf(current);
+    for (let index = children.length - 1; index >= 0; index--) stack.push(children[index] as JSONContent);
+  }
   return false;
 }
 

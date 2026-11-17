@@ -224,7 +224,11 @@ export const tiktok: EmbedProvider = {
 const codepenUser = /^[A-Za-z0-9_-]{1,40}$/;
 const codepenSlug = /^[A-Za-z0-9]{3,20}$/;
 
-/** CodePen pens. */
+function codepenOwner(ref: EmbedRef): string {
+  return ref.team ? `https://codepen.io/team/${ref.team}` : `https://codepen.io/${ref.user}`;
+}
+
+/** CodePen pens, a person's or a team's. */
 export const codepen: EmbedProvider = {
   name: 'codepen',
   label: 'CodePen',
@@ -232,14 +236,19 @@ export const codepen: EmbedProvider = {
   match(url): EmbedRef | null {
     if (host(url) !== 'codepen.io') return null;
     const parts = pathParts(url);
-    if (parts.length === 3 && fits(parts[0], codepenUser) && ['pen', 'embed', 'full', 'details'].includes(parts[1] ?? '')) {
+    const views = ['pen', 'embed', 'full', 'details'];
+    // codepen.io/team/<team>/pen/<pen> is a team's pen.
+    if (parts.length === 4 && parts[0] === 'team' && fits(parts[1], codepenUser) && views.includes(parts[2] ?? '')) {
+      return fits(parts[3], codepenSlug) ? { team: parts[1], pen: parts[3] } : null;
+    }
+    if (parts.length === 3 && parts[0] !== 'team' && fits(parts[0], codepenUser) && views.includes(parts[1] ?? '')) {
       return fits(parts[2], codepenSlug) ? { user: parts[0], pen: parts[2] } : null;
     }
     return null;
   },
   frame(ref) {
     return {
-      src: `https://codepen.io/${ref.user}/embed/${ref.pen}?default-tab=result`,
+      src: `${codepenOwner(ref)}/embed/${ref.pen}?default-tab=result`,
       title: 'CodePen',
       allow: 'clipboard-write; encrypted-media; fullscreen',
       sandbox: `${scripts} allow-forms allow-modals ${popups}`,
@@ -247,9 +256,8 @@ export const codepen: EmbedProvider = {
       height: 420,
     };
   },
-  canonicalUrl: (ref) => `https://codepen.io/${ref.user}/pen/${ref.pen}`,
-  oembed: (ref) =>
-    `https://codepen.io/api/oembed?format=json&url=${encodeURIComponent(`https://codepen.io/${ref.user}/pen/${ref.pen}`)}`,
+  canonicalUrl: (ref) => `${codepenOwner(ref)}/pen/${ref.pen}`,
+  oembed: (ref) => `https://codepen.io/api/oembed?format=json&url=${encodeURIComponent(`${codepenOwner(ref)}/pen/${ref.pen}`)}`,
 };
 
 // ---------------------------------------------------------------------------------------------------------------------

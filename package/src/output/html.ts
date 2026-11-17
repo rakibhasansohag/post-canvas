@@ -43,12 +43,29 @@ export interface RenderHTMLOptions {
 export function renderToHTML(json: JSONContent, options: RenderHTMLOptions = {}): string {
   const { features, sanitize = true, embeds = 'facade', wrapper = true, locale, limits } = options;
   const base = renderExtensions(features, embeds, locale).extensions;
-  const extensions = options.extensions?.length ? mergeExtensions(base, options.extensions) : base;
+  const extensions = options.extensions?.length ? mergedFor(base, options.extensions) : base;
   const content = sanitize
     ? sanitizeDocument(json, { features, limits, ...(options.extensions?.length ? { extensions } : {}) }).doc
     : json;
   const html = renderToHTMLString({ content, extensions });
   return wrapper ? `<div class="pc-view"><div class="pc-content">${html}</div></div>` : html;
+}
+
+const merged = new WeakMap<AnyExtension[], WeakMap<AnyExtension[], AnyExtension[]>>();
+
+/** `mergeExtensions(base, extra)`, built once per pair of arrays so the sanitizer's schema cache hits. */
+function mergedFor(base: AnyExtension[], extra: AnyExtension[]): AnyExtension[] {
+  let byBase = merged.get(extra);
+  if (!byBase) {
+    byBase = new WeakMap();
+    merged.set(extra, byBase);
+  }
+  let result = byBase.get(base);
+  if (!result) {
+    result = mergeExtensions(base, extra);
+    byBase.set(base, result);
+  }
+  return result;
 }
 
 /** `base` with every extension in `extra` replacing the one with the same name, or added at the end. */

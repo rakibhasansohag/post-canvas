@@ -90,7 +90,10 @@ const percent = (fraction: number) => `${Math.round(fraction * 1_000_000) / 10_0
  */
 export function collageFrameBox(base: { width: number; height: number }): Box {
   const ratio = frameRatio(base);
-  return { aspectRatio: String(Math.round(ratio * 10000) / 10000), width: `min(100%, ${Math.round(collageMaxHeight * ratio)}px)` };
+  return {
+    aspectRatio: String(Math.round(ratio * 10000) / 10000),
+    width: `min(100%, ${Math.round(collageMaxHeight * ratio)}px)`,
+  };
 }
 
 /**
@@ -154,9 +157,13 @@ export function fileKind(mimeType: string | null, name: string): FileKind {
   if (type.startsWith('image/')) return 'image';
   if (type.startsWith('video/')) return 'video';
   if (type.startsWith('audio/')) return 'audio';
-  if (/zip|compressed|tar|rar|7z|gzip/.test(type) || /^(zip|rar|7z|gz|tgz|tar|bz2|xz)$/.test(extension)) return 'archive';
+  if (/zip|compressed|tar|rar|7z|gzip/.test(type) || /^(zip|rar|7z|gz|tgz|tar|bz2|xz)$/.test(extension))
+    return 'archive';
   if (/sheet|excel|csv/.test(type) || /^(xls|xlsx|ods|csv|numbers)$/.test(extension)) return 'sheet';
-  if (/json|javascript|typescript|xml|x-sh|x-python/.test(type) || /^(js|ts|tsx|jsx|json|py|rb|go|rs|sh|xml|html|css)$/.test(extension))
+  if (
+    /json|javascript|typescript|xml|x-sh|x-python/.test(type) ||
+    /^(js|ts|tsx|jsx|json|py|rb|go|rs|sh|xml|html|css)$/.test(extension)
+  )
     return 'code';
   if (type.startsWith('text/') || /pdf|word|document|rtf|presentation|powerpoint/.test(type)) return 'text';
   if (/^(pdf|doc|docx|odt|rtf|txt|md|ppt|pptx|odp|pages|key)$/.test(extension)) return 'text';
@@ -168,5 +175,11 @@ export function fileTypeLabel(mimeType: string | null, name: string): string {
   const extension = /\.([a-z0-9]{1,8})$/i.exec(name)?.[1];
   if (extension) return extension.toUpperCase();
   const subtype = /^[a-z]+\/([a-z0-9.+-]{1,20})$/i.exec(mimeType ?? '')?.[1];
-  return subtype ? subtype.replace(/^x-/, '').replace(/^vnd\./, '').toUpperCase().slice(0, 8) : '';
+  return subtype
+    ? subtype
+        .replace(/^x-/, '')
+        .replace(/^vnd\./, '')
+        .toUpperCase()
+        .slice(0, 8)
+    : '';
 }

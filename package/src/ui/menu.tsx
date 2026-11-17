@@ -137,7 +137,7 @@ export function MenuButton({ label, icon: Icon, text, entries, disabled, active,
       >
         {Icon && <Icon size={18} aria-hidden="true" />}
         {text && <span className="pc-tb-button__text">{text}</span>}
-        {text && <span className="pc-sr-only">{label}</span>}
+        {text && text !== label && <span className="pc-sr-only">{label}</span>}
         <ChevronDown size={14} aria-hidden="true" className="pc-tb-button__caret" />
       </button>
       <Popover

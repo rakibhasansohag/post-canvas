@@ -54,13 +54,10 @@ export function InsertButton({ canvas }: { canvas: RefObject<HTMLDivElement | nu
   });
   const [caretSpot, setCaretSpot] = useState<Spot | null>(null);
   useEffect(() => {
-    const element = canvas.current;
-    if (caret === null || !element) {
-      setCaretSpot(null);
-      return;
-    }
+    // Measured after the browser has laid out the new text.
     const id = requestAnimationFrame(() => {
-      const next = spotFor(editor, caret, element);
+      const element = canvas.current;
+      const next = caret === null || !element ? null : spotFor(editor, caret, element);
       setCaretSpot((prev) => (same(prev, next) ? prev : next));
     });
     return () => cancelAnimationFrame(id);

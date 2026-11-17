@@ -5,10 +5,7 @@ import type { UploadEntry } from '../upload/manager';
 
 /** How an upload stands, for drawing: running, failed, lost (the key is unknown, as after a reload) or nothing. */
 export type UploadView =
-  | { state: 'none' }
-  | { state: 'running'; progress: number }
-  | { state: 'failed' }
-  | { state: 'lost' };
+  { state: 'none' } | { state: 'running'; progress: number } | { state: 'failed' } | { state: 'lost' };
 
 /** The view of one upload key. */
 export function uploadView(key: string | null, entry: UploadEntry | undefined): UploadView {
@@ -39,14 +36,14 @@ export function UploadStatus({ view, t, onRetry, onReplace }: UploadStatusProps)
           {t('media.upload.progress', { percent })}
         </span>
         <span
-          className="pc-progress"
+          className="pc-media-progress"
           role="progressbar"
           aria-label={t('media.upload.progressLabel')}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
         >
-          <span className="pc-progress__bar" style={{ width: `${Math.max(6, percent)}%` }} />
+          <span className="pc-media-progress__bar" style={{ width: `${Math.max(6, percent)}%` }} />
         </span>
       </div>
     );
@@ -58,7 +55,7 @@ export function UploadStatus({ view, t, onRetry, onReplace }: UploadStatusProps)
       <TriangleAlert size={16} strokeWidth={2.2} aria-hidden="true" />
       <span className="pc-upload-status__text">{lost ? t('media.upload.lost') : t('media.upload.failedShort')}</span>
       {action && (
-        <button type="button" className="pc-text-button" onClick={action}>
+        <button type="button" className="pc-media-text-button" onClick={action}>
           <RotateCw size={14} strokeWidth={2.4} aria-hidden="true" />
           {lost ? t('media.upload.replace') : t('media.upload.retry')}
         </button>

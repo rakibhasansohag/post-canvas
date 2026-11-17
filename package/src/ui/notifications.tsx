@@ -43,7 +43,7 @@ export function useNotifications(): Notifications {
       // A changed string is what a screen reader announces; the counter makes a repeat count as a change.
       setLive((current) => ({
         ...current,
-        [kind === 'error' ? 'assertive' : 'polite']: `${message}${id % 2 ? '' : ' '}`,
+        [kind === 'error' ? 'assertive' : 'polite']: `${message}${id % 2 ? '' : '\u00a0'}`,
       }));
       timers.current.set(
         id,

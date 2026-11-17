@@ -57,8 +57,14 @@ export function sniffImage(bytes: Uint8Array): ImageFormat | null {
 
 /** True when the bytes look like SVG or other XML, so the refusal can say why. */
 export function looksLikeSvg(bytes: Uint8Array): boolean {
-  const head = new TextDecoder().decode(bytes.subarray(0, 512)).replace(/^﻿/, '').trimStart().toLowerCase();
-  return head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg')) || head.startsWith('<!doctype svg');
+  const head = new TextDecoder()
+    .decode(bytes.subarray(0, 512))
+    .replace(/^\ufeff/, '')
+    .trimStart()
+    .toLowerCase();
+  return (
+    head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg')) || head.startsWith('<!doctype svg')
+  );
 }
 
 /** Formats that are turned into JPEG before uploading, because browsers (or apps) can't show them everywhere. */
@@ -184,7 +190,11 @@ export async function prepareImage(file: File, options: PrepareOptions = {}): Pr
       }
     }
     try {
-      current = renamed(await codec.encode(source, { maxEdge, type: 'image/jpeg', quality: 0.9 }), file.name, 'image/jpeg');
+      current = renamed(
+        await codec.encode(source, { maxEdge, type: 'image/jpeg', quality: 0.9 }),
+        file.name,
+        'image/jpeg',
+      );
     } catch {
       throw new MediaRefusal(format === 'heic' ? 'heic' : 'unreadable');
     }

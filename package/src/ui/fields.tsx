@@ -30,7 +30,7 @@ export function TitleField({ value, onChange, editor, t, missing = false, inputR
     <div className="pc-title">
       <div className="pc-title__grow">
         <div className="pc-title__mirror" aria-hidden="true">
-          {value === '' ? t('ui.title.placeholder') : `${value}​`}
+          {value === '' ? t('ui.title.placeholder') : `${value}\u200b`}
         </div>
         <textarea
           ref={inputRef}

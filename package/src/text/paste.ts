@@ -2,10 +2,12 @@
 // Clean pasting from Word, Google Docs and the web: keep the structure (headings, lists, tables, links, bold and the
 // like), drop the noise (styles, classes, Office markup, scripts, handlers). Plain text keeps its paragraphs.
 import { Extension } from '@tiptap/core';
-import { Fragment, Slice, type Node as PmNode, type ResolvedPos, type Schema } from '@tiptap/pm/model';
+import { Fragment, Slice, type Mark, type Node as PmNode, type ResolvedPos, type Schema } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { safeHref } from '../core/url';
-import { codeLanguagePattern } from './sanitize';
+import { sanitizersFor } from '../core/registry';
+import type { AttrsSanitizer } from '../core/types';
+import { safeHref, safeMediaSrc } from '../core/url';
+import { codeLanguage } from './sanitize';
 
 // Elements removed with everything inside them.
 const dropped = new Set([
@@ -36,10 +38,23 @@ const dropped = new Set([
   'video',
   'source',
   'base',
+  'noembed',
+  'noframes',
+  'xmp',
+  'plaintext',
+  'listing',
   'o:p',
 ]);
 
-// Elements replaced by their children.
+// Elements whose inline styles may become marks: inline wrappers and text blocks, never containers like tables or lists.
+const styledTags = new Set(['span', 'font', 'a', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+const listTypes = new Set(['1', 'a', 'A', 'i', 'I']);
+
+/** The deepest ProseMirror clipboard context accepted from pasted HTML. Deeper ones are dropped. */
+const maxSliceContext = 40;
+
+// Elements replaced by their children, once they have no data attributes left.
 const unwrapped = new Set(['font', 'center', 'span', 'div', 'section', 'article', 'header', 'footer', 'main', 'aside']);
 
 // Attributes kept per element, besides `data-*`.
@@ -99,6 +114,7 @@ function semanticStyles(element: Element): void {
   const style = declarations(element);
   if (style.size === 0) return;
   const tag = element.tagName.toLowerCase();
+  if (!styledTags.has(tag)) return;
   const weight = style.get('font-weight') ?? '';
   if ((weight === 'bold' || weight === 'bolder' || Number(weight) >= 600) && tag !== 'b' && tag !== 'strong')
     wrapChildren(element, 'strong');
@@ -113,7 +129,7 @@ function semanticStyles(element: Element): void {
 
 function isEmptyBlock(element: Element): boolean {
   if (element.querySelector('img, br, hr, table')) return false;
-  return (element.textContent ?? '').replace(/[\s ​]/g, '') === '';
+  return (element.textContent ?? '').replace(/[\s\u00a0\u200b]/g, '') === '';
 }
 
 /** Word writes lists as `<p style="mso-list:l0 level1">` paragraphs with a marker span. Rebuild real lists. */
@@ -131,22 +147,28 @@ function rebuildWordLists(body: Element): void {
       handled.add(node);
       node = node.nextElementSibling;
     }
-    const stack: { list: Element; level: number }[] = [];
+    const stack: { list: Element; level: number; id: string }[] = [];
     const container = doc.createElement('div');
     first.parentNode?.insertBefore(container, first);
     for (const p of run) {
       const level = Number(/level(\d+)/.exec(styleOf(p))?.[1] ?? '1');
-      const marker = Array.from(p.querySelectorAll('span')).find((span) => declarations(span).get('mso-list') === 'ignore');
-      const markerText = (marker?.textContent ?? '').replace(/[\s ]/g, '');
+      const id = /mso-list:(l\d+)/.exec(styleOf(p))?.[1] ?? '';
+      const marker = Array.from(p.querySelectorAll('span')).find(
+        (span) => declarations(span).get('mso-list') === 'ignore',
+      );
+      const markerText = (marker?.textContent ?? '').replace(/[\s\u00a0]/g, '');
       marker?.remove();
       const ordered = /^\(?[0-9a-z]{1,4}[.)]$/i.test(markerText);
       while (stack.length > 0 && stack[stack.length - 1]!.level > level) stack.pop();
+      // Another list (a new Word list id, or bullets turning into numbers) at the same level starts a new list.
+      const same = stack[stack.length - 1];
+      if (same && same.level === level && (same.id !== id || (same.list.tagName === 'OL') !== ordered)) stack.pop();
       let top = stack[stack.length - 1];
       if (!top || top.level < level) {
         const list = doc.createElement(ordered ? 'ol' : 'ul');
         if (top) (top.list.lastElementChild ?? top.list).appendChild(list);
         else container.appendChild(list);
-        top = { list, level };
+        top = { list, level, id };
         stack.push(top);
       }
       const item = doc.createElement('li');
@@ -160,35 +182,72 @@ function rebuildWordLists(body: Element): void {
   }
 }
 
-function cleanElement(element: Element): void {
+function clampedInteger(value: string | null, min: number, max: number): string | null {
+  const n = Number(value);
+  return value !== null && Number.isFinite(n) ? String(Math.min(max, Math.max(min, Math.round(n)))) : null;
+}
+
+/** Keeps the allowed attributes only, and makes the kept ones safe. */
+function cleanElement(element: Element, { keepSlice = false }: { keepSlice?: boolean } = {}): void {
   const tag = element.tagName.toLowerCase();
   const kept = keptAttributes[tag] ?? [];
+  // A code language survives as a single `language-…` class.
+  const language =
+    tag === 'code' || tag === 'pre'
+      ? codeLanguage(
+          (element.getAttribute('class') ?? '')
+            .split(/\s+/)
+            .find((name) => name.startsWith('language-'))
+            ?.slice('language-'.length),
+        )
+      : null;
   for (const attr of Array.from(element.attributes)) {
     const name = attr.name.toLowerCase();
-    const keepData = name.startsWith('data-') && !name.startsWith('data-pm-');
-    const keepLanguage =
-      name === 'class' &&
-      (tag === 'code' || tag === 'pre') &&
-      /^language-/.test(attr.value) &&
-      codeLanguagePattern.test(attr.value.slice('language-'.length));
-    if (!kept.includes(name) && !keepData && !keepLanguage) element.removeAttribute(attr.name);
+    const keepData =
+      name.startsWith('data-') && (!name.startsWith('data-pm-') || (keepSlice && name === 'data-pm-slice'));
+    if (!kept.includes(name) && !keepData) element.removeAttribute(attr.name);
   }
+  if (language) element.setAttribute('class', `language-${language}`);
   if (tag === 'a') {
     const href = safeHref(element.getAttribute('href'));
     if (href) element.setAttribute('href', href);
     else element.removeAttribute('href');
+  } else if (tag === 'img') {
+    const src = safeMediaSrc(element.getAttribute('src'));
+    if (src) element.setAttribute('src', src);
+    else element.remove();
+  } else if (tag === 'td' || tag === 'th') {
+    for (const name of ['colspan', 'rowspan']) {
+      const value = clampedInteger(element.getAttribute(name), 1, 100);
+      if (value) element.setAttribute(name, value);
+      else element.removeAttribute(name);
+    }
+  } else if (tag === 'ol') {
+    const start = clampedInteger(element.getAttribute('start'), 0, 1_000_000);
+    if (start) element.setAttribute('start', start);
+    else element.removeAttribute('start');
+    if (!listTypes.has(element.getAttribute('type') ?? '')) element.removeAttribute('type');
   }
 }
 
-function walk(node: Node, visit: (element: Element) => void): void {
-  for (const child of Array.from(node.childNodes)) {
-    if (child.nodeType === 8) {
-      child.parentNode?.removeChild(child); // comments, conditional comments included
-    } else if (child.nodeType === 1) {
-      walk(child, visit);
-      visit(child as Element);
+/**
+ * Visits every element after its children (post-order), without recursion, so deeply nested input can't overflow the
+ * stack. Comments are removed on the way.
+ */
+function walk(root: Node, visit: (element: Element) => void): void {
+  const order: Element[] = [];
+  const stack: Node[] = Array.from(root.childNodes).reverse();
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (node.nodeType === 8) {
+      node.parentNode?.removeChild(node); // comments, conditional comments included
+    } else if (node.nodeType === 1) {
+      order.push(node as Element);
+      const children = Array.from(node.childNodes);
+      for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]!);
     }
   }
+  for (let i = order.length - 1; i >= 0; i--) visit(order[i]!);
 }
 
 /**
@@ -210,6 +269,10 @@ export function cleanPastedHTML(html: string): string {
     if (weight === 'normal' || weight === '400') unwrap(wrapper);
   }
   rebuildWordLists(body);
+  // Numbered Word headings keep a marker span outside any list.
+  for (const span of Array.from(body.querySelectorAll('span'))) {
+    if (declarations(span).get('mso-list') === 'ignore') span.remove();
+  }
 
   // Word's title styles become headings.
   for (const p of Array.from(body.querySelectorAll('p'))) {
@@ -228,7 +291,8 @@ export function cleanPastedHTML(html: string): string {
     cleanElement(element);
     if (tag === 'a' && !element.hasAttribute('href')) {
       unwrap(element);
-    } else if (unwrapped.has(tag) || isNamespaced(tag)) {
+    } else if ((unwrapped.has(tag) && element.attributes.length === 0) || isNamespaced(tag)) {
+      // Wrappers go, unless a data attribute marks them as something (a mention, a colour, a media block).
       unwrap(element);
     } else if (tag === 'h5' || tag === 'h6') {
       rename(element, 'h4');
@@ -278,37 +342,84 @@ export const PasteCleanup = Extension.create({
   name: 'postCanvasPaste',
 
   addProseMirrorPlugins() {
+    let cached: Record<string, AttrsSanitizer> | null = null;
+    const sanitizers = () => (cached ??= sanitizersFor(this.editor.extensionManager.extensions));
     return [
       new Plugin({
         key: new PluginKey('postCanvasPaste'),
         props: {
-          transformPastedHTML: (html) => (/data-pm-slice/.test(html) ? cleanOwnHTML(html) : cleanPastedHTML(html)),
+          transformPastedHTML: (html) => (/data-pm-slice/i.test(html) ? cleanOwnHTML(html) : cleanPastedHTML(html)),
           clipboardTextParser: (text, $context) => plainTextSlice(text, this.editor.schema, $context),
+          transformPasted: (slice) => sanitizeSlice(slice, sanitizers()),
         },
       }),
     ];
   },
 });
 
-/** HTML from ProseMirror's own clipboard: only scripts, handlers and styles go. */
-function cleanOwnHTML(html: string): string {
+/**
+ * HTML from a ProseMirror clipboard (this editor, or another Tiptap site): the same element and attribute allowlist,
+ * but wrappers stay and `data-pm-slice` is kept when its context is sane. Without a sane context the HTML gets the full
+ * clean.
+ */
+export function cleanOwnHTML(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
+  const sliced = doc.body.querySelector('[data-pm-slice]');
+  const context = sliced?.getAttribute('data-pm-slice') ?? '';
+  const match = /^(\d+) (\d+)(?:-\d+)? (.*)$/s.exec(context);
+  let sane = false;
+  if (match) {
+    try {
+      const parsed: unknown = JSON.parse(match[3]!);
+      sane = Array.isArray(parsed) && parsed.length <= maxSliceContext * 2;
+    } catch {
+      sane = false;
+    }
+  }
+  if (!sane) return cleanPastedHTML(html.replace(/data-pm-slice/gi, 'data-x'));
   walk(doc.body, (element) => {
     const tag = element.tagName.toLowerCase();
-    if (dropped.has(tag) && tag !== 'o:p') {
+    if (dropped.has(tag) || tag.includes(':')) {
       element.remove();
       return;
     }
-    for (const attr of Array.from(element.attributes)) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith('on') || name === 'style' || name === 'srcdoc' || name === 'formaction')
-        element.removeAttribute(attr.name);
-    }
-    if (tag === 'a') {
-      const href = safeHref(element.getAttribute('href'));
-      if (href) element.setAttribute('href', href);
-      else element.removeAttribute('href');
-    }
+    cleanElement(element, { keepSlice: element === sliced });
   });
   return doc.body.innerHTML;
+}
+
+/** Runs every node's and mark's sanitizer over a pasted slice, so nothing skips the schema's rules. */
+export function sanitizeSlice(slice: Slice, sanitizers: Record<string, AttrsSanitizer>): Slice {
+  const cleanMarks = (marks: readonly Mark[]): Mark[] =>
+    marks.flatMap((mark) => {
+      const sanitize = sanitizers[mark.type.name];
+      if (!sanitize) return [mark];
+      const attrs = sanitize({ ...mark.attrs });
+      return attrs ? [mark.type.create(known(attrs, mark.type.spec.attrs))] : [];
+    });
+  const cleanFragment = (fragment: Fragment): Fragment => {
+    const nodes: PmNode[] = [];
+    fragment.forEach((node) => {
+      const sanitize = sanitizers[node.type.name];
+      let attrs: Record<string, unknown> | null = node.attrs;
+      if (sanitize) attrs = sanitize({ ...node.attrs });
+      // Only leaf nodes are dropped, so an open wrapper at the slice's edge is never lost.
+      if (!attrs && node.isLeaf) return;
+      const merged = { ...node.attrs, ...known(attrs ?? {}, node.type.spec.attrs) };
+      nodes.push(
+        node.isText
+          ? node.mark(cleanMarks(node.marks))
+          : node.type.create(merged, cleanFragment(node.content), cleanMarks(node.marks)),
+      );
+    });
+    return Fragment.fromArray(nodes);
+  };
+  return new Slice(cleanFragment(slice.content), slice.openStart, slice.openEnd);
+}
+
+/** The attributes a node or mark type declares. */
+function known(attrs: Record<string, unknown>, spec: Record<string, unknown> | undefined): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(spec ?? {})) if (key in attrs) out[key] = attrs[key];
+  return out;
 }

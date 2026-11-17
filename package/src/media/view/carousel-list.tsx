@@ -1,7 +1,14 @@
 'use client';
 // The carousel strip with a mouse: drag it sideways, and it glides on when let go. Touch, pens, trackpads and the
 // keyboard already scroll it natively, and without JavaScript it still scrolls with CSS scroll-snap.
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 
 interface Sample {
   x: number;
@@ -132,6 +139,7 @@ export function CarouselList({ className, tabIndex, label, children }: CarouselL
       className={className}
       tabIndex={tabIndex}
       aria-label={label}
+      data-drag-scroll=""
       data-dragging={dragging || undefined}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}

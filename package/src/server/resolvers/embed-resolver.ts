@@ -1,6 +1,7 @@
 // The server half of video and social embeds: looks up a title, description and thumbnail through each provider's
 // public oEmbed endpoint. Only fixed endpoint URLs built from validated ids are ever fetched, so a pasted link can't
 // make the server call anywhere else, and the oEmbed `html` is never passed on.
+import { readHead } from './link-resolver';
 import type { EmbedMetadata, EmbedMetadataResolver } from '../../core/types';
 import { safeHttpUrl, safeMediaSrc } from '../../core/url';
 import { matchEmbedUrl, type EmbedProvider, type EmbedRef } from '../../embeds/providers';
@@ -41,9 +42,18 @@ export interface EmbedResolverOptions {
   cacheSize?: number;
   /** How long a lookup is kept, in milliseconds. Default ten minutes. */
   cacheTtlMs?: number;
+  /**
+   * Which providers to look up, by name, such as `['youtube', 'vimeo', 'spotify']`. Default: YouTube, Vimeo and every
+   * registered embed provider. Pass the names your editor's features allow, so the server never looks up others.
+   */
+  providers?: readonly string[];
 }
 
 const titleMax = 200;
+/** The most bytes of an oEmbed answer that are read. */
+const oembedMaxBytes = 256 * 1024;
+/** The most bytes of YouTube's watch page that are read; the description is in its head. */
+const pageMaxBytes = 1024 * 1024;
 const descriptionMax = 1000;
 const youtubeId = /^[A-Za-z0-9_-]{11}$/;
 
@@ -54,14 +64,15 @@ interface Target {
 }
 
 /** Finds the provider for a pasted URL: YouTube and Vimeo first, then every registered embed provider. */
-function identify(input: string): Target | null {
+function identify(input: string, providers?: readonly string[]): Target | null {
   const video = parseVideoUrl(input);
-  if (video) {
+  if (video && (!providers || providers.includes(video.provider))) {
     const provider = videoProviders[video.provider];
     const ref = embedRefFromVideoRef(video);
     return { provider, ref, key: `${provider.name}:${provider.canonicalUrl(ref)}` };
   }
-  const match = matchEmbedUrl(input);
+  if (video) return null;
+  const match = matchEmbedUrl(input, providers?.filter((name) => name !== 'youtube' && name !== 'vimeo'));
   return match ? { provider: match.provider, ref: match.ref, key: `${match.provider.name}:${match.url}` } : null;
 }
 
@@ -148,9 +159,14 @@ export function createEmbedResolver(options: EmbedResolverOptions = {}): EmbedMe
     if (!response.ok) {
       throw new EmbedResolveError('unavailable', `${label} answered ${response.status}.`, response.status);
     }
+    const type = response.headers.get('content-type') ?? '';
+    if (type && !/json|javascript|text\/plain/i.test(type)) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new EmbedResolveError('unavailable', `${label} sent an unreadable answer.`);
+    }
     let data: unknown;
     try {
-      data = await response.json();
+      data = JSON.parse(new TextDecoder().decode(await readHead(response.body, oembedMaxBytes)));
     } catch {
       throw new EmbedResolveError('unavailable', `${label} sent an unreadable answer.`);
     }
@@ -171,7 +187,8 @@ export function createEmbedResolver(options: EmbedResolverOptions = {}): EmbedMe
         signal,
       });
       if (!response.ok) return '';
-      const { meta } = readHtmlMeta(await response.text());
+      const html = new TextDecoder().decode(await readHead(response.body, pageMaxBytes));
+      const { meta } = readHtmlMeta(html);
       return meta.get('og:description') ?? meta.get('description') ?? '';
     } catch {
       return '';
@@ -214,7 +231,7 @@ export function createEmbedResolver(options: EmbedResolverOptions = {}): EmbedMe
   }
 
   return async (url, ctx) => {
-    const target = identify(url);
+    const target = identify(url, options.providers);
     if (!target) throw new EmbedResolveError('unsupported', 'No embed provider recognises this link.');
     const cached = recall(target.key);
     if (cached) return { ...cached };

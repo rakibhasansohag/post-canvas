@@ -1,7 +1,15 @@
 // Gives media attributes their contract shape before they're drawn, whatever they came from. Unlike the sanitizer it
 // keeps `blob:` previews and upload keys, because the editor draws those too; the drawing code still checks every URL
 // and number, so a value that slips through can't become markup.
-import type { CollagePlace, FileAttrs, GalleryAttrs, GalleryPhoto, ImageAlign, ImageAttrs, MediaSource } from '../core/types';
+import type {
+  CollagePlace,
+  FileAttrs,
+  GalleryAttrs,
+  GalleryPhoto,
+  ImageAlign,
+  ImageAttrs,
+  MediaSource,
+} from '../core/types';
 
 const text = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
 const nullableText = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);

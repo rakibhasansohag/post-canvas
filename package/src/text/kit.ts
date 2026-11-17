@@ -102,7 +102,7 @@ function mentionSuggestion(
     items: async ({ query, editor, signal }) => {
       const adapters = editor.storage.postCanvasCore.adapters;
       const source = kind === 'mention' ? adapters.mentions : adapters.hashtags;
-      let found: SuggestionItem[] = [];
+      let found: SuggestionItem[];
       try {
         found = source ? (await source.search(query, { signal })).slice(0, 8) : [];
       } catch {
@@ -195,7 +195,7 @@ export const PostCanvasText = Extension.create<Record<string, never>, PostCanvas
   postCanvasProblems() {
     const { t } = this.editor.storage.postCanvasCore;
     const stats = getDocStats(this.editor.getJSON());
-    return [...limitProblems(stats, this.storage.limits, t), ...classifierProblems(this.editor)];
+    return [...limitProblems(stats, this.editor.storage.postCanvasText.limits, t), ...classifierProblems(this.editor)];
   },
 
   addKeyboardShortcuts() {
@@ -204,7 +204,7 @@ export const PostCanvasText = Extension.create<Record<string, never>, PostCanvas
       return $from.depth === 0 ? $from.pos : $from.before(1);
     };
     return {
-      'Mod-k': () => this.storage.menu.emit('link'),
+      'Mod-k': () => this.editor.storage.postCanvasText.menu.emit('link'),
       'Alt-Shift-ArrowUp': () => moveBlock(this.editor, blockStart(), -1),
       'Alt-Shift-ArrowDown': () => moveBlock(this.editor, blockStart(), 1),
       'Alt-Shift-d': () => duplicateBlock(this.editor, blockStart()),

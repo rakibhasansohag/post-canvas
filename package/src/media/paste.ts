@@ -16,8 +16,8 @@ const extensions: Record<ImageFormat, string> = {
 };
 
 /**
- * A pasted `data:` picture as a file, or `null` when it isn't base64, isn't a picture we know by its bytes (SVG
- * included), or is too big. The type comes from the bytes, never from the URL.
+ * A pasted `data:` picture as a file, or `null` when it isn't base64, isn't a JPEG, PNG, WebP, GIF or AVIF by its bytes
+ * (SVG, HEIC, TIFF and BMP included), or is too big. The type comes from the bytes, never from the URL.
  */
 export function dataUrlToFile(dataUrl: string, name: string): File | null {
   const match = /^data:([a-z0-9.+/-]*)(?:;[a-z0-9=-]+)*;base64,([a-z0-9+/=\s]+)$/i.exec(dataUrl.trim());
@@ -33,8 +33,13 @@ export function dataUrlToFile(dataUrl: string, name: string): File | null {
     return null;
   }
   const format = sniffImage(bytes);
-  if (!format) return null;
-  const safeName = name.replace(/[^\p{L}\p{N} ._-]/gu, '').trim().slice(0, 60) || 'image';
+  // Formats every browser shows. HEIC, TIFF and BMP need converting, which only a picked file goes through.
+  if (format !== 'jpeg' && format !== 'png' && format !== 'webp' && format !== 'gif' && format !== 'avif') return null;
+  const safeName =
+    name
+      .replace(/[^\p{L}\p{N} ._-]/gu, '')
+      .trim()
+      .slice(0, 60) || 'image';
   return new File([bytes], `${safeName}.${extensions[format]}`, { type: `image/${format}` });
 }
 

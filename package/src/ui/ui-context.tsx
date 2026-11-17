@@ -48,7 +48,7 @@ export function useDocInfo(editor: Editor | null): DocInfo {
     useEditorState({
       editor,
       selector: ({ editor: current }): DocInfo => {
-        if (!current) return emptyInfo;
+        if (!current || current.isDestroyed) return emptyInfo;
         return {
           stats: getDocStats(current.getJSON()),
           classification: classifyEditor(current),

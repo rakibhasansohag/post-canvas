@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Post Canvas playground: plain JS from the CDN build</title>
+    <style>
+      body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; background: Canvas; color: CanvasText; }
+      main { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+      .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      pre { max-height: 260px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Plain JS, from the CDN build</h1>
+      <p>
+        This page loads only <code>dist/cdn/post-canvas.iife.js</code> and <code>post-canvas.css</code> (run
+        <code>npm run build</code> first). There is no React on the page apart from what the bundle carries.
+      </p>
+      <div class="bar">
+        <button type="button" id="dark">Dark</button>
+        <button type="button" id="german">Deutsch</button>
+        <button type="button" id="html">Show getHTML()</button>
+        <a href="./index.html">All pages</a>
+      </div>
+      <div id="editor"></div>
+      <h2>Rendered with PostCanvas.renderToHTML</h2>
+      <div id="rendered"></div>
+      <pre id="out" aria-live="polite"></pre>
+    </main>
+    <script type="module">
+      // Vite serves the built files by URL; the editor itself comes only from the classic CDN script below.
+      import scriptUrl from '../dist/cdn/post-canvas.iife.js?url';
+      import styleUrl from '../dist/cdn/post-canvas.css?url';
+      const link = Object.assign(document.createElement('link'), { rel: 'stylesheet', href: styleUrl });
+      document.head.append(link);
+      const script = Object.assign(document.createElement('script'), { src: scriptUrl });
+      script.onload = () => {
+        const { PostCanvas } = window;
+        const out = document.getElementById('out');
+        const canvas = PostCanvas.create(document.getElementById('editor'), {
+          preset: 'article',
+          defaultContent:
+            '<h2>Hello from plain JS</h2><p>Type here, or paste a YouTube link into an empty line.</p><p><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe></p><p></p>',
+        });
+        const rendered = document.getElementById('rendered');
+        const show = (json) => {
+          out.textContent = JSON.stringify(json, null, 2);
+          rendered.innerHTML = PostCanvas.renderToHTML(json);
+          PostCanvas.activateEmbeds(rendered);
+        };
+        canvas.ready.then(() => show(canvas.getJSON()));
+        canvas.on('change', show);
+        let dark = false;
+        document.getElementById('dark').onclick = () => {
+          dark = !dark;
+          canvas.update({ theme: dark ? 'dark' : 'light' });
+          document.body.style.colorScheme = dark ? 'dark' : 'light';
+        };
+        document.getElementById('german').onclick = () => canvas.update({ locale: PostCanvas.locales.de });
+        document.getElementById('html').onclick = () => (out.textContent = canvas.getHTML());
+      };
+      script.onerror = () => (document.getElementById('out').textContent = 'Build the package first: npm run build');
+      document.body.append(script);
+    </script>
+  </body>
+</html>

@@ -21,9 +21,10 @@ import type { ImageAlign } from '../../core/types';
 import { imageAttrsOf } from '../coerce';
 import { imgAttrs } from '../html';
 import { textLimits } from '../rules';
-import { openFilePicker } from '../upload/picker';
+import { imageAccept, openFilePicker } from '../upload/picker';
 import { uploadFiles } from '../upload/pipeline';
 import { CaptionField } from './caption-field';
+import { RadioMenu } from './radio-menu';
 import { runFrameKey, useEditable, useUpload } from './node-view-utils';
 import { UploadStatus, uploadView } from './upload-status';
 
@@ -35,11 +36,6 @@ const alignIcons: Record<ImageAlign, LucideIcon> = {
   right: PanelRight,
 };
 const alignOrder: ImageAlign[] = ['center', 'wide', 'full', 'left', 'right'];
-
-/** The accept string for picture pickers. */
-export function imageAccept(accept: string | undefined): string {
-  return accept ?? 'image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic,image/heif,.heic,.heif';
-}
 
 /** The `image` block in the editor: the picture, its caption, and tools to replace, describe, align and remove it. */
 export function ImageNodeView({ editor, node, getPos, selected, updateAttributes, deleteNode }: ReactNodeViewProps) {
@@ -78,7 +74,7 @@ export function ImageNodeView({ editor, node, getPos, selected, updateAttributes
   const toolbar = editable ? (
     <MediaToolbar label={t('core.frame.tools', { label })}>
       <ToolButton icon={ImageUp} label={t('media.image.replace')} onClick={replace} />
-      <span ref={setAltAnchor} className="pc-anchor">
+      <span ref={setAltAnchor} className="pc-media-anchor">
         <ToolButton
           icon={TextCursorInput}
           label={t('media.image.alt')}
@@ -86,7 +82,7 @@ export function ImageNodeView({ editor, node, getPos, selected, updateAttributes
           onClick={() => setPanel(panel === 'alt' ? null : 'alt')}
         />
       </span>
-      <span ref={setAlignAnchor} className="pc-anchor">
+      <span ref={setAlignAnchor} className="pc-media-anchor">
         <ToolButton
           icon={alignIcons[attrs.align]}
           label={t('media.image.align')}
@@ -167,13 +163,17 @@ export function ImageNodeView({ editor, node, getPos, selected, updateAttributes
         placement="bottom-end"
         className="pc-menu"
       >
-        <AlignMenu
+        <RadioMenu
           value={attrs.align}
+          options={alignOrder.map((align) => ({
+            value: align,
+            label: t(`media.align.${align}`),
+            icon: alignIcons[align],
+          }))}
           onSelect={(align) => {
             setPanel(null);
             updateAttributes({ align });
           }}
-          t={t}
         />
       </Popover>
     </NodeViewWrapper>
@@ -195,10 +195,10 @@ export function AltTextForm({ value, onChange, onDone, t, label }: AltTextFormPr
   const [draft, setDraft] = useState(value);
   return (
     <div className="pc-alt-form">
-      <label className="pc-field">
-        <span className="pc-field__label">{label ?? t('media.alt.title')}</span>
+      <label className="pc-media-field">
+        <span className="pc-media-field__label">{label ?? t('media.alt.title')}</span>
         <textarea
-          className="pc-input pc-input--area"
+          className="pc-media-input pc-media-input--area"
           rows={3}
           value={draft}
           maxLength={textLimits.alt}
@@ -215,52 +215,12 @@ export function AltTextForm({ value, onChange, onDone, t, label }: AltTextFormPr
           }}
         />
       </label>
-      <p className="pc-field__hint">{t('media.alt.hint')}</p>
-      <div className="pc-panel-actions">
-        <button type="button" className="pc-button pc-button--primary" onClick={onDone}>
+      <p className="pc-media-field__hint">{t('media.alt.hint')}</p>
+      <div className="pc-media-panel__actions">
+        <button type="button" className="pc-media-button pc-media-button--primary" onClick={onDone}>
           {t('media.done')}
         </button>
       </div>
-    </div>
-  );
-}
-
-function AlignMenu({ value, onSelect, t }: { value: ImageAlign; onSelect: (align: ImageAlign) => void; t: (key: string) => string }) {
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
-    const index = items.indexOf(event.target as HTMLButtonElement);
-    const next =
-      event.key === 'ArrowDown'
-        ? items[(index + 1) % items.length]
-        : event.key === 'ArrowUp'
-          ? items[(index - 1 + items.length) % items.length]
-          : event.key === 'Home'
-            ? items[0]
-            : event.key === 'End'
-              ? items[items.length - 1]
-              : undefined;
-    if (!next) return;
-    event.preventDefault();
-    next.focus();
-  }
-  return (
-    <div className="pc-menu__items" onKeyDown={onKeyDown}>
-      {alignOrder.map((align) => {
-        const Icon = alignIcons[align];
-        return (
-          <button
-            key={align}
-            type="button"
-            role="menuitemradio"
-            aria-checked={value === align}
-            className="pc-menu__item"
-            onClick={() => onSelect(align)}
-          >
-            <Icon size={17} strokeWidth={2.2} aria-hidden="true" />
-            {t(`media.align.${align}`)}
-          </button>
-        );
-      })}
     </div>
   );
 }

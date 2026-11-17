@@ -31,7 +31,7 @@ export function useRovingFocus(root: RefObject<HTMLElement | null>) {
   return {
     'data-roving-root': '',
     onFocus(event: FocusEvent<HTMLElement>) {
-      const target = event.target as HTMLElement;
+      const target = event.target;
       if (!target.matches('[data-roving]') || target.closest('[data-roving-root]') !== event.currentTarget) return;
       current.current = target;
       for (const item of items(event.currentTarget)) item.tabIndex = item === target ? 0 : -1;
