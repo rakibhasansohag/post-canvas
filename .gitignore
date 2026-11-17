@@ -134,3 +134,7 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Post Canvas: internal plan files and chat locks (this repo is public)
+docs/plan/
+.locks/
