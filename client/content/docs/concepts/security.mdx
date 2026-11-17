@@ -1,0 +1,131 @@
+---
+title: 'Security model'
+description: 'How Post Canvas keeps stored and rendered posts safe: sanitizing client JSON on the server, URL rules, sandboxed embeds, and what it does not protect against.'
+---
+
+Post Canvas lets people write documents that other people read, so a hostile document is the main risk: a link that runs script, a picture that points at an internal address, an embed that loads a page you did not choose. This page describes what the library does about that, and what stays your job.
+
+<Callout type="warn">
+  The editor is not a security boundary. Anyone can send your server any JSON, with or without your editor. Run
+  `sanitizeDocument()` on every document that comes from a client before you store it or show it to anyone else.
+</Callout>
+
+## The rule
+
+Treat JSON from a browser like any other form input. On your server:
+
+```ts
+import { sanitizeDocument } from 'post-canvas/server';
+
+const { doc, removed } = sanitizeDocument(body.content);
+await save(doc); // store the clean copy, not the original
+```
+
+Store `doc`, not `body.content`. `renderToHTML` and `PostCanvasView` sanitize again by default, which protects you if an old or hand-edited document slips into storage. Sanitizing twice costs little and the second pass changes nothing on a clean document.
+
+## sanitizeDocument or validateDocument
+
+Both run on the server with no DOM and no React, and both use the same rules.
+
+|                           | `sanitizeDocument(json, options)`                                       | `validateDocument(json, options)`                 |
+| ------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------- |
+| Returns                   | `{ doc, removed, omitted }`: a clean document and a list of what it cut | `{ ok, errors }`                                  |
+| A bad link in a paragraph | Removes the link, keeps the text                                        | `ok` is `false`                                   |
+| Use it to                 | Clean user content and carry on                                         | Reject a request with a `422`, or check an import |
+
+`ok` is `true` only when sanitizing would leave the document exactly as it is. `removed` lists at most the first 100 changes, each with a `path`, a `reason` and a node `type`. `omitted` counts the rest.
+
+```ts
+import { validateDocument } from 'post-canvas/server';
+
+const { ok, errors } = validateDocument(body.content);
+if (!ok) return Response.json({ errors }, { status: 422 });
+```
+
+Pass `features` to both when your editor runs a preset other than `full`, so a `comment` box cannot receive a gallery. See [presets and features](/docs/concepts/presets-and-features).
+
+<TypeTable path="output/sanitize.ts" name="SanitizeOptions" />
+
+## What the sanitizer removes
+
+It walks the document, keeps only what the schema knows, and rebuilds the result through ProseMirror so that it fits the schema.
+
+- **Unknown nodes and marks.** An unknown wrapper is removed, and the text of an unknown inline wrapper stays. Nodes of a feature that is off are removed too.
+- **Unsafe URLs.** See the next section.
+- **Unsafe attributes.** For a custom node without its own sanitizer, `on*`, `style`, `srcdoc` and `srcset` attributes are dropped, only plain values are kept, and any value that looks like a URL with a dangerous scheme becomes `null`. If you add your own nodes, give them a `postCanvasSanitize` function.
+- **Editor-only state.** The open link field, upload keys and `blob:` pictures.
+- **Colours.** Only the nine palette names are kept. A hex value or a CSS string is dropped.
+- **Size.** Documents are cut at 20,000 nodes, 48 levels of nesting and 500,000 characters of text by default. Override with `limits`. Anything cut appears in `removed`.
+- **Control characters.** Bidirectional text controls are stripped from captions, names and similar fields, so a file called `invoice<RLO>fdp.exe` cannot read as something else.
+
+## URL rules
+
+All checks run on the server, and again when rendering.
+
+- **Links** (`href`): `http`, `https`, `mailto`, `tel` and relative URLs. Every other scheme is blocked, including `javascript:`, `data:` and `vbscript:`, also when hidden behind spaces, control characters, mixed case, HTML entities or percent-encoding. Protocol-relative URLs such as `//example.com` are blocked.
+- **Pictures and media** (`src`, `image`, `favicon`): absolute `http` or `https` only. A `blob:` source never survives in a saved document.
+- **Links that open a new tab** get `rel` with at least `noopener`. Other `rel` tokens are checked against a short list. Links on embeds and link cards carry `noopener noreferrer nofollow`.
+- **Embeds and videos** store a provider and validated ids. No player URL is stored.
+
+## Iframes are built, not stored
+
+A `video` or `embed` node holds a provider name and ids, such as a YouTube video id. The player URL, the `allow` list and the `sandbox` list are built at render time from the provider's code, from ids that pass that provider's strict pattern and an exact host allowlist. A document cannot bring its own iframe address.
+
+Every iframe gets the provider's minimal `sandbox` tokens, a `referrerpolicy` of `strict-origin-when-cross-origin`, and an `https` address. The sandbox limits what the player can do to your page, but a player still needs to run its own scripts to work. In the default `facade` mode, nothing from the provider runs until a click. See [rendering](/docs/concepts/rendering).
+
+In `renderToHTML` and `PostCanvasView`, text and attribute values are escaped by the renderer. Nothing in a document is written into the page as raw HTML.
+
+## fromHTML and pasted content
+
+`fromHTML(html)` reads HTML from other editors. It parses the markup into an inert document (scripts do not run), removes `script`, `style`, `template`, `noscript`, `object`, `embed`, `link` and `meta` elements, reads the rest through the schema, and then runs `sanitizeDocument`. On a server you pass a DOM window, for example from `happy-dom`, which you install yourself. Pasted content in the editor goes through a similar cleaning step.
+
+## Link previews and SSRF
+
+SSRF (server-side request forgery) means a user tricks your server into requesting an address it should not, such as an internal admin page or a cloud metadata endpoint. A link-card feature is a natural way to do it, because the writer gives you a URL and your server fetches it.
+
+`createLinkPreviewResolver()` guards against it. Before every request and every redirect it checks that the URL is `http` or `https`, uses an allowed port (80 and 443 by default) and has no user name or password. It resolves the host, checks that every address is public, and pins the connection to a checked address, so a second DNS answer cannot swap in a private one. It reads at most 1 MB of HTML by default and gives up after a timeout.
+
+`createEmbedResolver()` fetches only each provider's fixed oEmbed address (and YouTube's watch page for a description), never the URL the writer pasted.
+
+Two cautions:
+
+- If you pass your own `fetch` to the link resolver, the DNS pinning no longer applies. An injected `fetch` resolves the name again when it connects, so it is not safe against DNS rebinding. Inject one only in tests, or behind an egress proxy that blocks private networks itself.
+- The resolvers need Node. They are not for the edge runtime.
+
+Also protect the route that calls them. Require a signed-in user and add a rate limit, or the endpoint is an open way to make your server fetch pages.
+
+## The staged-upload marker
+
+While a pasted picture is on its way in, the editor holds it as an image with the source `https://staged.post-canvas.invalid/<key>`. The `.invalid` domain is reserved and never loads anything, so the marker is harmless to a reader. It is also a valid `https` address, so it passes `sanitizeDocument` and `validateDocument`: the sanitizer does not know it as a problem.
+
+The client check is `hasPendingUploads(json)` from `post-canvas`: do not save while it is `true`. On the server, which cannot call that function, add a check of your own if you need one:
+
+```ts
+const text = JSON.stringify(doc);
+if (text.includes('staged.post-canvas.invalid')) {
+  return Response.json({ error: 'Uploads are not finished.' }, { status: 422 });
+}
+```
+
+## What Post Canvas does not protect against
+
+The library cleans documents. These stay your job:
+
+- **Who may write.** Authentication, authorization and rate limits on your save and upload routes.
+- **Upload content.** The editor refuses files that are not images in the image block and refuses SVG, but your server must check what an upload really is, scan it if you need to, and serve it from a host that cannot run script, because the browser's check is not a security control.
+- **Which hosts pictures come from.** The sanitizer accepts any `http` or `https` picture address. A writer can link a picture on another site, and then readers' browsers request it from there, which can track them. Check `src` hosts against your own storage if you want to forbid this. The same holds for link card images and favicons, and for facade thumbnails, which load from providers' image hosts. An `http` address can also cause mixed-content warnings on an `https` page.
+- **The title and the cover.** They are outside the document. Escape the title, and check the cover. See [fields](/docs/concepts/fields).
+- **Where links go.** A link to a phishing page is a valid link. The `rel` values reduce what the destination learns, not what it is.
+- **Content moderation.** Spam, abuse and illegal content are not detected.
+- **Third-party players.** Once a reader loads a player, the provider's code runs in its sandboxed frame under the provider's terms and privacy policy.
+- **Request size.** The sanitizer caps what it keeps, after the body has been parsed. Limit the size of the request body in your own server.
+- **Anything in your own code.** Custom nodes, custom embed providers and `sanitize: false` are yours to get right.
+
+## Checklist
+
+1. Run `sanitizeDocument` (or check `validateDocument`) on the server for every document a client sends, with the same `features` as your editor.
+2. Store the clean `doc`, not the original.
+3. Check the title and the cover yourself.
+4. Authenticate and rate limit the save, upload and preview routes.
+5. Check uploaded files on the server, and decide whether to restrict picture hosts.
+6. Choose an `embeds` mode (`facade`, `iframe` or `link`) that suits your privacy needs.

@@ -1,0 +1,307 @@
+---
+title: 'Render entry'
+description: 'The post-canvas/render entry: show saved documents as HTML or React, convert to Markdown and text, read HTML, and sanitize JSON.'
+---
+
+`post-canvas/render` shows and converts documents without the editor. Everything here works in React Server Components. `renderToHTML`, `sanitizeDocument` and the Markdown and text helpers run on any server with no DOM. `fromHTML` needs an HTML parser: the browser's own, or a server-side window.
+
+Run `sanitizeDocument()` on JSON from a client before you show it to others. `renderToHTML` and `PostCanvasView` do it by default. The same functions are re-exported from [`post-canvas/server`](/docs/reference/server) where noted there.
+
+```ts
+import {
+  PostCanvasView,
+  activateEmbeds,
+  excerpt,
+  fromHTML,
+  fromMarkdown,
+  getCover,
+  hasTransientContent,
+  renderToHTML,
+  sanitizeDocument,
+  toMarkdown,
+  toPlainText,
+} from 'post-canvas/render';
+```
+
+Load `post-canvas/styles.css` where you show the output. The output is wrapped in `.pc-view > .pc-content` and styled by that file.
+
+## renderToHTML
+
+```ts
+function renderToHTML(json: JSONContent, options?: RenderHTMLOptions): string;
+```
+
+`renderToHTML` renders a document to an HTML string, on the server or in the browser, with no DOM. Text and attribute values are escaped, and every embed URL is rebuilt from validated ids.
+
+**Parameters.** `json` is the Tiptap JSON. `options` is a `RenderHTMLOptions` object.
+
+**Returns.** The HTML string.
+
+By default it sanitizes the document first, wraps the result in `.pc-view > .pc-content`, and shows videos and embeds as click-to-load facades. Run it on the server, or when the post is saved, and send readers the HTML: it needs Tiptap and ProseMirror, so calling it in the browser adds them to the page.
+
+<TypeTable path="output/html.ts" name="RenderHTMLOptions" />
+
+```tsx title="app/posts/[slug]/page.tsx"
+import { renderToHTML } from 'post-canvas/render';
+import 'post-canvas/styles.css';
+
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await loadPost(slug); // your own data access
+  const html = renderToHTML(post.content, { embeds: 'facade' });
+  return <article dangerouslySetInnerHTML={{ __html: html }} />;
+}
+```
+
+With `sanitize: false` the document is not cleaned. Use that only for a document you sanitized yourself when it was saved. To add your own nodes, pass them in `extensions`: they replace built-in nodes with the same name and are rendered with their own `renderHTML`.
+
+### EmbedRenderMode
+
+`EmbedRenderMode` says how videos and embeds appear in static output.
+
+```ts
+type EmbedRenderMode = 'facade' | 'iframe' | 'link';
+```
+
+- `facade`: a thumbnail or placeholder that links to the provider. No player and no third-party script loads until a reader clicks. YouTube and Vimeo thumbnails still load from their image hosts. `activateEmbeds()` turns a click into the player.
+- `iframe`: the provider's player straight away.
+- `link`: a plain link, for feeds and email.
+
+## PostCanvasView
+
+```tsx
+function PostCanvasView(props: PostCanvasViewProps): ReactNode;
+```
+
+`PostCanvasView` shows a document read-only, with the same look as the editor. Media and embed nodes use their interactive React views (the carousel, the click-to-load player). Everything else renders from the schema's static HTML. It sanitizes by default and works from a Server Component.
+
+Render it on the server. In a React Server Component the schema, the sanitizer and Tiptap stay on the server, and the browser gets only the small client parts (the click-to-load player and the carousel). Rendered in the browser it carries Tiptap and ProseMirror. For pages without React on the server, store the output of `renderToHTML()` when the post is saved instead.
+
+The props are `PostCanvasViewProps`:
+
+<TypeTable path="output/react-view.tsx" name="PostCanvasViewProps" />
+
+```tsx title="app/posts/[slug]/page.tsx"
+import { PostCanvasView } from 'post-canvas/render';
+import 'post-canvas/styles.css';
+
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await loadPost(slug); // your own data access
+  return <PostCanvasView content={post.content} />;
+}
+```
+
+`views` replaces the view of a node type with your own component. A `ViewComponent` receives `ViewProps` (the node and the translator). It gets the sanitized attributes.
+
+```tsx
+import { PostCanvasView } from 'post-canvas/render';
+import type { JSONContent, ViewProps } from 'post-canvas';
+
+function PlainImage({ node }: ViewProps) {
+  return <img src={String(node.attrs.src)} alt={String(node.attrs.alt)} />;
+}
+
+export function Body({ content }: { content: JSONContent }) {
+  return <PostCanvasView content={content} views={{ image: PlainImage }} />;
+}
+```
+
+## activateEmbeds
+
+```ts
+function activateEmbeds(root?: ParentNode & EventTarget): () => void;
+```
+
+`activateEmbeds` is for pages without React. `renderToHTML()` shows a video or embed as a facade link. After you insert that HTML into the page, call `activateEmbeds(root)` so a click loads the player instead of following the link. It works in the browser only, and touches nothing until you call it.
+
+**Parameters.** `root` is the element that holds the output. The default is `document`. Facades added later under the same root work too.
+
+**Returns.** A function that stops listening.
+
+The player is rebuilt from the figure's canonical URL through the provider registry, so markup from elsewhere on the page cannot choose an iframe URL, `allow` list or sandbox. A click with Ctrl, Cmd or Shift, or any button but the main one, still follows the link. Custom providers must be registered on the page with `registerEmbedProvider()`. The function is also available from `post-canvas/vanilla` and as `PostCanvas.activateEmbeds` in the CDN build.
+
+```ts
+import { activateEmbeds } from 'post-canvas/render';
+
+const container = document.getElementById('post')!;
+container.innerHTML = htmlFromYourServer; // the output of renderToHTML()
+const stop = activateEmbeds(container);
+// Later: stop();
+```
+
+## Markdown
+
+### toMarkdown
+
+```ts
+function toMarkdown(json: JSONContent): string;
+```
+
+`toMarkdown` converts a document to GitHub-flavoured Markdown. It walks the JSON, so it needs no schema and no DOM. Galleries become a list of images. Videos, embeds and link cards become a link on their own line. Tables become GFM tables. Mentions and hashtags become `@label` and `#label`. Formatting Markdown cannot show, such as underline or colour, is left out.
+
+```ts
+const markdown = toMarkdown(post.content);
+```
+
+### fromMarkdown
+
+```ts
+function fromMarkdown(markdown: string, options?: FromMarkdownOptions): JSONContent;
+```
+
+`fromMarkdown` reads Markdown into a sanitized document, through `@tiptap/markdown`. Syntax for nodes the features turn off ends up as plain text. If the parser throws, the text falls back to one paragraph per blank-line-separated block.
+
+`options` is a `FromMarkdownOptions` object:
+
+<TypeTable path="output/markdown.ts" name="FromMarkdownOptions" />
+
+```ts
+const doc = fromMarkdown('# Weekend plans\n\nA **short** list.', { features });
+```
+
+## Plain text helpers
+
+These are pure walks over the JSON. They need no schema and no DOM, so they work on any document, anywhere.
+
+| Function                    | Returns                                                                                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `toPlainText(json)`         | The document as plain text: blocks separated by blank lines, list items and table rows by line breaks. Images give their caption or alt text, files their name, videos, embeds and link cards their title and URL. |
+| `excerpt(json, max?)`       | The first paragraph or heading with words in it, on one line, cut at a word boundary to `max` characters (default 160) with an ellipsis. An empty string when there is no text.                                    |
+| `getCover(json)`            | The document's cover picture as a `CoverImage`: the first image, or first photo of a gallery, that has a known size, or else the first video thumbnail. `null` when there is neither.                              |
+| `hasTransientContent(json)` | `true` when the document still holds editor-only state: an open paste-a-link field, an upload that is running or failed (`uploadKey`), or a `blob:` source. Check it before saving.                                |
+
+```ts
+const description = excerpt(post.content, 140);
+const cover = getCover(post.content);
+const text = toPlainText(post.content);
+if (hasTransientContent(post.content)) throw new Error('Wait for uploads to finish.');
+```
+
+`getCover` skips a picture whose `width` or `height` is `0` (unknown), because a `CoverImage` needs a size. `hasTransientContent` is also exported from `post-canvas` and `post-canvas/server`. The check `hasPendingUploads(json)` from `post-canvas` also covers the staged-upload marker source.
+
+## fromHTML
+
+```ts
+function fromHTML(html: string, options?: FromHTMLOptions): JSONContent;
+```
+
+`fromHTML` reads HTML into a sanitized document. Scripts never run: the HTML is parsed into an inert document, read through the schema's parse rules, and then cleaned by `sanitizeDocument()`. HTML from editors such as TinyMCE and Froala keeps its headings, lists, tables, links and formatting, and their YouTube, Vimeo and other player iframes become `video` and `embed` nodes.
+
+In a browser it uses `DOMParser`. On a server there is no `DOMParser`, so pass `{ window }` from a DOM library such as happy-dom or linkedom. The library is yours to install.
+
+<TypeTable path="output/from-html.ts" name="FromHTMLOptions" />
+
+`HTMLParserHost` is the shape of that `window`: anything with a `DOMParser` class.
+
+<TypeTable path="output/from-html.ts" name="HTMLParserHost" />
+
+```ts title="scripts/import-legacy.ts"
+import { fromHTML, type HTMLParserHost } from 'post-canvas/render';
+import { Window } from 'happy-dom';
+
+const window = new Window() as unknown as HTMLParserHost;
+const doc = fromHTML('<h2>Trip notes</h2><p>We left at <strong>dawn</strong>.</p>', { window });
+```
+
+happy-dom's own types differ from the DOM library's, so TypeScript rejects its `Window` as an `HTMLParserHost` without the cast. At run time it works.
+
+If neither the global `DOMParser` nor `window` exists, `fromHTML` throws an error that says so.
+
+## sanitizeDocument
+
+```ts
+function sanitizeDocument(json: unknown, options?: SanitizeOptions): SanitizeResult;
+```
+
+`sanitizeDocument` cleans an untrusted document so it is safe to store and render. It is pure and synchronous, with no DOM, and it runs in edge runtimes. It:
+
+- removes unknown nodes and marks (keeping the text of unknown inline wrappers),
+- runs each extension's `postCanvasSanitize` (which checks URLs and rebuilds embeds from their ids),
+- removes transient editor state: the paste-a-link field, upload keys and `blob:` sources,
+- cuts the document at the size caps,
+- rebuilds the result through the ProseMirror schema and checks it.
+
+The rules per node and mark are on [Nodes and marks](/docs/reference/nodes-and-marks).
+
+**Parameters.** `json` is anything: it is treated as untrusted. `options` is a `SanitizeOptions` object.
+
+**Returns.** A `SanitizeResult`. `doc` is always a `doc` node with at least one block.
+
+<TypeTable path="output/sanitize.ts" name="SanitizeOptions" />
+
+<TypeTable path="output/sanitize.ts" name="SanitizeResult" />
+
+<TypeTable path="output/sanitize.ts" name="SanitizeRemoval" />
+
+`SanitizeReason` is why something was removed or changed:
+
+```ts
+type SanitizeReason =
+  | 'not-a-document'
+  | 'invalid-node'
+  | 'unknown-node'
+  | 'unknown-mark'
+  | 'rejected'
+  | 'invalid-attrs'
+  | 'transient'
+  | 'invalid-content'
+  | 'limit-nodes'
+  | 'limit-depth'
+  | 'limit-text';
+```
+
+`DocumentLimits` are the size caps. A document over a cap is cut and the cut is reported. `defaultLimits` holds the defaults:
+
+<TypeTable path="output/sanitize.ts" name="DocumentLimits" />
+
+`defaultLimits` is `{ maxNodes: 20000, maxDepth: 48, maxTextLength: 500000 }`. Pass `limits` with only the keys you want to change.
+
+```ts
+import { sanitizeDocument } from 'post-canvas/render';
+
+const { doc, removed, omitted } = sanitizeDocument(body.content, { limits: { maxTextLength: 100_000 } });
+if (removed.length > 0) console.warn(`Cleaned ${removed.length + omitted} items`, removed[0]);
+await save(doc); // your own storage
+```
+
+`removed` lists at most the first 100 items. `omitted` counts the rest. To reject a document instead of fixing it, use [`validateDocument`](/docs/reference/server#validatedocument).
+
+## Read-only views
+
+`PostCanvasView` builds its views from these. They are exported so you can compose or wrap them. They take `ViewProps` and are safe in Server Components.
+
+| Export         | What it is                                                                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `embedViews`   | A `ViewMap` for `video`, `embed` and `linkCard`: `{ video: VideoView, embed: EmbedView, linkCard: LinkCardView }`.                             |
+| `VideoView`    | A YouTube or Vimeo video: a click-to-load player with its title, description and "Watch on" link.                                              |
+| `EmbedView`    | A third-party embed behind a click-to-load placeholder, with an "Open on" link.                                                                |
+| `LinkCardView` | A link card: the page's image, site, title and description, all one link.                                                                      |
+| `EmbedPlayer`  | The client component that holds the click-to-load player: a thumbnail or placeholder until the reader asks for it, then the provider's iframe. |
+
+`EmbedPlayer` takes only strings and numbers, so a Server Component can render it. Its props are `EmbedPlayerProps`:
+
+<TypeTable path="embeds/view/embed-player.tsx" name="EmbedPlayerProps" />
+
+```tsx
+import { EmbedPlayer } from 'post-canvas/render';
+
+export function Trailer() {
+  return (
+    <EmbedPlayer
+      src="https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ?rel=0&playsinline=1"
+      playerTitle="Big Buck Bunny"
+      allow="autoplay; fullscreen"
+      sandbox="allow-scripts allow-same-origin allow-presentation"
+      aspectRatio={16 / 9}
+      height={null}
+      label="Play Big Buck Bunny on YouTube"
+      badge="YouTube"
+      thumbnail="https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg"
+      play
+    />
+  );
+}
+```
+
+Build the `src` from validated ids. Do not pass a URL you got from a user. `embedViews`, `VideoView`, `EmbedView` and `LinkCardView` rebuild their URLs from the node's provider and ids, so prefer them when you render a document's nodes.

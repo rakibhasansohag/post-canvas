@@ -1,0 +1,258 @@
+---
+title: 'Headless usage'
+description: 'Build your own editor interface on the Post Canvas editor with usePostCanvasEditor, the extensions entry, and your own Tiptap extensions.'
+---
+
+`PostCanvas` is the editor plus a toolbar, menus, a status bar, title and cover fields and toasts. If you want your own interface around the same editor, you can use the layer underneath: the `usePostCanvasEditor` hook, or the Tiptap extensions it is built from. Both give you a Tiptap `Editor` that knows about galleries, embeds, uploads, mentions and the safe output pipeline, with no Post Canvas chrome.
+
+## The hook
+
+`usePostCanvasEditor(options)` creates the editor for a preset and a set of features and keeps it in step with its options. It returns the editor and the values it resolved. You render the editor with Tiptap's `EditorContent`.
+
+```tsx title="components/my-editor.tsx"
+'use client';
+
+import { EditorContent, useEditorState } from '@tiptap/react';
+import { PostCanvasProvider, usePostCanvasEditor } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export function MyEditor({ save }: { save: (json: unknown) => void }) {
+  const { editor, features, t, adapters } = usePostCanvasEditor({
+    preset: 'article',
+    onChange: ({ json }) => save(json),
+  });
+
+  const active = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({ bold: e?.isActive('bold') ?? false, italic: e?.isActive('italic') ?? false }),
+  });
+
+  if (!editor) return null;
+
+  return (
+    <PostCanvasProvider value={{ editor, t, adapters, features }}>
+      <div className="pc-root" data-pc-theme="auto">
+        <div role="toolbar" aria-label="Formatting">
+          <button type="button" aria-pressed={active?.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
+            Bold
+          </button>
+          <button type="button" aria-pressed={active?.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>
+            Italic
+          </button>
+        </div>
+        <EditorContent editor={editor} />
+      </div>
+    </PostCanvasProvider>
+  );
+}
+```
+
+Points to know:
+
+- **`@tiptap/react` is yours to install.** Install the same version Post Canvas uses (`npm install @tiptap/react @tiptap/core`), so the app and the package share one copy.
+- **`editor` is `null` on the server and on the first render.** The hook creates the editor with `immediatelyRender: false`.
+- **The editor does not re-render React on every transaction.** Use `useEditorState` with a selector, as above, to read things such as `isActive('bold')`. Reading `editor.isActive()` during render gives stale values.
+- **`PostCanvasProvider` is optional but worth adding.** Some editor views (the image block, for one) read the language from React context. Without the provider they show English, whatever `locale` you passed.
+- **Wrap the content in `.pc-root`** (with `data-pc-theme`) to get the Post Canvas styles. See [Theming](/docs/guides/theming).
+- **Content is uncontrolled.** Pass `defaultContent`, listen with `onChange`, and replace content with `editor.commands.setContent()`.
+
+<TypeTable path="react/use-post-canvas-editor.ts" name="UsePostCanvasEditorOptions" />
+
+The hook returns `{ editor, features, t, adapters, limits, classifier }`: the editor, the resolved features, the translator, the adapters, the limits and the classifier.
+
+### What you get and what you do not
+
+You get the schema, input rules and keyboard shortcuts, paste cleanup, the `/` suggestion logic, mentions, media and embed node views, uploads through your adapter, and the sanitizer. The hook does not render the toolbar, the selection menu, the `+` button, the block handle, the `/` menu list, the status bar, the title and cover fields or toasts. Without `PostCanvas` there is nothing to show a suggestion list for `@`, `#` and `/`, so mentions and the slash menu need UI you write against the store in `editor.storage.postCanvasText.menu`, or you leave them off with `features`.
+
+Notices (upload errors, limit warnings) go to `notify`. The default prints to the console. Pass your own to show a toast:
+
+```tsx
+usePostCanvasEditor({ notify: (message, kind) => toast[kind === 'error' ? 'error' : 'info'](message) });
+```
+
+Commands such as `insertFiles(files)`, `insertImage(options)`, `insertGallery(options)` and `insertEmbedInput()` work from your own buttons: `editor.commands.insertFiles(files)`. See the [commands reference](/docs/reference/commands).
+
+Before you publish, check the same things the status bar checks:
+
+```ts
+import { getProblems, hasPendingUploads } from 'post-canvas';
+
+const blocked = hasPendingUploads(editor.getJSON()) || getProblems(editor).some((p) => p.severity === 'error');
+```
+
+## The extensions entry
+
+If you already run Tiptap and want to add Post Canvas to it, skip the hook and use `post-canvas/extensions`. It exports the pieces:
+
+| Export                                                      | What it is                                                                                          |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `postCanvasKit(features, core)`                             | Every editor extension for a feature set: core, unique ids, text, media and embeds, with node views |
+| `postCanvasSchema(features)`                                | The same schema without node views, React or DOM: for servers, sanitizing and static rendering      |
+| `ImageNode`, `GalleryNode`, `FileNode`, `createGalleryNode` | The media nodes                                                                                     |
+| `Video`, `Embed`, `LinkCard`, `createEmbedNode`             | The embed nodes                                                                                     |
+| `textKit`, `textSchema`, `PasteCleanup`, `CodeHighlight`    | The text extensions and paste cleanup                                                               |
+| `moveBlock`, `duplicateBlock`, `deleteBlock`, `turnInto`    | Block commands the block handle uses                                                                |
+
+Use it with Tiptap's own `useEditor`:
+
+```tsx title="components/tiptap-editor.tsx"
+'use client';
+
+import { EditorContent, useEditor } from '@tiptap/react';
+import { resolveFeatures } from 'post-canvas';
+import { postCanvasKit } from 'post-canvas/extensions';
+import { useMemo } from 'react';
+import 'post-canvas/styles.css';
+
+const adapters = {};
+
+export function TiptapEditor() {
+  const extensions = useMemo(() => {
+    const features = resolveFeatures('article', { image: false, gallery: false, file: false });
+    return postCanvasKit(features, { adapters });
+  }, []);
+
+  const editor = useEditor({
+    extensions,
+    content: '<p>Hello</p>',
+    immediatelyRender: false,
+    editorProps: { attributes: { class: 'pc-content' } },
+  });
+
+  return (
+    <div className="pc-root" data-pc-theme="auto">
+      <EditorContent editor={editor} />
+    </div>
+  );
+}
+```
+
+`resolveFeatures(preset, overrides, { adapters })` builds the full feature set. Pass the third argument to apply the rule that image, gallery and file are off without an upload adapter. `postCanvasKit(features, core)` takes the translator `t`, the `adapters` and `notify` in its second argument, and sets them in the core extension's storage.
+
+On the server, build the schema from the same feature set so what you accept matches what the editor can make:
+
+```ts
+import { postCanvasSchema } from 'post-canvas/extensions';
+import { sanitizeDocument } from 'post-canvas/server';
+
+const { doc } = sanitizeDocument(json, { extensions: postCanvasSchema() });
+```
+
+## Add your own Tiptap extensions
+
+`PostCanvas` and `usePostCanvasEditor` take an `extensions` array. Your extensions are added after the Post Canvas kit. Changing the array does not rebuild the editor, so define it outside the component or memoize it.
+
+```tsx
+<PostCanvas extensions={[Highlighter]} />
+```
+
+### Custom nodes and the sanitizer
+
+JSON that comes back from a browser is not trusted. `sanitizeDocument()`, `renderToHTML()` and `PostCanvasView` run it through the schema and drop any node type they do not know. A custom node therefore needs to reach the server schema, and it needs a way to clean its own attributes.
+
+That is the `postCanvasSanitize` field. Put it on the Tiptap node or mark. It receives the raw attributes, must be pure (no DOM, no network, so it runs on the server), and returns the cleaned attributes, or `null` to drop the node.
+
+```ts title="lib/callout.ts"
+import { Node } from '@tiptap/core';
+import type { AttrsSanitizer } from 'post-canvas';
+
+const tones = ['info', 'warning'];
+
+const sanitizeCallout: AttrsSanitizer = (attrs) => ({
+  tone: typeof attrs.tone === 'string' && tones.includes(attrs.tone) ? attrs.tone : 'info',
+});
+
+/** The schema: no DOM and no React, so the server can import it too. */
+export const Callout = Node.create({
+  name: 'callout',
+  group: 'block',
+  content: 'inline*',
+  addAttributes() {
+    return {
+      tone: {
+        default: 'info',
+        parseHTML: (element) => element.getAttribute('data-tone'),
+        renderHTML: (attrs) => ({ 'data-tone': attrs.tone }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-callout]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['div', { ...HTMLAttributes, 'data-callout': '' }, 0];
+  },
+  postCanvasSanitize: sanitizeCallout,
+});
+```
+
+A node without `postCanvasSanitize` still gets a generic clean: only simple attribute values are kept, attributes named `style`, `srcdoc`, `srcset` and `on*` are dropped, and link and source attributes are checked. That is a safety net, not a design. Give every node that has attributes its own sanitizer.
+
+Use the node in the editor, and on the server through the `extensions` option:
+
+```ts title="server/save.ts"
+import { postCanvasSchema } from 'post-canvas/extensions';
+import { renderToHTML, sanitizeDocument } from 'post-canvas/server';
+import type { JSONContent } from 'post-canvas';
+import { Callout } from '@/lib/callout';
+
+const extensions = [...postCanvasSchema(), Callout];
+
+export function save(json: JSONContent) {
+  const { doc } = sanitizeDocument(json, { extensions });
+  return { doc, html: renderToHTML(doc, { extensions: [Callout], sanitize: false }) };
+}
+```
+
+`renderToHTML()` merges the extensions you pass into its own, so pass only your own nodes there. `sanitizeDocument()` takes the complete list. `PostCanvasView` has no `extensions` prop, so a page that shows custom nodes should use `renderToHTML()`.
+
+### Menu items and problems
+
+Two more fields add to the editor. Put them on the editor-side extension, not the shared schema one:
+
+- `postCanvasInsert()` returns `InsertItem[]` for the `+` and `/` menus.
+- `postCanvasProblems()` returns `Problem[]`: things that block or warn before publishing, shown by `getProblems(editor)` and in the status bar.
+
+```tsx title="lib/callout-editor.ts"
+import { Info } from 'lucide-react';
+import { Callout } from './callout';
+
+export const EditorCallout = Callout.extend({
+  postCanvasInsert() {
+    return [
+      {
+        id: 'callout',
+        group: 'advanced',
+        label: 'Callout',
+        keywords: ['note', 'tip', 'info'],
+        icon: Info,
+        run: ({ editor, range }) => {
+          const chain = editor.chain().focus();
+          if (range) chain.deleteRange(range);
+          chain.insertContent({ type: 'callout', attrs: { tone: 'info' } }).run();
+        },
+      },
+    ];
+  },
+});
+```
+
+Pass `EditorCallout` to the editor and plain `Callout` to the server.
+
+## Shared state: `editor.storage.postCanvasCore`
+
+Every Post Canvas extension reads shared state from `editor.storage.postCanvasCore`, and so can yours:
+
+| Field                    | What it is                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `t`                      | The translator for the current locale                                        |
+| `adapters`               | The adapters you passed (upload, mentions, hashtags, embeds, links, storage) |
+| `features`               | The resolved feature set                                                     |
+| `notify(message, kind?)` | Announces a message, as a toast and in a live region when the UI is there    |
+
+```ts
+const { adapters, notify } = editor.storage.postCanvasCore;
+if (!adapters.upload) notify('Uploads are not set up yet.', 'error');
+```
+
+The hook updates these values in place when its options change, so read them when you need them instead of keeping a copy.

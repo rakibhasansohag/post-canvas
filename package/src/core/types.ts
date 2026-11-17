@@ -40,9 +40,9 @@ export const paletteColors: readonly PaletteColor[] = [
 export interface MediaSource {
   /** An https URL from the upload adapter. A `blob:` URL only while the upload runs. */
   src: string;
-  /** Intrinsic width in pixels, greater than 0. */
+  /** Intrinsic width in pixels. `0` means unknown: the editor measures the picture when it loads. */
   width: number;
-  /** Intrinsic height in pixels, greater than 0. */
+  /** Intrinsic height in pixels. `0` means unknown. */
   height: number;
   /** Alternative text. Empty for decorative pictures. */
   alt: string;

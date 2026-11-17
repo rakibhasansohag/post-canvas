@@ -63,3 +63,49 @@ jobs:
       - name: Docs - build
         working-directory: client
         run: npm run build
+
+  # Chat D: package correctness, bundle sizes and the docs site's static export.
+  launch:
+    name: Package checks and docs export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package/package-lock.json
+            client/package-lock.json
+
+      - name: Package - install
+        working-directory: package
+        run: npm ci
+
+      - name: Package - build
+        working-directory: package
+        run: npm run build
+
+      - name: Package - check:package (publint and Are the Types Wrong)
+        working-directory: package
+        run: npm run check:package
+
+      - name: Package - size
+        working-directory: package
+        run: npm run size
+
+      - name: Docs - install
+        working-directory: client
+        run: npm ci
+
+      - name: Docs - static export under a base path
+        working-directory: client
+        env:
+          NEXT_PUBLIC_BASE_PATH: /post-canvas
+          NEXT_PUBLIC_SITE_URL: https://example.com
+        run: |
+          npm run build
+          test -f out/index.html
+          test -f out/playground/index.html
+          test -f out/llms.txt

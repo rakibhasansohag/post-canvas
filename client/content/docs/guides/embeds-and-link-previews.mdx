@@ -1,0 +1,195 @@
+---
+title: 'Embeds and link previews'
+description: 'How a pasted link becomes a video, an embed or a link card, which providers are built in, and how to wire the server resolvers.'
+---
+
+When a writer pastes a link into an empty paragraph, Post Canvas turns it into the best block it can:
+
+1. A **video** block, for a YouTube or Vimeo link.
+2. An **embed** block, for a link from one of the other built-in providers (Spotify, X and so on).
+3. A **link card** (a title, description and picture from the page), for any other web page. This needs the `links` adapter.
+4. Otherwise the link stays a plain link.
+
+The link is inserted as text first, as its own undo step, so Undo turns the block back into the plain link. Writers can also use the Insert button or the `/` menu: **Video**, **Embed** and **Link card** open a small paste-a-link field.
+
+Only a link on its own works this way. A link pasted inside a sentence, or into a paragraph that already has text, stays a normal link.
+
+## Built-in providers
+
+Video, from the `video` feature:
+
+| Provider | Links it reads                                  |
+| -------- | ----------------------------------------------- |
+| YouTube  | Watch, `youtu.be`, Shorts, embed and live links |
+| Vimeo    | Vimeo video links, including unlisted ones      |
+
+Embeds, from the `embed` feature:
+
+| Provider    | What it embeds                                          | Player size           |
+| ----------- | ------------------------------------------------------- | --------------------- |
+| Spotify     | Tracks, albums, playlists, episodes, shows, artists     | Fixed height          |
+| SoundCloud  | Tracks and sets                                         | Fixed height          |
+| X           | Posts on `x.com` and `twitter.com`                      | Fixed height (560 px) |
+| Instagram   | Posts, reels and videos                                 | Fixed height (640 px) |
+| TikTok      | Videos                                                  | 9:16                  |
+| CodePen     | Pens, personal and team                                 | Fixed height (420 px) |
+| Loom        | Recordings                                              | 16:9                  |
+| Figma       | Files, designs, prototypes, boards, slides              | 16:10                 |
+| Google Maps | Places, searches and map positions on `google.com/maps` | 4:3                   |
+
+X, Instagram and CodePen players use a fixed height. A player from another site cannot tell your page how tall it wants to be, so the editor cannot resize it to fit.
+
+Google Maps short links (`maps.app.goo.gl`) need a server lookup to find the real address, so they are not embedded. They become link cards, which the `links` adapter resolves.
+
+The embed providers are listed in `features.embed.providers`. To allow only some, list them:
+
+```tsx
+<PostCanvas features={{ embed: { providers: ['spotify', 'codepen'] } }} />
+```
+
+Set `embed: false` to turn embeds off, or `video: false` for videos. To add a provider of your own, see [Custom embed providers](/docs/guides/custom-embed-provider).
+
+## The adapters
+
+Two optional adapters fill in details. Both are functions that take a URL and an `AbortSignal`, and both usually call your server.
+
+- `adapters.embeds` looks up a video's or embed's title, and for a video its description and thumbnail. Without it, blocks still work, but have no title.
+- `adapters.links` looks up a link card's title, description, picture, site name and favicon. Without it, pasted web pages stay plain links.
+
+<TypeTable path="core/types.ts" name="EmbedMetadata" />
+
+<TypeTable path="core/types.ts" name="LinkPreview" />
+
+The browser cannot read other sites' pages (browsers block it), so these lookups run on your server. `post-canvas/server` provides both:
+
+- `createEmbedResolver()` asks each provider's public oEmbed endpoint for the title and thumbnail. It only calls fixed endpoints built from validated ids, and it never passes on the provider's HTML.
+- `createLinkPreviewResolver()` fetches the page and reads its `og:` and `twitter:` tags, the title and the icons.
+
+### The route handler
+
+One route can serve both. This is the Next.js version:
+
+```ts title="app/api/previews/route.ts"
+import { createEmbedResolver, createLinkPreviewResolver } from 'post-canvas/server';
+
+const embeds = createEmbedResolver();
+const links = createLinkPreviewResolver();
+
+export async function POST(request: Request) {
+  // Check the signed-in user here, and rate limit this route.
+  const { url, kind } = (await request.json()) as { url: string; kind: 'embed' | 'link' };
+  try {
+    const resolve = kind === 'embed' ? embeds : links;
+    return Response.json(await resolve(url, { signal: request.signal }));
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? String(error.code) : 'unavailable';
+    return Response.json({ code }, { status: 422 });
+  }
+}
+```
+
+This route fetches addresses that a user typed. The resolvers have protection (below), but you should still require a signed-in user and limit how often the route can be called.
+
+### The browser side
+
+```tsx title="app/editor.tsx"
+'use client';
+import { PostCanvas } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+const post =
+  (kind: 'embed' | 'link') =>
+  async (url: string, { signal }: { signal: AbortSignal }) => {
+    const response = await fetch('/api/previews', { method: 'POST', body: JSON.stringify({ url, kind }), signal });
+    if (!response.ok) throw new Error(((await response.json()) as { code: string }).code);
+    return response.json();
+  };
+
+const adapters = { embeds: post('embed'), links: post('link') };
+
+export function Editor() {
+  return <PostCanvas adapters={adapters} />;
+}
+```
+
+Throw an error whose message (or `code`) is the code from the server. The editor shows a specific message for `not_found`, `not_embeddable` and `blocked`, and a general "could not preview" message for everything else. Each lookup gives up after 10 seconds. A failed title lookup never breaks a video or embed: the block still works. If a pasted link cannot become a link card, the plain link stays. In the paste-a-link field, a failed lookup shows the error with **Try again** and **Add as a plain link**.
+
+The resolvers throw typed errors you can map to your own responses:
+
+- `EmbedResolveError` has a `code` of `unsupported`, `not_found`, `not_embeddable`, `unavailable` or `timeout`.
+- `LinkPreviewError` has a `code` of `invalid_url`, `blocked`, `timeout`, `too_many_redirects`, `not_html`, `http_error` or `unavailable`.
+
+Both are exported from `post-canvas/server`. They need Node, because they load `undici` and `node:dns` when they first run. On an edge runtime, pass your own `fetch` and `lookup`.
+
+Pass `providers` to the embed resolver to match the editor's features, so the server never looks up a provider the editor does not allow:
+
+```ts
+const embeds = createEmbedResolver({ providers: ['youtube', 'vimeo', 'spotify'] });
+```
+
+## SSRF protection
+
+SSRF (server-side request forgery) is when someone gives your server a link that points at your own network, such as `http://localhost` or a cloud metadata address, to make your server fetch it. The link resolver defends against this:
+
+- It only fetches `http` and `https` links, and only ports 80 and 443 unless you pass `allowPorts`.
+- It refuses `localhost` and any address that is private, loopback, link-local, multicast, reserved or otherwise internal (`isBlockedAddress()` is exported if you want the same check).
+- It resolves the host name, checks every address it gets, and on Node connects only to an address it checked. A second DNS answer cannot swap in a private one.
+- It checks every redirect, up to 3, and gives up after 5 seconds. It reads at most 1 MB of the page and only accepts HTML.
+
+Do not pass your own `fetch` to the link resolver in production. A `fetch` you inject resolves the host name again when it connects, so it is not safe against DNS rebinding (a host that answers the check with a public address and the connection with a private one). Inject one only in tests, or behind an egress proxy that blocks private networks itself.
+
+## Consent: facade, iframe or link
+
+A third-party player loads that site's scripts and can track the reader. Post Canvas lets you decide when it loads.
+
+**In the editor**, set `embedConsent`:
+
+- `click` (the default): a video or embed shows as a facade, a thumbnail and play button with no third-party iframe, until the writer clicks it.
+- `auto`: players load straight away.
+
+```tsx
+<PostCanvas embedConsent="auto" />
+```
+
+`embedConsent` is also an option of `createPostCanvas()` and the CDN build.
+
+**In output**, `renderToHTML()` and `PostCanvasView` take an `embeds` option:
+
+| Mode               | What the reader gets                                                           |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `facade` (default) | A thumbnail or plain box that links to the provider. A click loads the player. |
+| `iframe`           | The provider's player straight away.                                           |
+| `link`             | A plain link, with no player. Use this for feeds and email.                    |
+
+```ts
+import { renderToHTML } from 'post-canvas/server';
+
+const html = renderToHTML(post.content, { embeds: 'facade' });
+```
+
+A facade loads no third-party script or iframe. It does not load nothing at all: YouTube thumbnails come from `i.ytimg.com` and Vimeo thumbnails from `i.vimeocdn.com`, so a page with those facades still makes image requests to those hosts. The other embeds have no thumbnail and show a plain box.
+
+Player and iframe URLs are never stored in the document. They are built from the provider and the validated ids when the page is rendered, and always with `https`. YouTube plays from `youtube-nocookie.com`, and Vimeo is asked not to track (`dnt=1`).
+
+## Pages without React
+
+`renderToHTML()` gives you facades. To make a click load the player on a page that does not use React, call `activateEmbeds()` once after you insert the HTML:
+
+```html title="post.html"
+<div id="post"></div>
+<script type="module">
+  import { activateEmbeds } from 'post-canvas/vanilla';
+  document.getElementById('post').innerHTML = postHtml; // from renderToHTML() on your server
+  const stop = activateEmbeds(document.getElementById('post'));
+</script>
+```
+
+`activateEmbeds(root)` is also exported from `post-canvas/render`, and on the CDN build it is `PostCanvas.activateEmbeds`. It returns a function that stops listening. It rebuilds the player from the facade's provider and link through the provider registry, so markup elsewhere on the page cannot choose an iframe address, `allow` list or sandbox. A click with Ctrl, Cmd or Shift, or a middle click, still opens the provider's page.
+
+With `PostCanvasView` in React, the facades already load on click and you do not need `activateEmbeds()`.
+
+## Next steps
+
+- [Custom embed providers](/docs/guides/custom-embed-provider): add a site that is not built in.
+- [Adapters](/docs/concepts/adapters): the full list of adapters.
+- [Security](/docs/concepts/security): how documents are sanitized.

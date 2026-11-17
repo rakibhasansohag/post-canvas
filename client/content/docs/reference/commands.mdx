@@ -1,0 +1,206 @@
+---
+title: 'Commands and block helpers'
+description: 'Editor commands for media, embeds and text, plus the block helpers that move, copy, delete and convert blocks.'
+---
+
+Post Canvas adds editor commands to Tiptap's command system. Run them through `editor.chain().focus().<command>().run()`, or call one directly with `editor.commands.<command>()`. A command returns `true` when it did its job and `false` when it refused, for example because a URL was not safe.
+
+Commands only exist for the extensions that are loaded, so they follow your [features](/docs/reference/types#features-and-presets). Without the upload adapter the media commands are not there either, because `image`, `gallery` and `file` are off unless you set them in `features`.
+
+The block helpers further down are plain functions, not editor commands: they take the editor and a document position.
+
+## Media commands
+
+These come from the `MediaUploads` extension (name `postCanvasMedia`), which loads when `image`, `gallery` or `file` is on.
+
+| Command            | What it does                                                                                                                                                                                                                                           | Arguments                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `insertImage`      | Inserts an `image` block from a finished picture. Returns `false` when `src` is not an http or https URL.                                                                                                                                              | `options: InsertImageOptions`                                           |
+| `insertGallery`    | Inserts a `gallery` block from finished photos. Photos with an unsafe `src` are dropped, the rest is cut to the gallery's `maxPhotos`, and a layout the features do not allow becomes the first allowed layout. Returns `false` when no photo is left. | `options: InsertGalleryOptions`                                         |
+| `insertFiles`      | Uploads files at the selection. Pictures become an `image` (one) or a `gallery` (several), other files become `file` blocks. Starts the upload and returns `true` straight away.                                                                       | `files: File[]`                                                         |
+| `uploadFiles`      | Checks, prepares and uploads files, and puts them where `target` says. Same result as `insertFiles` with a choice of place. Returns `true` straight away.                                                                                              | `files: File[]`, `target?: UploadTarget` (default `{ type: 'cursor' }`) |
+| `setGalleryLayout` | Changes the layout of the selected gallery, or of the one with `nodeId`. Returns `false` when there is no such gallery or the features do not allow the layout. Collage places are reset to fit the new layout.                                        | `layout: GalleryLayout`, `nodeId?: string`                              |
+| `addGalleryPhotos` | Uploads pictures into the selected gallery, or into the one with `nodeId`. Photos past `maxPhotos` are dropped with a notice. Returns `false` when there is no such gallery.                                                                           | `files: File[]`, `nodeId?: string`                                      |
+
+The uploads need `adapters.upload`. Without it, `uploadFiles`, `insertFiles` and `addGalleryPhotos` show an error notice and add nothing.
+
+`InsertImageOptions` and `InsertGalleryOptions` are the arguments of the two insert commands:
+
+<TypeTable path="media/kit.ts" name="InsertImageOptions" />
+
+<TypeTable path="media/kit.ts" name="InsertGalleryOptions" />
+
+`width` and `height` of an image or photo can be `0`, meaning unknown. `insertImage` uses `0` when you leave them out. The editor measures the picture on load, outside the undo history. `align` defaults to `center`.
+
+`UploadTarget` says where uploaded files go:
+
+```ts
+type UploadTarget =
+  | { type: 'cursor'; as?: 'auto' | 'image' | 'gallery' | 'file' }
+  | { type: 'at'; pos: number }
+  | { type: 'gallery'; nodeId: string }
+  | { type: 'replace'; nodeId: string };
+```
+
+- `cursor`: at the selection, replacing it. `as` forces a single image, a gallery or file blocks. The default is `auto`.
+- `at`: at a document position, such as a drop point.
+- `gallery`: into the gallery with this node id.
+- `replace`: replaces the picture or file of the `image` or `file` node with this id.
+
+```ts
+// A picture you already host.
+editor
+  .chain()
+  .focus()
+  .insertImage({ src: 'https://example.com/photos/market.jpg', width: 1600, height: 1067, alt: 'A fruit stall' })
+  .run();
+
+// A gallery from finished photos.
+editor.commands.insertGallery({
+  layout: 'grid',
+  photos: [
+    { src: 'https://example.com/photos/a.jpg', width: 1200, height: 800 },
+    { src: 'https://example.com/photos/b.jpg', width: 1200, height: 800 },
+  ],
+  caption: 'Weekend market',
+});
+
+// Files from an input element. The upload adapter does the upload.
+editor.commands.uploadFiles(Array.from(input.files ?? []), { type: 'cursor', as: 'gallery' });
+
+editor.commands.setGalleryLayout('masonry');
+```
+
+Pasting or dropping files into the editor calls `uploadFiles` for you. A picture pasted as a `data:` URL is staged for upload with a marker source (`https://staged.post-canvas.invalid/<key>`). Check `hasPendingUploads(json)` before you save: it covers running, failed and staged uploads.
+
+## Embed commands
+
+### insertEmbedInput
+
+`insertEmbedInput` opens the inline "paste a link" field at the cursor. It loads when `video`, `embed` or `linkCard` is on.
+
+| Command            | What it does                                                                                                                                                                                          | Arguments                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `insertEmbedInput` | Inserts a transient `embedInput` node. When the writer submits a link, the field turns into a `video`, an `embed`, a `linkCard` (looked up through `adapters.links`) or a paragraph holding the link. | `options?: { kind?: EmbedInputKind; value?: string }` |
+
+`kind` limits what the link may become and defaults to `any`, which tries video, then embed, then link card. `value` pre-fills the field.
+
+```ts
+type EmbedInputKind = 'any' | 'video' | 'embed' | 'link';
+```
+
+```ts
+editor.chain().focus().insertEmbedInput({ kind: 'video' }).run();
+editor.chain().focus().insertEmbedInput({ value: 'https://vimeo.com/76979871' }).run();
+```
+
+The paste-a-link field never reaches a saved document: `hasTransientContent(json)` reports an open one and `sanitizeDocument()` removes it. To insert a finished video or embed yourself, use `insertContent` with the node's attributes (see [Nodes and marks](/docs/reference/nodes-and-marks#embeds)) and run the document through `sanitizeDocument()`.
+
+A bare link pasted into an empty paragraph turns into a video, an embed or a link card on its own, through the `EmbedPaste` extension. The link goes in first as its own undo step, so Undo turns the embed back into the plain link.
+
+### setEmbedConsent
+
+```ts
+function setEmbedConsent(editor: Editor, consent: 'click' | 'auto'): void;
+```
+
+`setEmbedConsent` (from `post-canvas/extensions`) sets whether players load in the editor before a click, and redraws the embeds. `PostCanvas` and `createPostCanvas` call it for their `embedConsent` option, so you only need it when you build the editor yourself. It does nothing when the embeds extension is not loaded.
+
+## Text commands
+
+The text kit adds no commands of its own. It loads Tiptap's extensions, so Tiptap's own commands are there when the matching feature is on. The ones the toolbar and menus use:
+
+| Area      | Commands                                                                                                                                                                    | Needs feature                                          |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Marks     | `toggleBold`, `toggleItalic`, `toggleUnderline`, `toggleStrike`, `toggleCode`, `toggleSubscript`, `toggleSuperscript`                                                       | the mark's own name                                    |
+| Links     | `setLink({ href, target })`, `unsetLink`, `extendMarkRange('link')`                                                                                                         | `link`                                                 |
+| Colour    | `setMark('textStyle', { color })`, `setHighlight({ color })`, `unsetHighlight`                                                                                              | `color`, `highlight`                                   |
+| Alignment | `setTextAlign(align)`, `unsetTextAlign`                                                                                                                                     | `textAlign`                                            |
+| Blocks    | `setParagraph`, `setHeading({ level })`, `setBlockquote`, `toggleBlockquote`, `setCodeBlock`, `toggleCodeBlock`, `setHorizontalRule`, `clearNodes`                          | `heading`, `blockquote`, `codeBlock`, `horizontalRule` |
+| Lists     | `toggleBulletList`, `toggleOrderedList`, `toggleTaskList`                                                                                                                   | `bulletList`, `orderedList`, `taskList`                |
+| Tables    | `insertTable`, `addRowBefore`, `addRowAfter`, `addColumnBefore`, `addColumnAfter`, `deleteRow`, `deleteColumn`, `deleteTable`, `mergeCells`, `splitCell`, `toggleHeaderRow` | `table`                                                |
+
+Colours are palette names such as `blue`, never hex values: `setHighlight({ color: 'yellow' })`. Anything else is dropped when the document is sanitized. See the [palette](/docs/reference/nodes-and-marks#palette-colours).
+
+```ts
+editor.chain().focus().toggleBold().run();
+editor.chain().focus().setHeading({ level: 2 }).run();
+editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+editor.chain().focus().setHighlight({ color: 'yellow' }).run();
+```
+
+### Keyboard shortcuts
+
+The text kit registers these shortcuts. `Mod` is Cmd on Apple devices and Ctrl elsewhere.
+
+| Keys                             | Action                                          |
+| -------------------------------- | ----------------------------------------------- |
+| `Mod-K`                          | Opens the link popover (when the UI is loaded). |
+| `Alt-Shift-Up`, `Alt-Shift-Down` | Moves the current block up or down.             |
+| `Alt-Shift-D`                    | Duplicates the current block.                   |
+| `Alt-Shift-Backspace`            | Deletes the current block.                      |
+
+The block handle is a button that Tab reaches from the text, and it opens a menu with the same actions. The `+` button is not in the tab order. To insert by keyboard, type `/` or use the Insert button in the toolbar.
+
+## Block helpers
+
+These functions work on top-level blocks, for text and media blocks alike. The block handle, its menu and the shortcuts above call them. Each takes the `editor` and a document position `pos`. `pos` can be any position inside the block, or the position right before it. Each returns `true` when it changed the document.
+
+```ts
+import { canMoveBlock, deleteBlock, duplicateBlock, moveBlock, turnInto, turnIntoTargets } from 'post-canvas/extensions';
+```
+
+| Function                         | What it does                                                                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `moveBlock(editor, pos, by)`     | Swaps the block with its neighbour above (`by = -1`) or below (`by = 1`) and keeps the caret in it. Returns `false` at either end.    |
+| `duplicateBlock(editor, pos)`    | Puts a copy right after the block. Media blocks get new ids from the unique-id extension.                                             |
+| `deleteBlock(editor, pos)`       | Removes the block. The document keeps at least one paragraph.                                                                         |
+| `canMoveBlock(editor, pos, by)`  | `true` when the block has a neighbour in that direction. Use it to disable a move button.                                             |
+| `turnInto(editor, target, pos?)` | Turns the text block at `pos`, or the selection when `pos` is left out, into another kind of block. Returns `false` for media blocks. |
+| `turnIntoTargets(editor)`        | The `TurnIntoTarget` values the editor's schema supports, in menu order.                                                              |
+
+`TurnIntoTarget` lists what a text block can turn into:
+
+```ts
+type TurnIntoTarget =
+  | 'paragraph'
+  | 'heading-1'
+  | 'heading-2'
+  | 'heading-3'
+  | 'heading-4'
+  | 'bulletList'
+  | 'orderedList'
+  | 'taskList'
+  | 'blockquote'
+  | 'codeBlock';
+```
+
+```ts
+const first = 0; // the position before the first block
+
+if (canMoveBlock(editor, first, 1)) moveBlock(editor, first, 1);
+duplicateBlock(editor, first);
+
+if (turnIntoTargets(editor).includes('heading-2')) turnInto(editor, 'heading-2', first);
+```
+
+## File picker helpers
+
+`openFilePicker` and `imageAccept` are exported from `post-canvas`. They are what the `+` menu items use.
+
+```ts
+function openFilePicker(options?: FilePickerOptions): Promise<File[]>;
+function imageAccept(accept: string | undefined): string;
+```
+
+`openFilePicker` opens the device's file picker and resolves with the chosen files, or with an empty list when the picker is closed. Call it from a click or key press: browsers only open pickers for a user action. `imageAccept` returns the `accept` string for picture pickers: the one you pass (usually `adapters.upload.accept.image`), or a default list of every format the editor takes, HEIC included. `FilePickerOptions` is on the [utilities page](/docs/reference/utilities#file-picking).
+
+```ts
+import type { Editor } from '@tiptap/core';
+import { imageAccept, openFilePicker } from 'post-canvas';
+
+async function addPhotos(editor: Editor) {
+  const files = await openFilePicker({ accept: imageAccept(undefined), multiple: true });
+  if (files.length > 0) editor.commands.uploadFiles(files, { type: 'cursor', as: 'gallery' });
+}
+```

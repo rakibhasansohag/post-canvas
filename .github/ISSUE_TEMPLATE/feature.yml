@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest something Post Canvas should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the roadmap in the docs and the open issues first. Collaboration, comments, AI, emoji shortcodes, RTL and Vue and Angular wrappers are already on the list.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what stops you?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: How it could work. An API sketch or a screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today
+      description: A workaround, or another editor that does it well.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to work on this

@@ -1,0 +1,147 @@
+---
+title: 'Theming'
+description: 'Switch between light, dark and automatic themes, and restyle Post Canvas by overriding its CSS custom properties.'
+---
+
+Post Canvas is styled with CSS custom properties, also called tokens. Every colour, font, radius and spacing value in the stylesheet comes from a token named `--pc-*`, so you restyle the editor by overriding tokens, not by rewriting selectors.
+
+Import the stylesheet once, before your own CSS:
+
+```tsx title="app/layout.tsx"
+import 'post-canvas/styles.css';
+import './globals.css';
+```
+
+## Light, dark and auto
+
+The `theme` prop takes `light`, `dark` or `auto`. The default is `auto`, which follows the reader's system setting through `prefers-color-scheme`.
+
+```tsx title="components/editor.tsx"
+<PostCanvas theme="dark" />
+```
+
+`PostCanvasView` takes the same prop. The prop sets a `data-pc-theme` attribute on the root element (`.pc-root` for the editor, `.pc-view` for the read view), and the stylesheet reads that attribute. You can set it yourself when you write the wrapper by hand, for example around the output of `renderToHTML()`:
+
+```html
+<div class="pc-view" data-pc-theme="auto">
+  <div class="pc-content">...</div>
+</div>
+```
+
+To switch themes from your own toggle, keep the value in state and pass it down. With the [CDN build](/docs/examples/vanilla-cdn) call `canvas.update({ theme: 'dark' })`.
+
+## The tokens
+
+All tokens are defined on `.pc-root` and `.pc-view` in `post-canvas/styles.css`. The values below are the light defaults.
+
+| Token                                                                 | Default                         | What it styles                                               |
+| --------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------ |
+| `--pc-font-body`                                                      | system UI stack                 | Body text and the interface                                  |
+| `--pc-font-display`                                                   | the body font                   | Headings and the post title field                            |
+| `--pc-font-mono`                                                      | system monospace stack          | Code                                                         |
+| `--pc-font-size`                                                      | `1rem`                          | Base text size                                               |
+| `--pc-line-height`                                                    | `1.65`                          | Base line height                                             |
+| `--pc-text`                                                           | `#1c1d1f`                       | Main text                                                    |
+| `--pc-muted`                                                          | `#6a6d73`                       | Secondary text and hints                                     |
+| `--pc-background`                                                     | `#ffffff`                       | The editor and view background                               |
+| `--pc-surface`                                                        | `#f5f5f4`                       | Quiet panels                                                 |
+| `--pc-surface-raised`                                                 | `#ffffff`                       | Menus, popovers and cards                                    |
+| `--pc-border`                                                         | `#e2e2df`                       | Default borders                                              |
+| `--pc-border-strong`                                                  | `#c9c9c5`                       | Stronger borders                                             |
+| `--pc-accent`                                                         | `#2f5fd0`                       | Links, selection outline, primary buttons                    |
+| `--pc-accent-text`                                                    | `#ffffff`                       | Text on an accent background                                 |
+| `--pc-accent-soft`                                                    | `#e6edfb`                       | Light accent backgrounds                                     |
+| `--pc-danger`                                                         | `#c4332b`                       | Errors and destructive actions                               |
+| `--pc-overlay`                                                        | `rgb(255 255 255 / 0.8)`        | Controls drawn over pictures                                 |
+| `--pc-selection`                                                      | `rgb(47 95 208 / 0.18)`         | Text selection                                               |
+| `--pc-radius-sm`, `--pc-radius`, `--pc-radius-lg`, `--pc-radius-full` | `6px`, `10px`, `16px`, `999px`  | Corner radii                                                 |
+| `--pc-space-1` to `--pc-space-4`, `--pc-space-6`, `--pc-space-8`      | `4px` to `32px`                 | Spacing steps (there is no `--pc-space-5` or `--pc-space-7`) |
+| `--pc-shadow`                                                         | two-layer shadow                | Menus and popovers                                           |
+| `--pc-focus-ring`                                                     | a 2px gap and a 2px accent ring | Keyboard focus                                               |
+| `--pc-z-popover`                                                      | `50`                            | Stacking order of popovers                                   |
+| `--pc-duration`                                                       | `150ms`                         | Transition length                                            |
+
+Dark mode redefines the colour tokens, the shadow and the palette. Layout tokens such as radii and spacing stay the same.
+
+## Palette tokens
+
+Text colour and highlight are stored in documents by name, never as a hex value. The names are `gray`, `brown`, `orange`, `yellow`, `green`, `blue`, `purple`, `pink` and `red`. Each name has two tokens:
+
+- `--pc-color-<name>` is the text colour, for example `--pc-color-blue`.
+- `--pc-highlight-<name>` is the highlight background, for example `--pc-highlight-blue`.
+
+The output uses the classes `pc-color-<name>` and `pc-highlight-<name>`, which read those tokens. Because documents store only names, changing a token recolours every existing post, and dark mode picks lighter text colours and darker highlights on its own. A theme cannot add a tenth colour: a name outside the list is dropped when a document is sanitized.
+
+## Override tokens
+
+Set tokens on `.pc-root` and `.pc-view` in your own stylesheet, after the Post Canvas one. The `className` prop adds a class to the editor root, which gives you a hook with a higher specificity than the defaults:
+
+```css title="app/globals.css"
+/* Light theme */
+.brand.pc-root,
+.brand.pc-view {
+  --pc-accent: #0f766e;
+  --pc-accent-soft: #ccfbf1;
+  --pc-radius: 4px;
+}
+
+/* Dark: the stylesheet's own dark rules are more specific, so match them */
+.brand.pc-root[data-pc-theme='dark'],
+.brand.pc-view[data-pc-theme='dark'] {
+  --pc-accent: #5eead4;
+  --pc-accent-text: #042f2e;
+  --pc-accent-soft: #134e4a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .brand.pc-root[data-pc-theme='auto'],
+  .brand.pc-view[data-pc-theme='auto'] {
+    --pc-accent: #5eead4;
+    --pc-accent-text: #042f2e;
+    --pc-accent-soft: #134e4a;
+  }
+}
+```
+
+```tsx title="components/editor.tsx"
+<PostCanvas className="brand" />
+<PostCanvasView className="brand" content={post.json} />
+```
+
+Dark mode has three places to override because it has three rules: the light default, an explicit `dark` theme, and `auto` under a dark system setting. A light override also applies in dark mode when you leave the other two out, because it has the same specificity as the stylesheet's dark rule and comes later.
+
+## Match your site's fonts
+
+Point the font tokens at the fonts your site already loads. With `next/font` the font's CSS variable can go straight in:
+
+```css title="app/globals.css"
+.pc-root,
+.pc-view {
+  --pc-font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --pc-font-display: var(--font-fraunces), Georgia, serif;
+  --pc-font-size: 1.0625rem;
+  --pc-line-height: 1.7;
+}
+```
+
+Post Canvas does not load fonts. It uses the system stack until you set these.
+
+## Touch targets and reduced motion
+
+- On devices where the primary pointer is coarse (`@media (pointer: coarse)`), toolbar buttons, menu items and media frame handles grow to at least 44 by 44 pixels, and the controls over pictures stay visible because there is no hover on touch.
+- When the reader prefers reduced motion (`@media (prefers-reduced-motion: reduce)`), animations and transitions inside `.pc-root` and `.pc-view` are cut to about zero length and smooth scrolling is turned off.
+
+Both are in the stylesheet, so there is nothing to switch on. If you add your own animation inside the editor, honour the same media query.
+
+## Class names
+
+Every class Post Canvas adds starts with `pc-`, so it does not collide with yours. The ones you are most likely to need:
+
+| Class         | Where                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `.pc-root`    | The editor's outer element                                                             |
+| `.pc-view`    | The read view's outer element, from `PostCanvasView` and `renderToHTML()`              |
+| `.pc-content` | The text area: the editable element in the editor, and the content wrapper in the view |
+| `.pc-canvas`  | The block around the editable area, inside `.pc-root`                                  |
+
+Prefer tokens to class selectors. The other `pc-` class names describe the inside of the editor and are not a documented interface, so a selector that depends on one may break when the markup changes.

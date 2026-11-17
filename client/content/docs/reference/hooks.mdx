@@ -1,0 +1,154 @@
+---
+title: 'React hooks'
+description: 'The React hooks of post-canvas: build your own editor chrome, read the editor context, translate strings and drag blocks.'
+---
+
+The hooks below are exported from `post-canvas`. They are for apps that build their own editor chrome instead of using the [`PostCanvas`](/docs/reference/post-canvas) component. All of them run on the client.
+
+## usePostCanvasEditor
+
+```ts
+function usePostCanvasEditor(options?: UsePostCanvasEditorOptions): PostCanvasEditorState;
+```
+
+`usePostCanvasEditor` creates a Tiptap editor with the Post Canvas kit for a preset and a feature set, and keeps it current as the options change. It is the headless core of `PostCanvas`: no toolbar, no menus, no fields, no autosave. Render the editor with Tiptap's `<EditorContent editor={editor} />`.
+
+**Parameters.** `options` is a `UsePostCanvasEditorOptions` object. Its fields are listed in the [PostCanvas props](/docs/reference/post-canvas#props) (the second table). Every field is optional.
+
+**Returns.** A `PostCanvasEditorState`:
+
+<TypeTable path="react/use-post-canvas-editor.ts" name="PostCanvasEditorState" />
+
+`editor` is `null` on the server and on the first client render, because the editor renders on the client.
+
+**What rebuilds the editor.** A change to `features`, `preset` or the presence of `adapters.upload` rebuilds the editor and keeps its content, because the schema follows the features. You can pass a new `features` or `limits` object on every render: the hook compares values, not object identity. Everything else (`locale`, `adapters`, `limits`, `classify`, `placeholder`, `readOnly`) updates in place. Changing `extensions` does not rebuild the editor.
+
+**Notices.** Without a `notify` function, notices go to the console. `PostCanvas` passes its toast area.
+
+```tsx title="components/plain-editor.tsx"
+'use client';
+import { EditorContent } from '@tiptap/react';
+import { usePostCanvasEditor } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export function PlainEditor({ onText }: { onText: (text: string) => void }) {
+  const { editor } = usePostCanvasEditor({
+    preset: 'comment',
+    placeholder: 'Write a reply',
+    onChange: ({ editor }) => onText(editor.getText()),
+  });
+  return (
+    <div className="pc-root">
+      <EditorContent editor={editor} />
+    </div>
+  );
+}
+```
+
+`EditorContent` comes from `@tiptap/react`, which you add to your app. Without the `pc-root` wrapper and `post-canvas/styles.css` the content has no Post Canvas styling.
+
+### PostCanvasChange
+
+`onChange` and `onSubmit` receive a `PostCanvasChange`:
+
+<TypeTable path="react/use-post-canvas-editor.ts" name="PostCanvasChange" />
+
+### ContentFormat
+
+`ContentFormat` is the type of the `contentFormat` option, which says how to read a string `defaultContent`.
+
+```ts
+type ContentFormat = 'json' | 'html' | 'markdown';
+```
+
+The default is `html`. The hook treats `markdown` specially: with a string `defaultContent` and `contentFormat: 'markdown'` it loads Tiptap's Markdown extension and parses the string as Markdown. For an object `defaultContent` (Tiptap JSON) you do not need `contentFormat`. `setContent(content, format)` on the `ref` handle takes the same type, and its `'markdown'` format needs that extension, so it works only on an editor that started from Markdown. To load Markdown into any editor, convert it with `fromMarkdown` from `post-canvas/render` and pass the JSON.
+
+## usePostCanvasContext
+
+```ts
+function usePostCanvasContext(): PostCanvasContextValue;
+```
+
+`usePostCanvasContext` reads the nearest `PostCanvasProvider`: the editor (or `null` before it mounts), the translator, the adapters and the resolved features. It throws outside a provider. Use it in components you render inside `PostCanvas` or inside your own `PostCanvasProvider`. See [`PostCanvasContextValue`](/docs/reference/post-canvas#postcanvasprovider).
+
+```tsx
+import { usePostCanvasContext } from 'post-canvas';
+
+export function WordCount() {
+  const { editor, t } = usePostCanvasContext();
+  if (!editor) return null;
+  return <span>{t('core.editor.label')}: {editor.getText().split(/\s+/).filter(Boolean).length}</span>;
+}
+```
+
+## useOptionalPostCanvasContext
+
+```ts
+function useOptionalPostCanvasContext(): PostCanvasContextValue | null;
+```
+
+`useOptionalPostCanvasContext` reads the nearest `PostCanvasProvider`, or returns `null` outside one. Use it for components that work with or without the editor around them, such as `CoverField`.
+
+## useTranslator
+
+```ts
+function useTranslator(): Translator;
+```
+
+`useTranslator` returns the translator of the nearest `PostCanvasProvider`, or an English translator outside one. A `Translator` takes a dotted message key and optional placeholder values and returns a string. See the [`Translator` type](/docs/reference/types#i18n) and `createTranslator` on the [utilities page](/docs/reference/utilities#translation).
+
+```tsx
+import { useTranslator } from 'post-canvas';
+
+export function RemoveLabel() {
+  const t = useTranslator();
+  return <span>{t('core.frame.remove')}</span>;
+}
+```
+
+## usePointerDrag
+
+```ts
+function usePointerDrag(callbacks: DragCallbacks, options?: PointerDragOptions): PointerDragHandlers;
+```
+
+`usePointerDrag` handles a press and drag with a mouse, a finger or a pen. It is what the block handle and the gallery thumbnails use. A press that never becomes a drag stays an ordinary click, and the click after a drag is swallowed. While a drag runs, the class `pc-dragging` is set on `<html>`, for global cursor and selection styles. Escape cancels a running drag.
+
+**Parameters.**
+
+- `callbacks`: a `DragCallbacks` object, described below.
+- `options`: a `PointerDragOptions` object, described below. Both fields are optional.
+
+**Returns.** `PointerDragHandlers`: spread them on the element that starts the drag.
+
+<TypeTable path="core/react/use-pointer-drag.ts" name="DragCallbacks" />
+
+<TypeTable path="core/react/use-pointer-drag.ts" name="PointerDragOptions" />
+
+<TypeTable path="core/react/use-pointer-drag.ts" name="PointerDragHandlers" />
+
+With `touchDelay`, a finger has to rest first, so a swipe still scrolls the page.
+
+```tsx title="components/drag-grip.tsx"
+'use client';
+import { useState } from 'react';
+import { usePointerDrag } from 'post-canvas';
+
+export function DragGrip() {
+  const [offset, setOffset] = useState(0);
+  const handlers = usePointerDrag(
+    {
+      onStart: () => setOffset(0),
+      onMove: (event) => setOffset(event.clientY),
+      onEnd: () => console.log('dropped at', offset),
+      onCancel: () => setOffset(0),
+    },
+    { threshold: 6, touchDelay: 200 },
+  );
+  return (
+    <button type="button" {...handlers}>
+      Drag me
+    </button>
+  );
+}
+```

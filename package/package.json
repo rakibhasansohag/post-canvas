@@ -1,6 +1,6 @@
 {
   "name": "post-canvas",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "A rich-text editor for posts and articles, built on Tiptap: formatting, tables and code, plus photo galleries (carousel, grid, masonry, collage), video and social embeds, link cards and drag-to-reorder blocks.",
   "keywords": [
     "editor",
@@ -67,7 +67,8 @@
     "node": ">=20.19"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "lint": "eslint . && npm run lint:names",
@@ -77,7 +78,13 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "build": "tsdown && node scripts/build-css.js",
-    "playground": "vite"
+    "playground": "vite",
+    "prepack": "node scripts/prepack.js",
+    "check:package": "publint --strict --pack npm && attw --pack . --profile esm-only --exclude-entrypoints ./styles.css ./package.json",
+    "size": "size-limit",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "release": "changeset publish"
   },
   "peerDependencies": {
     "react": "^18.2.0 || ^19.0.0",
@@ -134,6 +141,7 @@
     "@changesets/cli": "^3.0.3",
     "@eslint/js": "^10.0.1",
     "@ls-lint/ls-lint": "^2.3.2",
+    "@size-limit/esbuild": "^14.3.0",
     "@size-limit/file": "^14.3.0",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",

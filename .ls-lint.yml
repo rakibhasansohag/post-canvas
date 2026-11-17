@@ -13,6 +13,7 @@ ignore:
   - .github
   - .locks
   - docs/plan
+  - package/.changeset
   - package/node_modules
   - package/dist
   - client/node_modules

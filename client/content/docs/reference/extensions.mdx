@@ -1,0 +1,355 @@
+---
+title: 'Extensions entry'
+description: 'The post-canvas/extensions entry: Tiptap kits, schemas, node classes, sanitizers and paste helpers for custom editors and servers.'
+---
+
+`post-canvas/extensions` exposes the Tiptap extensions that `PostCanvas` is built from. Use it to build a custom editor with `usePostCanvasEditor` or plain Tiptap, to add your own nodes next to the built-in ones, or to reuse the schema and the attribute sanitizers on a server.
+
+Every area comes in two forms:
+
+- A **schema** is render-safe: node and mark names, attributes, `parseHTML`, `renderHTML` and sanitizers, with no React, DOM access or node views. It runs on the server and drives `sanitizeDocument()` and `renderToHTML()`.
+- A **kit** is the schema extended for the editor: node views, commands, shortcuts, paste handling, insert items and problems. For the same features it yields the same schema as the schema form.
+
+Types that appear in the signatures below are on the [types page](/docs/reference/types).
+
+## Whole-editor kit and schema
+
+### postCanvasKit
+
+```ts
+function postCanvasKit(features?: Features, core?: Partial<Omit<PostCanvasCoreOptions, 'features'>>): AnyExtension[];
+```
+
+`postCanvasKit` returns every editor extension for a feature set, in order: `PostCanvasCore`, unique ids, then the text, media and embed kits. `features` defaults to `defaultFeatures` (the `full` preset). `core` sets the translator `t`, the `adapters` and the `notify` function. Build `features` with `resolveFeatures(preset, overrides, { adapters })`.
+
+It uses the default embed consent (`click`). To change it, call `setEmbedConsent(editor, 'auto')` after the editor exists, or assemble the kits yourself and pass `embedsKit(features, { embedConsent })`.
+
+The node views are React components, so render the editor with `EditorContent` from `@tiptap/react`.
+
+```tsx title="components/kit-editor.tsx"
+'use client';
+import { EditorContent, useEditor } from '@tiptap/react';
+import { resolveFeatures } from 'post-canvas';
+import { postCanvasKit } from 'post-canvas/extensions';
+import 'post-canvas/styles.css';
+
+const features = resolveFeatures('article', { table: false });
+
+export function KitEditor() {
+  const editor = useEditor({
+    extensions: postCanvasKit(features),
+    content: '<p>Spring menu</p>',
+    immediatelyRender: false,
+  });
+  return (
+    <div className="pc-root">
+      <EditorContent editor={editor} />
+    </div>
+  );
+}
+```
+
+For most apps, [`usePostCanvasEditor`](/docs/reference/hooks) is the better start: it also keeps the translator, adapters, limits and classifier current.
+
+### postCanvasSchema
+
+```ts
+function postCanvasSchema(features?: Features): AnyExtension[];
+```
+
+`postCanvasSchema` returns the render-safe extensions for a feature set: `textSchema`, `mediaSchema` and `embedsSchema` together. Use it on a server and for static rendering. Pass the result to Tiptap's `getSchema()` to get a ProseMirror schema, and to `sanitizersFor()` to get the sanitizers.
+
+```ts
+import { getSchema } from '@tiptap/core';
+import { defaultFeatures } from 'post-canvas';
+import { postCanvasSchema } from 'post-canvas/extensions';
+
+const schema = getSchema(postCanvasSchema(defaultFeatures));
+const valid = schema.nodeFromJSON(json); // throws when json does not fit
+```
+
+### PostCanvasCore
+
+`PostCanvasCore` is the extension every Post Canvas editor starts with. It holds the translator, the adapters, the resolved features and `notify()` in `editor.storage.postCanvasCore`, where any extension can read them. Its options are `PostCanvasCoreOptions`:
+
+<TypeTable path="core/extension.ts" name="PostCanvasCoreOptions" />
+
+`PostCanvasCore` is a Tiptap extension named `postCanvasCore`. Configure it with `PostCanvasCore.configure({ t, adapters, features, notify })`.
+
+### updatePostCanvasCore
+
+```ts
+function updatePostCanvasCore(editor: Editor, values: Partial<PostCanvasCoreStorage>): void;
+```
+
+`updatePostCanvasCore` updates the shared state in `editor.storage.postCanvasCore`, for example when your adapters or locale change. Extensions read the storage when they run, so they see the new values on their next call. `usePostCanvasEditor` does this for you.
+
+### idNodeTypes
+
+```ts
+const idNodeTypes: readonly string[]; // 'image', 'gallery', 'file', 'video', 'embed', 'linkCard'
+```
+
+`idNodeTypes` lists the node types that carry a unique `id`. `postCanvasKit` gives them to Tiptap's unique-id extension, which fills the id when a node is created or copied.
+
+### sanitizersFor
+
+```ts
+function sanitizersFor(extensions: AnyExtension[]): Record<string, AttrsSanitizer>;
+```
+
+`sanitizersFor` collects the `postCanvasSanitize` functions of a list of extensions (nested ones included), by node or mark name. `sanitizeDocument()` and the paste handler use it. Use it when you build your own cleaning step.
+
+## Text
+
+| Export                             | What it is                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `textSchema(features)`             | The render-safe text extensions for a feature set.                                                                                                                                                                                                                                                                  |
+| `textExtensions(features, parts?)` | The same list, in schema order. `parts` swaps in editor versions of the few extensions that differ: an object with `link`, `table`, `mention` and `codeBlock` extensions.                                                                                                                                           |
+| `textKit(features)`                | The editor text extensions: the text schema plus autolinking, resizable tables, mention and hashtag suggestions, the `/` menu, code highlighting, paste cleanup, the placeholder, character count, cursors, undo and redo. Includes `PostCanvasText`.                                                               |
+| `PostCanvasText`                   | The text kit's own extension (name `postCanvasText`). It keeps the menu store, limits, classifier, fields and placeholder in storage, adds the text insert items, reports limit and title problems, and registers the shortcuts `Mod-K`, `Alt-Shift-Up`, `Alt-Shift-Down`, `Alt-Shift-D` and `Alt-Shift-Backspace`. |
+
+`PostCanvasText` keeps its state in `editor.storage.postCanvasText`, typed as `PostCanvasTextStorage`:
+
+<TypeTable path="text/kit.ts" name="PostCanvasTextStorage" />
+
+### The Pc extensions
+
+These are the text extensions Post Canvas changes from Tiptap's own. Each one adds a sanitizer to a Tiptap extension.
+
+| Export          | Extends       | What changes                                                                                                                                         |
+| --------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PcParagraph`   | `paragraph`   | Sanitizes `textAlign`.                                                                                                                               |
+| `PcHeading`     | `heading`     | Levels 1 to 4. Clamps `level`.                                                                                                                       |
+| `PcOrderedList` | `orderedList` | Sanitizes `start` and `type`, also when parsed from HTML.                                                                                            |
+| `PcTaskItem`    | `taskItem`    | A boolean `checked`. Items can nest.                                                                                                                 |
+| `PcTableCell`   | `tableCell`   | Clamps spans to 1 to 100, and checks `colwidth`.                                                                                                     |
+| `PcTableHeader` | `tableHeader` | The same as `PcTableCell`.                                                                                                                           |
+| `PcCodeBlock`   | `codeBlock`   | `language` comes from `class="language-..."` and must match `codeLanguagePattern`.                                                                   |
+| `PcLink`        | `link`        | `href` must pass `safeHref`. `target` is `_blank` or nothing, and `rel` always carries `noopener` with `_blank`. Nothing is clickable in the editor. |
+| `PcTextStyle`   | `textStyle`   | Carries a palette colour by name.                                                                                                                    |
+| `PcHighlight`   | `highlight`   | A palette colour or the default.                                                                                                                     |
+| `PcMention`     | `mention`     | People with `@` and hashtags with `#`. The schema version never opens a suggestion list.                                                             |
+
+### Menu types
+
+The text kit and the UI talk through a small store, `MenuStore`, kept in `editor.storage.postCanvasText.menu`. The kit writes the open suggestion list to it and the UI subscribes. Without the UI, nothing listens and the suggestion plugins stay quiet.
+
+<TypeTable path="text/menu-store.ts" name="MenuStore" />
+
+`SuggestionState` is the open suggestion list:
+
+<TypeTable path="text/menu-store.ts" name="SuggestionState" />
+
+`SuggestionKind` says which list is open, and `SuggestionEntry` is one entry in it: a person or tag, or an insert item.
+
+```ts
+type SuggestionKind = 'mention' | 'hashtag' | 'slash';
+
+type SuggestionEntry =
+  | { kind: 'mention' | 'hashtag'; item: SuggestionItem; isNew?: boolean }
+  | { kind: 'slash'; item: InsertItem };
+```
+
+`isNew` is set on a hashtag the person typed that is not in the source's results.
+
+### Insert items and mentions
+
+| Function                          | What it does                                                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `textInsertItems(features, t)`    | The text `InsertItem` entries for a feature set, in the `basic`, `lists` and `advanced` groups.                     |
+| `filterInsertItems(items, query)` | Items whose label, id or keywords match `query`, ordered by how well they match. An empty query returns every item. |
+| `countMentions(doc)`              | The number of mentions and hashtags in a ProseMirror document node.                                                 |
+| `mentionText(attrs)`              | The text a mention shows: `@Ada Lovelace` or `#design`.                                                             |
+
+```ts
+import { collectInsertItems } from 'post-canvas';
+import { filterInsertItems } from 'post-canvas/extensions';
+
+const matches = filterInsertItems(collectInsertItems(editor), 'tab'); // the Table item first
+```
+
+## Media
+
+| Export                       | What it is                                                                                                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mediaSchema(features)`      | The render-safe media nodes for a feature set: `image`, `gallery` and `file`, as far as the features allow.                                                                         |
+| `mediaKit(features)`         | The editor media extensions: the nodes with React node views, the upload pipeline, paste and drop, the commands, the `+` and `/` items and the problems that block publishing.      |
+| `MediaUploads`               | The upload side of the media kit (name `postCanvasMedia`): the upload manager, the plugins, paste and drop, the [media commands](/docs/reference/commands) and the upload problems. |
+| `ImageNode`                  | The `image` block.                                                                                                                                                                  |
+| `GalleryNode`                | The `gallery` block with every layout and up to 10 photos.                                                                                                                          |
+| `createGalleryNode(limits?)` | A `gallery` node for a set of `GalleryLimits`. Its sanitizer enforces them.                                                                                                         |
+| `FileNode`                   | The `file` block.                                                                                                                                                                   |
+
+`createGalleryNode` takes a `GalleryLimits` object, and the node keeps it in its options as `GalleryNodeOptions`:
+
+<TypeTable path="media/sanitize.ts" name="GalleryLimits" />
+
+<TypeTable path="media/schema.ts" name="GalleryNodeOptions" />
+
+## Embeds
+
+| Export                             | What it is                                                                                                                                                                   |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `embedsSchema(features, options?)` | The render-safe embed extensions for a feature set, with optional render options for the static HTML (`render` and `t`). Includes `EmbedInput` when any embed feature is on. |
+| `embedsKit(features, options?)`    | The editor embed extensions: node views, the paste-a-link field, the paste rule, insert items and problems. `options` is `EmbedsKitOptions`.                                 |
+| `EmbedPaste`                       | The paste rule. A bare link pasted into an empty paragraph becomes a video, an embed or a link card. The link goes in first as its own undo step.                            |
+| `Video`                            | The `video` node.                                                                                                                                                            |
+| `Embed`                            | The `embed` node with every built-in provider allowed. Use `embedsSchema(features)` to follow the features.                                                                  |
+| `LinkCard`                         | The `linkCard` node.                                                                                                                                                         |
+| `EmbedInput`                       | The transient `embedInput` node, the inline paste-a-link field. It is never saved.                                                                                           |
+| `createEmbedNode(allowed)`         | An `embed` node for a list of allowed provider names.                                                                                                                        |
+
+`EmbedsKitOptions` has one option, and `EmbedConsent` is its type:
+
+<TypeTable path="embeds/kit.ts" name="EmbedsKitOptions" />
+
+```ts
+type EmbedConsent = 'click' | 'auto';
+```
+
+`Video`, `Embed` and `LinkCard` take `EmbedNodeOptions`: the render mode and the translator used by the static HTML.
+
+<TypeTable path="embeds/schema.ts" name="EmbedNodeOptions" />
+
+## Sanitizers
+
+A sanitizer is an `AttrsSanitizer`: it takes a node's or mark's attributes and returns a clean copy, or `null` to drop it. Each is pure, so it runs on the server, on JSON from clients and inside `parseHTML`. The rules each one applies are on [Nodes and marks](/docs/reference/nodes-and-marks).
+
+| Export                 | For                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| `sanitizeLink`         | The `link` mark. Drops it when `href` is unsafe, and forces `noopener` on `_blank`.     |
+| `sanitizeTextStyle`    | The `textStyle` mark. Keeps only a palette colour and drops the mark when none is left. |
+| `sanitizeHighlight`    | The `highlight` mark. A palette colour or `null`.                                       |
+| `sanitizeParagraph`    | `paragraph`: the alignment.                                                             |
+| `sanitizeHeading`      | `heading`: a level from 1 to 4, and the alignment.                                      |
+| `sanitizeOrderedList`  | `orderedList`: a whole-number `start` and a known `type`.                               |
+| `sanitizeTaskItem`     | `taskItem`: a boolean `checked`.                                                        |
+| `sanitizeCodeBlock`    | `codeBlock`: a `language` that matches `codeLanguagePattern`, or `null`.                |
+| `sanitizeTableCell`    | `tableCell` and `tableHeader`: spans and column widths.                                 |
+| `sanitizeMention`      | `mention`: an id and label, and `@` or `#`. Drops a mention without an id.              |
+| `sanitizeImageAttrs`   | `image`. Returns `null` when the source is not http or https.                           |
+| `sanitizeGalleryAttrs` | `gallery`, with `GalleryLimits`. Returns `null` when no usable photo is left.           |
+| `sanitizeFileAttrs`    | `file`. Returns `null` when the source is not http or https.                            |
+
+The helpers they share are exported too:
+
+| Export                            | What it is                                                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `paletteColor(value)`             | A palette colour name, or `null` for anything else.                                                                                  |
+| `codeLanguage(value)`             | A code block language that matches `codeLanguagePattern`, or `null`.                                                                 |
+| `codeLanguagePattern`             | The pattern `/^[a-z0-9+#-]{1,20}$/`: lower-case letters, digits, `+`, `#` and `-`.                                                   |
+| `textAlign(value)`                | A text alignment (`left`, `center`, `right` or `justify`), or `null`.                                                                |
+| `linkRel(rel, target, blankRel?)` | A link's `rel`: known tokens only. With `target` set to `_blank`, `noopener` is always there, and an empty `rel` becomes `blankRel`. |
+| `defaultBlankRel`                 | The `rel` a `_blank` link gets by default: `noopener noreferrer nofollow`.                                                           |
+
+## Paste and code
+
+| Export                                   | What it is                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PasteCleanup`                           | The extension (name `postCanvasPaste`) that cleans pasted HTML, splits pasted plain text into paragraphs, and runs every node's and mark's sanitizer over the pasted slice. HTML copied from a Post Canvas editor keeps its data attributes, so mentions, task lists and media survive a copy within the editor.                    |
+| `cleanPastedHTML(html)`                  | Cleans HTML pasted from Word, Google Docs or a web page. Keeps headings, paragraphs, lists, tables, links, quotes, code and inline formatting. Removes styles, classes, ids, event handlers, scripts, Office markup and comments. Needs a DOM (`DOMParser`). On a server, use `fromHTML` instead. Also exported from `post-canvas`. |
+| `plainTextSlice(text, schema, $context)` | Turns pasted plain text into a ProseMirror slice of paragraphs: a blank line starts a new paragraph, and a single line break becomes a hard break. Inside a code block the text stays as it is.                                                                                                                                     |
+| `CodeHighlight`                          | The extension (name `postCanvasCodeHighlight`) that highlights `codeBlock` nodes with a set language, through lowlight. The grammars load on first use, after the document has a code block.                                                                                                                                        |
+| `codeLanguages`                          | The languages in the code block menu, as `{ id, label }` objects in menu order. The npm package has 20. The CDN build swaps in a smaller set of 8.                                                                                                                                                                                  |
+| `loadLowlight()`                         | Loads lowlight and the menu's languages once, and returns the instance.                                                                                                                                                                                                                                                             |
+| `resolveCodeLanguage(language)`          | The lowlight name for a stored language, following common aliases such as `js`, `ts`, `html`, `sh`, `py` and `yml`.                                                                                                                                                                                                                 |
+
+```ts
+import { cleanPastedHTML } from 'post-canvas/extensions';
+
+const clean = cleanPastedHTML('<p style="font-weight:bold" class="MsoNormal">Hello</p>');
+// '<p><strong>Hello</strong></p>'
+```
+
+## Extension fields
+
+Importing `post-canvas` or `post-canvas/extensions` adds three fields to Tiptap's node, mark and extension configs. Post Canvas reads them from the extensions of an editor.
+
+| Field                | On                          | What it does                                                                                                                                                                                              |
+| -------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `postCanvasSanitize` | nodes and marks             | `(attrs) => attrs or null`. Cleans the attributes from untrusted JSON. Pure, because it runs on the server. Return `null` to drop the node or mark. Put it on the schema extension so the server sees it. |
+| `postCanvasInsert`   | nodes, marks and extensions | A function that returns `InsertItem[]`: items for the `+` and `/` menus. Put it on the editor extension. Its `this` has `name`, `editor`, `options` and `storage`.                                        |
+| `postCanvasProblems` | nodes, marks and extensions | A function that returns `Problem[]`: what blocks or warns before publishing. Its `this` is the same as above.                                                                                             |
+
+`collectInsertItems(editor)` and `collectProblems(editor)` (from `post-canvas`) gather them. A node or mark without its own sanitizer gets a generic one: only primitive attributes are kept, `on*`, `style`, `srcdoc` and `srcset` are dropped, link and source attributes are checked, and a string that looks like a URL with a dangerous scheme becomes `null`. Give every custom node with attributes its own `postCanvasSanitize`.
+
+This example adds a callout block. The schema extension is server-safe. The editor extension adds a menu entry.
+
+```tsx title="callout.tsx"
+import { Node } from '@tiptap/core';
+import type { InsertItem } from 'post-canvas';
+
+const tones = ['info', 'warn'] as const;
+
+// Server-safe: names, attributes, parse and render rules, and the sanitizer.
+export const CalloutSchema = Node.create({
+  name: 'callout',
+  group: 'block',
+  content: 'inline*',
+  addAttributes() {
+    return { tone: { default: 'info' } };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: 'aside[data-callout]',
+        getAttrs: (element) => ({ tone: (element as HTMLElement).getAttribute('data-callout') }),
+      },
+    ];
+  },
+  renderHTML({ node }) {
+    return ['aside', { 'data-callout': String(node.attrs.tone), class: 'callout' }, 0];
+  },
+  postCanvasSanitize: (attrs) => ({ tone: attrs.tone === 'warn' ? 'warn' : 'info' }),
+});
+
+const CalloutIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+    <rect x="1" y="3" width="14" height="10" rx="2" fill="none" stroke="currentColor" />
+  </svg>
+);
+
+// Editor: adds the + and / menu entry.
+export const Callout = CalloutSchema.extend({
+  postCanvasInsert() {
+    const item: InsertItem = {
+      id: 'callout',
+      group: 'advanced',
+      label: 'Callout',
+      keywords: ['note', 'tip', 'aside'],
+      icon: CalloutIcon,
+      run: ({ editor, range }) => {
+        const chain = editor.chain().focus();
+        if (range) chain.deleteRange(range);
+        chain.insertContent({ type: 'callout' }).run();
+      },
+    };
+    return [item];
+  },
+});
+```
+
+Use `Callout` in the editor and `CalloutSchema` where you sanitize and render:
+
+```tsx
+const { editor } = usePostCanvasEditor({ extensions: [Callout] });
+```
+
+```ts
+import { postCanvasSchema } from 'post-canvas/extensions';
+import { renderToHTML, sanitizeDocument } from 'post-canvas/render';
+
+const { doc } = sanitizeDocument(json, { extensions: [...postCanvasSchema(features), CalloutSchema] });
+const html = renderToHTML(doc, { features, extensions: [CalloutSchema] });
+```
+
+`PostCanvas` does not take an `extensions` prop. Use `usePostCanvasEditor` with `extensions` for a custom node. `extensions` are added after the kit, and changing them does not rebuild the editor.
+
+## Other exports
+
+`post-canvas/extensions` also exports these, which are described on other pages:
+
+- `moveBlock`, `duplicateBlock`, `deleteBlock`, `turnInto`, `turnIntoTargets`, `canMoveBlock` and `TurnIntoTarget`: [Commands and block helpers](/docs/reference/commands#block-helpers).
+- `setEmbedConsent`: [Commands and block helpers](/docs/reference/commands#setembedconsent).
+- `registerEmbedProvider`, `defineEmbedProvider` and `builtInProviders`: [Embed providers](/docs/reference/embed-providers).

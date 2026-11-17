@@ -148,3 +148,7 @@ coverage/
 out/
 node_modules/.vite*
 .claude/settings.local.json
+
+# Post Canvas: copied from the repo root into package/ by its prepack script, so npm shows them
+package/README.md
+package/LICENSE

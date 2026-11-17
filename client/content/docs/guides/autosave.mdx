@@ -1,0 +1,226 @@
+---
+title: 'Autosave'
+description: 'Keep drafts as writers type, restore them on the next visit, store them in localStorage or your own backend, and clear them after publishing.'
+---
+
+Autosave keeps a **draft** of what the writer is typing, so a closed tab or a crash does not lose it. It is off until you turn it on. A draft is a private working copy in the writer's browser (or wherever you store it). It is not your saved post.
+
+```tsx title="app/editor.tsx"
+<PostCanvas autosave />
+```
+
+With `autosave` on, the editor:
+
+1. Saves a draft 800 milliseconds after the writer stops typing.
+2. Saves again when the page is hidden or closed, and when the editor unmounts.
+3. Looks for a draft when it mounts. If it finds one, it puts the content back and shows a banner: "Draft restored", with **Discard** and a close button.
+
+Nothing is saved until the stored draft has had its chance to come back, so an empty editor on a new visit never overwrites an older draft.
+
+## Options
+
+Pass an object instead of `true` to change the defaults.
+
+<TypeTable path="text/autosave.ts" name="AutosaveOptions" />
+
+```tsx
+<PostCanvas autosave={{ key: `post:${postId}`, delay: 1500 }} />
+```
+
+Use one `key` for each document. With the default key (`draft`), every editor on your site would share one draft. If several people use the same browser, put the user id in the key as well, and clear drafts when someone signs out.
+
+Set `restore: false` to keep saving without ever bringing a draft back. No banner shows. Use it when you load the content yourself and do not want a stored draft to replace it.
+
+## What is saved
+
+A draft holds the document JSON, the title and cover (the `fields`), and the time it was saved. Two things are left out:
+
+- Parts that cannot survive a reload: uploads that are still running or have failed, `blob:` previews and an open paste-a-link field.
+- An empty document. If there are no words, no media, no title and no cover, autosave clears the draft instead of saving it.
+
+A draft has not been through your server's checks. When the writer publishes a restored draft, it goes through the same checks as any other content: see [Saving and loading](/docs/guides/saving-and-loading).
+
+## Where drafts are stored
+
+By default, drafts go to `localStorage` under the name `post-canvas:<key>` (so `post-canvas:draft` for the default key). If `localStorage` is blocked or full, which happens in some private windows, autosave does nothing and does not throw.
+
+`localStorage` keeps the draft in plain text on that one device. It is not shared between a writer's phone and laptop. To keep drafts somewhere else, give the editor a **draft storage** adapter.
+
+<TypeTable path="core/types.ts" name="DraftStorage" />
+
+Each method may return a value directly or a promise. `load` returns `null` when there is no draft.
+
+<TypeTable path="core/types.ts" name="DraftSnapshot" />
+
+<Tabs items={['IndexedDB', 'Your server']}>
+<Tab value="IndexedDB">
+
+IndexedDB holds more than `localStorage` and does not block the page while it saves. This version uses the small `idb-keyval` package.
+
+```bash
+npm install idb-keyval
+```
+
+```ts title="lib/draft-storage.ts"
+import { del, get, set } from 'idb-keyval';
+import type { DraftSnapshot, DraftStorage } from 'post-canvas';
+
+export const indexedDbDrafts: DraftStorage = {
+  async load(key) {
+    return (await get<DraftSnapshot>(`post-canvas:${key}`)) ?? null;
+  },
+  async save(key, snapshot) {
+    try {
+      await set(`post-canvas:${key}`, snapshot);
+    } catch {
+      // Storage is full or blocked. The draft is not kept.
+    }
+  },
+  async clear(key) {
+    await del(`post-canvas:${key}`);
+  },
+};
+```
+
+</Tab>
+<Tab value="Your server">
+
+Server drafts follow the writer to another device. The routes below are yours to write: each stores and returns one JSON snapshot for the signed-in user.
+
+```ts title="lib/draft-storage.ts"
+import type { DraftSnapshot, DraftStorage } from 'post-canvas';
+
+const url = (key: string) => `/api/drafts/${encodeURIComponent(key)}`;
+
+export const serverDrafts: DraftStorage = {
+  async load(key) {
+    const response = await fetch(url(key));
+    return response.ok ? ((await response.json()) as DraftSnapshot | null) : null;
+  },
+  async save(key, snapshot) {
+    try {
+      await fetch(url(key), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(snapshot) });
+    } catch {
+      // Offline: the next change tries again.
+    }
+  },
+  async clear(key) {
+    await fetch(url(key), { method: 'DELETE' });
+  },
+};
+```
+
+A draft from a client is not trusted content. Run `validateDocument()` or `sanitizeDocument()` on it on the server before you store it, as you would for a post.
+
+</Tab>
+</Tabs>
+
+Pass the adapter in `adapters.storage`. Create it once, outside the component, so the editor does not restart autosave on every render.
+
+```tsx title="app/editor.tsx"
+import { indexedDbDrafts } from '@/lib/draft-storage';
+
+const adapters = { storage: indexedDbDrafts };
+
+export function Editor({ postId }: { postId: string }) {
+  return <PostCanvas adapters={adapters} autosave={{ key: `post:${postId}` }} />;
+}
+```
+
+Catch errors inside `save()`, as the examples do. Autosave does not wait for or catch a rejected `save()`, so an error you do not catch becomes an unhandled promise rejection. An error in `load()` is caught: the editor starts without a draft.
+
+## The restore banner
+
+When a draft comes back, a banner shows above the editor:
+
+- **Discard** throws the draft away. The editor goes back to `defaultContent` and `defaultFields`, and the stored draft is deleted.
+- The close button hides the banner and keeps the restored content.
+
+## Clear the draft after publishing
+
+If you do not clear the draft after a successful save, the writer's next visit brings the old text back with the restore banner. Two methods on the `ref` handle do it:
+
+| Method         | What it does                                                                                                               |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `clear()`      | Empties the document and the fields, and forgets the draft. Use it after publishing a new post.                            |
+| `clearDraft()` | Forgets the draft only. The text stays in the editor. Use it after saving an existing post, when the writer keeps editing. |
+
+```tsx title="app/editor.tsx"
+'use client';
+import { useRef } from 'react';
+import { PostCanvas, hasPendingUploads, type JSONContent, type PostCanvasHandle } from 'post-canvas';
+
+export function Editor() {
+  const canvas = useRef<PostCanvasHandle>(null);
+  const latest = useRef<JSONContent | null>(null);
+
+  async function publish() {
+    const json = latest.current;
+    if (!json || hasPendingUploads(json)) return;
+    const response = await fetch('/api/posts', { method: 'POST', body: JSON.stringify(json) });
+    if (response.ok) canvas.current?.clear();
+  }
+
+  return (
+    <>
+      <PostCanvas
+        ref={canvas}
+        autosave={{ key: 'post:new' }}
+        onChange={({ json }) => {
+          latest.current = json;
+        }}
+      />
+      <button type="button" onClick={publish}>Publish</button>
+    </>
+  );
+}
+```
+
+Call `clear()` only after your server confirms the save. If you call it first and the save fails, the writer loses the text.
+
+## Autosave without the component
+
+`createAutosave(storage, options)` is the same engine, for code that does not use `PostCanvas`, such as your own editor built on `usePostCanvasEditor`. It returns a controller:
+
+| Method                      | What it does                                                           |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `schedule(content, fields)` | Saves this state after the delay. A newer call replaces a waiting one. |
+| `flush()`                   | Saves a waiting state now.                                             |
+| `load()`                    | Resolves with the stored draft, or `null` when it is empty or missing. |
+| `clear()`                   | Cancels a waiting save and deletes the stored draft.                   |
+| `dispose()`                 | Cancels a waiting save.                                                |
+
+```tsx title="app/notes-editor.tsx"
+'use client';
+import { useEffect, useMemo } from 'react';
+import { EditorContent } from '@tiptap/react';
+import { createAutosave, localDraftStorage, usePostCanvasEditor } from 'post-canvas';
+
+export function NotesEditor() {
+  const autosave = useMemo(() => createAutosave(localDraftStorage, { key: 'notes', delay: 1000 }), []);
+  const { editor } = usePostCanvasEditor({
+    onChange: ({ json }) => autosave.schedule(json, {}),
+  });
+
+  useEffect(() => {
+    if (!editor) return;
+    void autosave.load().then((draft) => {
+      if (draft) editor.commands.setContent(draft.content);
+    });
+  }, [editor, autosave]);
+
+  useEffect(
+    () => () => {
+      autosave.flush();
+      autosave.dispose();
+    },
+    [autosave],
+  );
+
+  return <EditorContent editor={editor} />;
+}
+```
+
+`localDraftStorage`, `storableContent()` (the document without parts that cannot be restored) and `hasDraftContent()` (whether a draft is worth keeping) are exported from `post-canvas` too.
+
+In this example the restore step has no banner and no check that the writer has not already typed. Add both if the editor can be used before `load()` finishes.

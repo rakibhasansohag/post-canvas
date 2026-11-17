@@ -1,0 +1,216 @@
+---
+title: 'Article editor'
+description: 'An article editor with a title, a cover picture, controlled fields, autosave and a save button, plus a read page that renders the saved JSON.'
+---
+
+This example is a blog-style article editor on the `article` preset. It adds a title and a cover above the text, keeps them in React state, autosaves a draft in the browser, saves the document as JSON, and shows the finished article on a separate page with `PostCanvasView`.
+
+It assumes a Next.js App Router project with Post Canvas installed (`npm install post-canvas`). The storage here is a JSON file so that the example runs on its own. Replace `lib/articles.ts` with your database.
+
+## Storage
+
+```ts title="lib/articles.ts"
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { JSONContent, PostFields } from 'post-canvas';
+
+export interface Article {
+  fields: PostFields;
+  content: JSONContent;
+}
+
+const directory = join(process.cwd(), '.data');
+const file = (id: string) => join(directory, `${id.replace(/[^a-z0-9-]/gi, '')}.json`);
+
+export async function getArticle(id: string): Promise<Article | null> {
+  try {
+    return JSON.parse(await readFile(file(id), 'utf8')) as Article;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveArticle(id: string, article: Article): Promise<void> {
+  await mkdir(directory, { recursive: true });
+  await writeFile(file(id), JSON.stringify(article));
+}
+```
+
+## The save route
+
+The route sanitizes what the browser sends. The document is trusted only after that.
+
+```ts title="app/api/articles/[id]/route.ts"
+import { sanitizeDocument } from 'post-canvas/server';
+import { saveArticle } from '@/lib/articles';
+
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { fields, content } = await request.json();
+  const { doc, removed } = sanitizeDocument(content);
+  if (removed.length > 0) console.warn(`Article ${id}: sanitizer removed`, removed);
+
+  await saveArticle(id, { fields: { title: String(fields?.title ?? '').slice(0, 200), cover: fields?.cover ?? null }, content: doc });
+  return Response.json({ ok: true });
+}
+```
+
+The cover is stored as it comes. If you need the same checking as pictures in the body, run it through your own validation, or keep only the address and the alt text.
+
+## The editor
+
+`fields` is controlled: the title and cover live in your state, and `onFieldsChange` updates it. The content is not controlled. `defaultContent` sets the start, and `onChange` reports changes.
+
+```tsx title="components/article-editor.tsx"
+'use client';
+
+import { useRef, useState } from 'react';
+import {
+  PostCanvas,
+  getProblems,
+  hasPendingUploads,
+  type Adapters,
+  type JSONContent,
+  type PostCanvasHandle,
+  type PostFields,
+} from 'post-canvas';
+import 'post-canvas/styles.css';
+
+// Defined outside the component so the editor sees the same object on every render.
+// Add `/api/upload` from the social composer example, or your own storage.
+const adapters: Adapters = {
+  upload: {
+    accept: { image: 'image/*' },
+    maxBytes: { image: 10 * 1024 * 1024 },
+    async upload(file, { signal, onProgress }) {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await fetch('/api/upload', { method: 'POST', body, signal });
+      if (!response.ok) throw new Error('The upload failed.');
+      onProgress(1);
+      return (await response.json()) as { src: string; width?: number; height?: number };
+    },
+  },
+};
+
+interface Props {
+  id: string;
+  initialFields: PostFields;
+  initialContent?: JSONContent;
+}
+
+export function ArticleEditor({ id, initialFields, initialContent }: Props) {
+  const canvas = useRef<PostCanvasHandle>(null);
+  const [fields, setFields] = useState<PostFields>(initialFields);
+  const [status, setStatus] = useState('');
+
+  async function save() {
+    const editor = canvas.current?.editor;
+    if (!editor) return;
+    const content = editor.getJSON();
+
+    if (hasPendingUploads(content)) {
+      setStatus('Wait for the uploads to finish.');
+      return;
+    }
+    if (!fields.title?.trim()) {
+      setStatus('Add a title first.');
+      return;
+    }
+    const errors = getProblems(editor).filter((problem) => problem.severity === 'error');
+    if (errors.length > 0) {
+      setStatus(errors.map((problem) => problem.message).join(' '));
+      return;
+    }
+
+    setStatus('Saving…');
+    const response = await fetch(`/api/articles/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ fields, content }),
+    });
+    if (!response.ok) {
+      setStatus('Could not save. Your draft is still in this browser.');
+      return;
+    }
+    await canvas.current?.clearDraft(); // the server has it now, so forget the local draft
+    setStatus('Saved.');
+  }
+
+  return (
+    <PostCanvas
+      ref={canvas}
+      preset="article"
+      adapters={adapters}
+      defaultContent={initialContent}
+      fields={fields}
+      onFieldsChange={setFields}
+      autosave={{ key: `article:${id}` }}
+      slots={{
+        footer: (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12 }}>
+            <button type="button" onClick={save}>
+              Save
+            </button>
+            <p role="status" style={{ margin: 0 }}>
+              {status}
+            </p>
+          </div>
+        ),
+      }}
+    />
+  );
+}
+```
+
+How the parts work:
+
+- **Title and cover.** The `article` preset turns both on. The title field holds up to 200 characters. The `article` preset shows the field but does not require it, so `save` checks the title itself. `getProblems()` still reports limit and upload problems. The cover picture goes through `adapters.upload`, so the cover field needs an upload adapter.
+- **Controlled `fields`.** Passing `fields` makes the editor display exactly what you hold. Remember to update it in `onFieldsChange`, or the field will not change.
+- **Autosave.** `autosave` writes a draft to `localStorage` after the writer stops typing, under the key you give it, and brings it back on the next visit with a "restore" banner. Use one key per article. To store drafts elsewhere, set `adapters.storage`. See [Autosave](/docs/guides/autosave).
+- **`clearDraft()`** forgets the draft only. `clear()` would also empty the document and fields, which is what a "new article" button wants.
+
+## The edit page
+
+```tsx title="app/articles/[id]/edit/page.tsx"
+import { ArticleEditor } from '@/components/article-editor';
+import { getArticle } from '@/lib/articles';
+
+export default async function EditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const article = await getArticle(id);
+
+  return (
+    <main style={{ maxWidth: 760, margin: '0 auto', padding: 16 }}>
+      <ArticleEditor id={id} initialFields={article?.fields ?? {}} initialContent={article?.content} />
+    </main>
+  );
+}
+```
+
+## The read page
+
+The read page is a Server Component. `PostCanvasView` renders the document without loading the editor, and it sanitizes the JSON again before drawing it.
+
+```tsx title="app/articles/[id]/page.tsx"
+import { PostCanvasView } from 'post-canvas/render';
+import { notFound } from 'next/navigation';
+import { getArticle } from '@/lib/articles';
+
+export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const article = await getArticle(id);
+  if (!article) notFound();
+
+  const { cover, title } = article.fields;
+  return (
+    <main style={{ maxWidth: 760, margin: '0 auto', padding: 16 }}>
+      <h1>{title}</h1>
+      {cover && <img src={cover.src} alt={cover.alt} style={{ width: '100%', height: 'auto' }} />}
+      <PostCanvasView content={article.content} />
+    </main>
+  );
+}
+```
+
+Import `post-canvas/styles.css` in your root layout so the read page is styled. See [Server rendering](/docs/guides/ssr-rendering) for embed modes and caching, and [Saving and loading](/docs/guides/saving-and-loading) for the rules about what to store.

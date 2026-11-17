@@ -1,0 +1,130 @@
+---
+title: 'Mentions and hashtags'
+description: 'Back the @ mention and # hashtag menus with your own search API, and learn how they are stored, rendered and limited.'
+---
+
+Typing `@` opens a list of people. Typing `#` opens a list of tags. Post Canvas does not know your users or your tags, so you provide two adapters that look them up: `adapters.mentions` for `@` and `adapters.hashtags` for `#`. Each one has a single `search()` function.
+
+Both features are on in the `full`, `article` and `social` presets. The `comment` preset keeps mentions and turns hashtags off. If an adapter is missing, the menu has nothing to list (for hashtags, it still offers the typed text as a new tag).
+
+## The adapter
+
+<TypeTable path="core/types.ts" name="SuggestionSource" />
+
+`search(query, { signal })` returns a list of `SuggestionItem` objects.
+
+<TypeTable path="core/types.ts" name="SuggestionItem" />
+
+The editor shows at most 8 results. If `search()` throws, the list is empty and the typed text stays as it is.
+
+### You do not need to debounce
+
+The editor already waits 150 milliseconds after the last keystroke before it calls `search()`. It also gives you an `AbortSignal`. When the writer types another character, the signal of the earlier search aborts. Pass it to `fetch` so the old request is cancelled:
+
+```ts title="lib/suggestions.ts"
+import type { SuggestionItem, SuggestionSource } from 'post-canvas';
+
+function fromApi(path: string): SuggestionSource {
+  return {
+    async search(query, { signal }) {
+      const response = await fetch(`${path}?q=${encodeURIComponent(query)}`, { signal });
+      if (!response.ok) throw new Error(`Search failed (${response.status})`);
+      return (await response.json()) as SuggestionItem[];
+    },
+  };
+}
+
+export const mentions = fromApi('/api/users/search');
+export const hashtags = fromApi('/api/tags/search');
+```
+
+An aborted `fetch` rejects with an `AbortError`. The editor ignores that result, so you do not need a `try` and `catch`.
+
+Your API returns objects in the `SuggestionItem` shape:
+
+```json
+[{ "id": "u_42", "label": "Maya Ortiz", "description": "Editor", "avatarUrl": "https://cdn.example.com/u/42.jpg" }]
+```
+
+`id` is yours (a user id, a username or a slug). `label` is what the document shows. `description` and `avatarUrl` only appear in the menu.
+
+A route handler for the `@` search, as an example:
+
+```ts title="app/api/users/search/route.ts"
+export async function GET(request: Request) {
+  // Check the signed-in user here: this endpoint lists people.
+  const query = new URL(request.url).searchParams.get('q')?.trim().toLowerCase() ?? '';
+  const users = await db.user.findMany({
+    where: { name: { contains: query, mode: 'insensitive' } },
+    take: 8,
+    select: { id: true, name: true, role: true },
+  });
+  return Response.json(users.map((user) => ({ id: user.id, label: user.name, description: user.role })));
+}
+```
+
+`db` stands for your own data access code.
+
+### Connect the adapters
+
+```tsx title="app/editor.tsx"
+'use client';
+import { PostCanvas } from 'post-canvas';
+import 'post-canvas/styles.css';
+import { hashtags, mentions } from '@/lib/suggestions';
+
+const adapters = { mentions, hashtags };
+
+export function Editor() {
+  return <PostCanvas preset="social" adapters={adapters} />;
+}
+```
+
+### Hashtags can be new
+
+For `#`, the editor needs at least one character before it searches. If the typed text is made of letters, digits and underscores (up to 50 characters) and no result has that exact `id`, the menu adds the typed text as a new tag. So your hashtag API only needs to return tags that already exist.
+
+## How they are stored
+
+Mentions and hashtags use the same node, `mention`. The `mentionSuggestionChar` attribute tells them apart.
+
+```json
+{
+  "type": "mention",
+  "attrs": { "id": "u_42", "label": "Maya Ortiz", "mentionSuggestionChar": "@" }
+}
+```
+
+A hashtag looks the same with `"#"`:
+
+```json
+{ "type": "mention", "attrs": { "id": "travel", "label": "travel", "mentionSuggestionChar": "#" } }
+```
+
+When the writer picks an item, the editor inserts the node and a space after it. The sanitizer keeps `id` and `label` (each up to 200 characters, trimmed) and sets `mentionSuggestionChar` to `#` or, for anything else, `@`. A mention without an `id` is removed.
+
+Only the id and label are saved, not the person's profile. If a user renames themselves, old documents keep the old label. If you need the current name, look the `id` up when you render.
+
+## How they are rendered
+
+`renderToHTML()` writes mentions as plain spans:
+
+```html
+<span class="pc-mention">@Maya Ortiz</span> <span class="pc-hashtag">#travel</span>
+```
+
+The span has no link and no `id` in the HTML. To link them to a profile or a tag page, either style them and attach a handler by text, or walk the JSON yourself before you render and look the `id` up. The output of `toMarkdown()` is `@label` and `#label`, and `toPlainText()` gives the same text.
+
+## Limits
+
+A document holds at most 20 mentions and hashtags together. At the limit, the menu stops opening, and `getProblems()` reports a `limit.mentions` error. The limit is exported as `maxMentions` from `post-canvas`. It is a fixed number: there is no prop to change it.
+
+If you need to enforce it on your server, count the `mention` nodes in the saved JSON.
+
+## Turn them off
+
+```tsx
+<PostCanvas features={{ mention: false, hashtag: false }} />
+```
+
+With a feature off, the `@` or `#` character types as normal text, and the sanitizer removes `mention` nodes from documents.

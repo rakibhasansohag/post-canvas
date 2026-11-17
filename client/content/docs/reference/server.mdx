@@ -1,0 +1,248 @@
+---
+title: 'Server entry'
+description: 'The post-canvas/server entry: validate saved documents, resolve embed and link-card previews safely, and check addresses for SSRF.'
+---
+
+`post-canvas/server` is everything your app's server needs to accept, store and show documents. It has no DOM and no React. `validateDocument`, `sanitizeDocument` and `renderToHTML` also run in edge runtimes. `createLinkPreviewResolver` loads `undici` and `node:dns` the first time it runs, so it needs Node unless you inject your own `fetch` and `lookup`. `createEmbedResolver` only calls `fetch` (the global one by default).
+
+Always run `sanitizeDocument()`, or check `validateDocument()`, on JSON that came from a client before you store it or show it to anyone else.
+
+## Wiring the resolvers
+
+The editor looks up video and embed titles through `adapters.embeds`, and link cards through `adapters.links`. Both are functions, and both need a server, because a browser cannot read another site's pages. Wire the resolvers to the editor through a route handler. A Next.js route:
+
+```ts title="app/api/previews/route.ts"
+import { createEmbedResolver, createLinkPreviewResolver } from 'post-canvas/server';
+
+const embeds = createEmbedResolver();
+const links = createLinkPreviewResolver();
+
+export async function POST(request: Request) {
+  const { url, kind } = (await request.json()) as { url: string; kind: 'embed' | 'link' };
+  try {
+    const resolve = kind === 'embed' ? embeds : links;
+    return Response.json(await resolve(url, { signal: request.signal }));
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? String(error.code) : 'unavailable';
+    return Response.json({ code }, { status: 422 });
+  }
+}
+```
+
+In the browser, pass two functions that call the route:
+
+```tsx title="components/editor.tsx"
+'use client';
+import { PostCanvas } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+const post = (kind: 'embed' | 'link') => async (url: string, { signal }: { signal: AbortSignal }) => {
+  const response = await fetch('/api/previews', { method: 'POST', body: JSON.stringify({ url, kind }), signal });
+  if (!response.ok) throw new Error(((await response.json()) as { code: string }).code);
+  return response.json();
+};
+
+export function Editor() {
+  return <PostCanvas adapters={{ embeds: post('embed'), links: post('link') }} />;
+}
+```
+
+The route is a public endpoint that fetches URLs for visitors. Put your own authentication and rate limit in front of it. The editor maps the error codes `not_found`, `not_embeddable` and `blocked` to specific messages, and any other code to a general one.
+
+## validateDocument
+
+```ts
+function validateDocument(json: unknown, options?: ValidateOptions): ValidationResult;
+```
+
+`validateDocument` checks a document from a client before you save it: the schema, the size caps, the attribute rules and transient editor state. It is pure and synchronous, with no DOM. `ok` is `true` only when `sanitizeDocument()` would leave the document exactly as it is.
+
+Use it when you want to reject a bad document. Use [`sanitizeDocument`](/docs/reference/render#sanitizedocument) when you want to fix it and carry on.
+
+**Parameters.** `json` is anything: it is treated as untrusted. `options` is a `ValidateOptions` object.
+
+<TypeTable path="server/validate.ts" name="ValidateOptions" />
+
+**Returns.** A `ValidationResult`.
+
+<TypeTable path="server/validate.ts" name="ValidationResult" />
+
+Each entry in `errors` is a `ValidationError`:
+
+<TypeTable path="server/validate.ts" name="ValidationError" />
+
+`ValidationCode` is the sanitizer's `SanitizeReason` values plus `schema` (the document does not fit the schema) and `changed` (it would change when sanitized, for example a URL or text that is not allowed):
+
+```ts
+type ValidationCode = SanitizeReason | 'schema' | 'changed';
+```
+
+At most 100 problems are listed. When there are more, a final error says how many were left out.
+
+```ts title="app/api/posts/route.ts"
+import { validateDocument } from 'post-canvas/server';
+
+export async function POST(request: Request) {
+  const body = (await request.json()) as { content: unknown };
+  const { ok, errors } = validateDocument(body.content);
+  if (!ok) return Response.json({ errors }, { status: 422 });
+  await savePost(body.content); // your own storage
+  return Response.json({ saved: true });
+}
+```
+
+Pass the same `features` you gave the editor, so a document that uses a feature you turned off is rejected.
+
+## createEmbedResolver
+
+```ts
+function createEmbedResolver(options?: EmbedResolverOptions): EmbedMetadataResolver;
+```
+
+`createEmbedResolver` returns the function you pass as `adapters.embeds`. It recognises the pasted URL (YouTube and Vimeo, then every registered embed provider), fetches only that provider's fixed oEmbed endpoint (plus YouTube's watch page for the description, best effort), and returns the title, description, thumbnail and aspect ratio. A pasted link cannot make the server call anywhere else, and the oEmbed `html` is never passed on. Results are cached by provider and canonical URL.
+
+**Parameters.** `options` is an `EmbedResolverOptions` object.
+
+<TypeTable path="server/resolvers/embed-resolver.ts" name="EmbedResolverOptions" />
+
+**Returns.** An `EmbedMetadataResolver`, a function `(url, { signal }) => Promise<EmbedMetadata>`. See [`EmbedMetadata`](/docs/reference/types#adapters).
+
+**Errors.** Failures throw an `EmbedResolveError`, whose `code` is an `EmbedResolveErrorCode`. An abort from the caller's signal is rethrown as it is.
+
+```ts
+class EmbedResolveError extends Error {
+  readonly code: EmbedResolveErrorCode;
+  /** The provider's HTTP status, when there was a response. */
+  readonly status?: number;
+  constructor(code: EmbedResolveErrorCode, message: string, status?: number);
+}
+
+type EmbedResolveErrorCode = 'unsupported' | 'not_found' | 'not_embeddable' | 'unavailable' | 'timeout';
+```
+
+- `unsupported`: no provider recognises the link.
+- `not_found`: the provider has no such item.
+- `not_embeddable`: the provider does not allow embedding it.
+- `unavailable`: the provider answered with an error, sent an unreadable answer, or could not be reached.
+- `timeout`: the provider did not answer in time.
+
+```ts
+import { createEmbedResolver } from 'post-canvas/server';
+
+const embeds = createEmbedResolver({ providers: ['youtube', 'vimeo', 'spotify'], timeoutMs: 4000 });
+const meta = await embeds('https://vimeo.com/76979871', { signal: AbortSignal.timeout(8000) });
+// { title, description?, thumbnailUrl?, aspectRatio? }
+```
+
+Pass the provider names your editor's `embed` feature allows in `providers`, so the server never looks up others.
+
+## createLinkPreviewResolver
+
+```ts
+function createLinkPreviewResolver(options?: LinkPreviewResolverOptions): LinkPreviewResolver;
+```
+
+`createLinkPreviewResolver` returns the function you pass as `adapters.links`. It fetches the page with every SSRF check in place: http and https only, allowed ports only, no user names or passwords, every resolved address public, the connection pinned to an address that was checked, and every redirect checked again. It reads at most `maxBytes` of HTML and returns the title, description, image, site name and icon, with each URL checked.
+
+**Parameters.** `options` is a `LinkPreviewResolverOptions` object.
+
+<TypeTable path="server/resolvers/link-resolver.ts" name="LinkPreviewResolverOptions" />
+
+**Returns.** A `LinkPreviewResolver`, a function `(url, { signal }) => Promise<LinkPreview>`. See [`LinkPreview`](/docs/reference/types#adapters).
+
+`ResolverFetch` is the type of the `fetch` option: the global `fetch`, undici's, or a test stub.
+
+```ts
+type ResolverFetch = (input: string, init: RequestInit) => Promise<Response>;
+```
+
+<Callout type="warn">
+  An injected `fetch` is not safe against DNS rebinding. It resolves the host name again when it connects, so a host
+  that answers the check with a public address and the connection with a private one gets through. Inject one only in
+  tests or behind an egress proxy that blocks private networks itself.
+</Callout>
+
+Without an injected `fetch`, the resolver connects through undici and pins the connection to the address it checked, which closes that gap. On runtimes without `node:dns` or `undici`, pass both `fetch` and `lookup`.
+
+**Errors.** Failures throw a `LinkPreviewError`, whose `code` is a `LinkPreviewErrorCode`. An abort from the caller's signal is rethrown as it is.
+
+```ts
+class LinkPreviewError extends Error {
+  readonly code: LinkPreviewErrorCode;
+  /** The HTTP status, for `http_error`. */
+  readonly status?: number;
+  constructor(code: LinkPreviewErrorCode, message: string, status?: number);
+}
+
+type LinkPreviewErrorCode =
+  | 'invalid_url'
+  | 'blocked'
+  | 'timeout'
+  | 'too_many_redirects'
+  | 'not_html'
+  | 'http_error'
+  | 'unavailable';
+```
+
+- `invalid_url`: not a valid http or https URL, or it carries a user name or password.
+- `blocked`: a disallowed port, `localhost`, or a host that points to a private or reserved address.
+- `timeout`: the page did not answer within `timeoutMs`.
+- `too_many_redirects`: more than `maxRedirects` redirects.
+- `not_html`: the answer is not an HTML page.
+- `http_error`: the page answered with an error status. Read `status`.
+- `unavailable`: the host could not be found or reached.
+
+```ts
+import { createLinkPreviewResolver, LinkPreviewError } from 'post-canvas/server';
+
+const links = createLinkPreviewResolver({ timeoutMs: 4000, maxRedirects: 2 });
+
+try {
+  const card = await links('https://example.com/blog/spring-menu', { signal: AbortSignal.timeout(8000) });
+  console.log(card.title, card.image);
+} catch (error) {
+  if (error instanceof LinkPreviewError && error.code === 'blocked') console.warn('Refused a private address');
+  else throw error;
+}
+```
+
+## isBlockedAddress
+
+```ts
+function isBlockedAddress(ip: string): boolean;
+```
+
+`isBlockedAddress` returns `true` when a server must not connect to an address: private, loopback, link-local, carrier-grade NAT, multicast, unspecified, broadcast, documentation, benchmarking or reserved, in IPv4 or IPv6. IPv4-mapped and NAT64 addresses are judged by the IPv4 address inside them. It accepts brackets (`[::1]`). A zone id (`fe80::1%en0`) and anything that does not parse are blocked.
+
+Use it in your own fetch code, for example in a webhook sender, so you get the same rules as the link resolver.
+
+```ts
+import { isBlockedAddress } from 'post-canvas/server';
+
+isBlockedAddress('10.0.0.5'); // true
+isBlockedAddress('::1'); // true
+isBlockedAddress('::ffff:127.0.0.1'); // true
+isBlockedAddress('93.184.216.34'); // false
+```
+
+### LookupFunction
+
+`LookupFunction` resolves a host name to every address it has. It is compatible with `dns.promises.lookup(hostname, { all: true })` from `node:dns`. Pass your own as the `lookup` option on runtimes without it.
+
+```ts
+type LookupFunction = (
+  hostname: string,
+  options: { all: true },
+) => Promise<{ address: string; family: number }[]>;
+```
+
+## Re-exports
+
+`post-canvas/server` also re-exports these from [`post-canvas/render`](/docs/reference/render) and the embed registry, so a server file needs one import:
+
+- `sanitizeDocument`, `defaultLimits` and the types `SanitizeOptions`, `SanitizeResult`, `SanitizeRemoval`, `SanitizeReason`, `DocumentLimits`
+- `renderToHTML` and `RenderHTMLOptions`
+- `fromHTML`, `FromHTMLOptions` and `HTMLParserHost`
+- `hasTransientContent`
+- `registerEmbedProvider`, `defineEmbedProvider` and the type `EmbedProvider`. Register custom providers on the server too, so `sanitizeDocument` and `createEmbedResolver` know them. See [Embed providers](/docs/reference/embed-providers).
+- the type `EmbedRenderMode`

@@ -1,0 +1,419 @@
+---
+title: 'Uploads'
+description: 'Connect an upload adapter to Post Canvas with S3, Cloudinary or a local route, with progress, cancel, retry and HEIC support.'
+---
+
+Post Canvas does not store files. You give the editor an **upload adapter**: an object with one `upload()` function that sends a file to your storage and returns the public URL. The editor handles everything around it: picking, pasting and dropping files, checking them, showing progress, retrying failures and writing the result into the document.
+
+Without an upload adapter, the `image`, `gallery` and `file` features are off, so the editor has no media blocks. You can still set them explicitly in `features`, but they have nothing to upload with. See [Adapters](/docs/concepts/adapters) for the other adapters.
+
+## The adapter
+
+<TypeTable path="core/types.ts" name="UploadAdapter" />
+
+`upload()` receives the file and a context, and returns an `UploadResult`.
+
+<TypeTable path="core/types.ts" name="UploadContext" />
+
+<TypeTable path="core/types.ts" name="UploadResult" />
+
+Only `src` is required. It must be an absolute `http` or `https` URL. A relative path such as `/uploads/a.jpg` is rejected, and the upload counts as failed.
+
+Everything else is optional:
+
+- `width` and `height`: the editor measures the picture before it uploads, so you can leave these out. If you send them, they replace the measured size. A value of `0` means unknown.
+- `srcset`: a responsive `srcset` string such as `"https://cdn.example.com/a-640.jpg 640w, https://cdn.example.com/a-1280.jpg 1280w"`. Each entry is checked on its own.
+- `placeholder`: a tiny `data:image/jpeg`, `png` or `webp` base64 preview, up to 2850 characters, shown while the picture loads.
+- `id`: your own id for the file (a storage key, for example). It is stored as `uploadId` and not shown to readers.
+
+### Progress and cancel
+
+Call `onProgress(fraction)` with a number from 0 to 1. The editor redraws at most once per 1% change. When the writer removes the block or cancels, the `signal` aborts: stop the request and let the promise reject.
+
+`fetch` cannot report upload progress, so the recipes below use `XMLHttpRequest`. This helper is shared by all three. It sends a body, reports progress, and aborts with the signal.
+
+```ts title="lib/xhr-upload.ts"
+interface XhrUploadOptions {
+  method: 'PUT' | 'POST';
+  url: string;
+  body: XMLHttpRequestBodyInit;
+  headers?: Record<string, string>;
+  signal: AbortSignal;
+  onProgress: (fraction: number) => void;
+}
+
+/** Sends `body` and resolves with the response text. Rejects with an AbortError when the signal aborts. */
+export function xhrUpload({ method, url, body, headers = {}, signal, onProgress }: XhrUploadOptions): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(new DOMException('Upload cancelled', 'AbortError'));
+    const xhr = new XMLHttpRequest();
+    const stop = () => xhr.abort();
+    signal.addEventListener('abort', stop, { once: true });
+    xhr.open(method, url);
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      signal.removeEventListener('abort', stop);
+      if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.responseText);
+      else reject(new Error(`Upload failed with status ${xhr.status}`));
+    };
+    xhr.onerror = () => {
+      signal.removeEventListener('abort', stop);
+      reject(new Error('Network error during upload'));
+    };
+    xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'));
+    xhr.send(body);
+  });
+}
+```
+
+## Recipe 1: S3 presigned URLs
+
+The browser uploads straight to your bucket, so large files do not pass through your server. Your server only signs a short-lived URL.
+
+<Steps>
+<Step>
+
+**Install the AWS SDK on your server.**
+
+```bash
+npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+```
+
+</Step>
+<Step>
+
+**Add a route that returns the presigned URL.** Check who is asking before you sign anything, and decide which types and sizes you accept.
+
+```ts title="app/api/uploads/s3/route.ts"
+import { randomUUID } from 'node:crypto';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+const s3 = new S3Client({ region: process.env.S3_REGION });
+const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'application/pdf']);
+const maxBytes = 20 * 1024 * 1024;
+
+export async function POST(request: Request) {
+  // Check the signed-in user here.
+  const { name, type, size } = (await request.json()) as { name: string; type: string; size: number };
+  if (!allowed.has(type) || !(size > 0 && size <= maxBytes)) {
+    return Response.json({ error: 'This file is not allowed.' }, { status: 400 });
+  }
+  const extension = (name.split('.').pop() ?? 'bin').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8);
+  const key = `posts/${randomUUID()}.${extension}`;
+  const uploadUrl = await getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, ContentType: type }),
+    { expiresIn: 300 },
+  );
+  // S3_PUBLIC_URL is your bucket's public address or the CDN in front of it.
+  return Response.json({ uploadUrl, key, publicUrl: `${process.env.S3_PUBLIC_URL}/${key}` });
+}
+```
+
+A presigned `PUT` does not enforce the size you checked. If you need a hard limit, use a presigned `POST` with a content-length condition instead.
+
+</Step>
+<Step>
+
+**Allow the browser to upload.** On the bucket, add a CORS rule that allows `PUT` from your site's origin and the `Content-Type` header.
+
+</Step>
+<Step>
+
+**Write the adapter.** It asks your route for a URL, then sends the file with progress.
+
+```ts title="lib/s3-upload.ts"
+import type { UploadAdapter } from 'post-canvas';
+import { xhrUpload } from './xhr-upload';
+
+export const s3Upload: UploadAdapter = {
+  accept: { image: 'image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic,image/heif', file: 'application/pdf' },
+  maxBytes: { image: 20 * 1024 * 1024, file: 20 * 1024 * 1024 },
+  async upload(file, { signal, onProgress }) {
+    const response = await fetch('/api/uploads/s3', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: file.name, type: file.type, size: file.size }),
+      signal,
+    });
+    if (!response.ok) throw new Error(`Could not start the upload (${response.status})`);
+    const { uploadUrl, key, publicUrl } = (await response.json()) as { uploadUrl: string; key: string; publicUrl: string };
+    await xhrUpload({ method: 'PUT', url: uploadUrl, body: file, headers: { 'Content-Type': file.type }, signal, onProgress });
+    return { src: publicUrl, id: key, name: file.name, size: file.size, mimeType: file.type };
+  },
+};
+```
+
+The `Content-Type` header must match the type you signed. The `file` you receive is already prepared (a HEIC photo has been converted, a very large picture scaled down), so `file.type` is the type that will be stored.
+
+</Step>
+<Step>
+
+**Pass it to the editor.**
+
+```tsx title="app/editor.tsx"
+'use client';
+import { PostCanvas } from 'post-canvas';
+import 'post-canvas/styles.css';
+import { s3Upload } from '@/lib/s3-upload';
+
+const adapters = { upload: s3Upload };
+
+export function Editor() {
+  return <PostCanvas adapters={adapters} onChange={({ json }) => console.log(json)} />;
+}
+```
+
+Define `adapters` outside the component, or memoize it, so the object keeps the same identity between renders.
+
+</Step>
+</Steps>
+
+## Recipe 2: Cloudinary
+
+Cloudinary stores the file and can resize it on the fly, which suits `srcset`. Upload goes from the browser to Cloudinary. Choose unsigned or signed.
+
+<Tabs items={['Unsigned', 'Signed']}>
+<Tab value="Unsigned">
+
+An unsigned upload needs an **unsigned upload preset**, created in the Cloudinary console. Anyone who finds the preset name can upload with it, so limit what the preset allows (formats, folder, size) in the console.
+
+```ts title="lib/cloudinary-upload.ts"
+import type { UploadAdapter } from 'post-canvas';
+import { xhrUpload } from './xhr-upload';
+
+const cloudName = 'your-cloud-name';
+const preset = 'your-unsigned-preset';
+
+interface CloudinaryResponse {
+  secure_url: string;
+  public_id: string;
+  width?: number;
+  height?: number;
+  bytes: number;
+}
+
+export const cloudinaryUpload: UploadAdapter = {
+  maxBytes: { image: 10 * 1024 * 1024, file: 10 * 1024 * 1024 },
+  async upload(file, { kind, signal, onProgress }) {
+    const body = new FormData();
+    body.append('file', file);
+    body.append('upload_preset', preset);
+    const text = await xhrUpload({
+      method: 'POST',
+      url: `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+      body,
+      signal,
+      onProgress,
+    });
+    const data = JSON.parse(text) as CloudinaryResponse;
+    // Cloudinary resizes through the URL, so a srcset needs no extra files.
+    const srcset =
+      kind === 'image'
+        ? [640, 1280, 1920]
+            .map((w) => `${data.secure_url.replace('/upload/', `/upload/w_${w},c_limit/`)} ${w}w`)
+            .join(', ')
+        : undefined;
+    return {
+      src: data.secure_url,
+      id: data.public_id,
+      width: data.width,
+      height: data.height,
+      size: data.bytes,
+      name: file.name,
+      mimeType: file.type,
+      ...(srcset ? { srcset } : {}),
+    };
+  },
+};
+```
+
+</Tab>
+<Tab value="Signed">
+
+A signed upload keeps the rules on your server. Your route signs the upload parameters with your API secret, and the browser sends the signature along.
+
+```ts title="app/api/uploads/cloudinary/route.ts"
+import { createHash } from 'node:crypto';
+
+export async function POST() {
+  // Check the signed-in user here.
+  const timestamp = Math.round(Date.now() / 1000);
+  const folder = 'posts';
+  // Cloudinary signs the parameters in alphabetical order, followed by your API secret.
+  const signature = createHash('sha1')
+    .update(`folder=${folder}&timestamp=${timestamp}${process.env.CLOUDINARY_API_SECRET}`)
+    .digest('hex');
+  return Response.json({
+    signature,
+    timestamp,
+    folder,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+  });
+}
+```
+
+```ts title="lib/cloudinary-signed-upload.ts"
+import type { UploadAdapter } from 'post-canvas';
+import { xhrUpload } from './xhr-upload';
+
+export const cloudinarySignedUpload: UploadAdapter = {
+  maxBytes: { image: 10 * 1024 * 1024, file: 10 * 1024 * 1024 },
+  async upload(file, { signal, onProgress }) {
+    const signed = await fetch('/api/uploads/cloudinary', { method: 'POST', signal });
+    if (!signed.ok) throw new Error(`Could not sign the upload (${signed.status})`);
+    const { signature, timestamp, folder, apiKey, cloudName } = (await signed.json()) as {
+      signature: string;
+      timestamp: number;
+      folder: string;
+      apiKey: string;
+      cloudName: string;
+    };
+    const body = new FormData();
+    body.append('file', file);
+    body.append('api_key', apiKey);
+    body.append('timestamp', String(timestamp));
+    body.append('folder', folder);
+    body.append('signature', signature);
+    const text = await xhrUpload({
+      method: 'POST',
+      url: `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+      body,
+      signal,
+      onProgress,
+    });
+    const data = JSON.parse(text) as { secure_url: string; public_id: string; width?: number; height?: number; bytes: number };
+    return {
+      src: data.secure_url,
+      id: data.public_id,
+      width: data.width,
+      height: data.height,
+      size: data.bytes,
+      name: file.name,
+      mimeType: file.type,
+    };
+  },
+};
+```
+
+Add the same `srcset` code as the unsigned tab if you want responsive sources.
+
+</Tab>
+</Tabs>
+
+## Recipe 3: a local Next.js route (development only)
+
+This writes files into `public/uploads` on your own machine. It has no authentication, no virus scanning and no cleanup, and a production host usually has a read-only or temporary disk. **Do not use it in production.** It is useful for trying the editor before you set up storage.
+
+```ts title="app/api/uploads/local/route.ts"
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+const extensions: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/avif': 'avif',
+  'image/gif': 'gif',
+  'application/pdf': 'pdf',
+};
+
+export async function POST(request: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return Response.json({ error: 'Local uploads are for development only.' }, { status: 403 });
+  }
+  const file = (await request.formData()).get('file');
+  if (!(file instanceof File)) return Response.json({ error: 'No file.' }, { status: 400 });
+  const extension = extensions[file.type];
+  if (!extension) return Response.json({ error: 'This type is not allowed.' }, { status: 415 });
+
+  const directory = path.join(process.cwd(), 'public', 'uploads');
+  await mkdir(directory, { recursive: true });
+  const name = `${randomUUID()}.${extension}`;
+  await writeFile(path.join(directory, name), Buffer.from(await file.arrayBuffer()));
+  // The editor needs an absolute URL, so build one from the request.
+  return Response.json({ url: new URL(`/uploads/${name}`, request.url).href, id: name });
+}
+```
+
+```ts title="lib/local-upload.ts"
+import type { UploadAdapter } from 'post-canvas';
+import { xhrUpload } from './xhr-upload';
+
+export const localUpload: UploadAdapter = {
+  async upload(file, { signal, onProgress }) {
+    const body = new FormData();
+    body.append('file', file);
+    const text = await xhrUpload({ method: 'POST', url: '/api/uploads/local', body, signal, onProgress });
+    const { url, id } = JSON.parse(text) as { url: string; id: string };
+    return { src: url, id, name: file.name, size: file.size, mimeType: file.type };
+  },
+};
+```
+
+## Limits and accepted types
+
+`accept` sets the `accept` string of the file picker. `maxBytes.image` and `maxBytes.file` set size limits in bytes. If you leave `accept.image` out, the picker offers JPEG, PNG, WebP, AVIF, GIF and HEIC.
+
+The editor checks every picture itself, before your adapter sees it:
+
+- It reads the file's first bytes to find the real format. The file name and the browser's `type` are not trusted.
+- It refuses SVG, even when the file is named `.png`, because an SVG can carry scripts. It also refuses anything that is not a picture it knows.
+- It converts HEIC, BMP and TIFF to JPEG.
+- It scales a picture whose longest side is over 4096 pixels down to 4096. Animated GIFs are left as they are.
+- It refuses a picture that is still over `maxBytes.image` after that step, and a file over `maxBytes.file`.
+
+A refused file shows a notice that names the file and the reason. The upload adapter is not called for it. Up to three uploads run at the same time; the rest wait in a queue.
+
+## HEIC photos
+
+Phones often save photos as HEIC. Safari can decode HEIC, but most other browsers cannot. Post Canvas does not bundle a converter. To convert HEIC in the browser, pass a `convertHeic` function on the adapter and install a converter yourself.
+
+The [`heic-to`](https://www.npmjs.com/package/heic-to) package is licensed under the LGPL. Your app installs it and your app is responsible for meeting that licence. Post Canvas does not depend on it.
+
+```bash
+npm install heic-to
+```
+
+```ts title="lib/s3-upload.ts"
+export const s3Upload: UploadAdapter = {
+  // ...accept, maxBytes and upload() as before
+  // Loaded only when a HEIC photo is picked, so it stays out of your main bundle.
+  convertHeic: async (file) => {
+    const { heicTo } = await import('heic-to');
+    return heicTo({ blob: file, type: 'image/jpeg', quality: 0.9 });
+  },
+};
+```
+
+Without `convertHeic`, the editor tries the browser's own decoder. If the browser cannot open the photo, the writer sees a notice asking them to save it as JPEG.
+
+## Failures and retry
+
+If `upload()` rejects, the block shows "Upload failed" with a **Try again** button. In a gallery, the failed photo's tile shows the same button, and the gallery shows how many photos failed. The error message you throw goes to the console. Writers see a translated message instead, so you can throw a plain English message for your logs.
+
+If the page reloads while an upload runs, the block comes back as "This upload was interrupted" with a **Replace** button, because the file is gone.
+
+While any upload runs, fails or waits, the document is not ready to save. Check it before you store anything:
+
+```ts
+import { hasPendingUploads, type JSONContent } from 'post-canvas';
+
+function save(json: JSONContent) {
+  if (hasPendingUploads(json)) return; // an upload is still running, failed or staged
+  void fetch('/api/posts', { method: 'POST', body: JSON.stringify(json) });
+}
+```
+
+`hasPendingUploads(json)` is `true` when a picture, photo or file has a running or failed upload, a `blob:` source, or the staged source `https://staged.post-canvas.invalid/<key>` that a pasted picture carries for a moment. The editor's `getProblems()` also reports these as errors. See [Saving and loading](/docs/guides/saving-and-loading) for the full publish check.
+
+## Next steps
+
+- [Galleries](/docs/guides/galleries): layouts, the photo manager and the collage editor.
+- [Saving and loading](/docs/guides/saving-and-loading): what to check before you store a document.

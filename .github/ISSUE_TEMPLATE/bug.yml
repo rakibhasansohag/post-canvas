@@ -1,0 +1,57 @@
+name: Bug report
+description: Something does not work the way the docs say it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please check the docs and the open issues first. For a security problem, do not file it here: use the private report in the Security tab.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: A short list, or a link to a minimal repo or playground state. A document (JSON) that shows the problem is the most useful thing you can add.
+      placeholder: |
+        1. Open the editor with preset "social"
+        2. Paste ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: post-canvas version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Where does it happen
+      multiple: true
+      options:
+        - The editor (post-canvas)
+        - Rendering (post-canvas/render)
+        - Server helpers (post-canvas/server)
+        - Vanilla build or CDN
+        - Docs site
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser, OS, React and framework
+      placeholder: Safari 19 on iOS 19, React 19, Next.js 16
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output or screenshots
+      description: Paste errors from the browser console or the server log.

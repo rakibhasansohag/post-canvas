@@ -1,0 +1,148 @@
+---
+title: 'Presets and features'
+description: 'Pick a preset for the kind of writing you need, change single features, and set limits and a classifier for post-or-article rules.'
+---
+
+The editor is one component with many switches. A **feature** is one switch, such as `table`, `gallery` or `statusBar`. A **preset** is a named starting set of switches for a common job. You pick a preset with `preset`, then change single features with `features`.
+
+```tsx
+<PostCanvas preset="social" features={{ table: true }} />
+```
+
+## The four presets
+
+| Preset    | For                            | What it does                                                                                                                                                                                                                                                            |
+| --------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `full`    | A general editor (the default) | Every text feature, media, embeds and all the editor chrome. No title or cover field.                                                                                                                                                                                   |
+| `article` | Blog posts and articles        | Everything in `full`, plus the title and cover fields.                                                                                                                                                                                                                  |
+| `social`  | A post composer                | Bold, italic, links, lists, mentions, hashtags, photos, galleries, video, embeds and link cards. No headings, tables, code, quotes, colours or task lists. No file blocks. The status bar shows the post kind. Title and cover appear once the post becomes an article. |
+| `comment` | A comment box                  | Paragraphs, bold, italic, links and mentions. No toolbar, `+` button, `/` menu, block handle or status bar: only the selection menu stays. A limit of 2,000 characters.                                                                                                 |
+
+For a comment box that sends on Enter, add `submitOnEnter` and `onSubmit`. No preset turns them on for you.
+
+```tsx
+<PostCanvas
+  preset="comment"
+  adapters={adapters}
+  submitOnEnter
+  onSubmit={({ json }) => postComment(json)}
+/>
+```
+
+With `submitOnEnter`, Enter calls `onSubmit` and Shift+Enter inserts a line break. While a mention list is open, Enter picks the person instead.
+
+Which of the three media features each preset has depends on the next rule.
+
+## No upload adapter, no media
+
+Image, gallery and file blocks need somewhere to put files. If you do not pass `adapters.upload`, these three features are turned off, whatever the preset says. In development, the console says so once.
+
+To keep one on without an adapter, set it explicitly:
+
+```tsx
+<PostCanvas preset="article" features={{ image: true, gallery: true }} />
+```
+
+An explicit `true` keeps the node in the schema, so a document that already holds images still opens and renders. The editor still cannot upload a new file without an adapter. See [adapters](/docs/concepts/adapters).
+
+## Change features
+
+`features` is a partial object. Each key you give replaces that key of the preset, and the other keys keep the preset's value.
+
+```tsx
+<PostCanvas
+  preset="article"
+  features={{
+    table: false, // no tables
+    heading: { levels: [2, 3] }, // only H2 and H3
+    gallery: { layouts: ['grid', 'carousel'], maxPhotos: 6 },
+    embed: { providers: ['spotify', 'codepen'] },
+    statusBar: false,
+  }}
+/>
+```
+
+`heading`, `gallery` and `embed` take `false` or an options object. The built-in embed providers are `spotify`, `soundcloud`, `x`, `instagram`, `tiktok`, `codepen`, `loom`, `figma` and `google-maps`. YouTube and Vimeo belong to the `video` feature.
+
+Changing `preset`, `features` or whether an upload adapter exists rebuilds the editor, because the schema follows the features. The content is kept. You can pass a new `features` object on every render: the editor compares the resolved values, not the object.
+
+### Every feature
+
+<TypeTable path="core/types.ts" name="Features" />
+
+## resolveFeatures
+
+`resolveFeatures(preset, overrides, context)` returns the full feature set that the editor would use. It applies `full`, then the preset, then your overrides.
+
+```ts
+import { resolveFeatures } from 'post-canvas';
+
+const features = resolveFeatures('comment', { link: false });
+features.mention; // true
+features.image; // false
+```
+
+Use it on your server so the sanitizer accepts exactly what the editor allows. A document from a `comment` editor should not be allowed to contain a gallery:
+
+```ts
+import { sanitizeDocument } from 'post-canvas/server';
+import { resolveFeatures } from 'post-canvas';
+
+const features = resolveFeatures('comment');
+const { doc } = sanitizeDocument(body.content, { features });
+```
+
+Call it without the third argument on the server. The third argument, `{ adapters }`, applies the upload rule above, and your server has no upload adapter in that sense. `sanitizeDocument` and `renderToHTML` use every feature by default, which is the wider choice.
+
+The package also exports `defaultFeatures` (the `full` set), `builtInEmbedProviderNames`, and `presets` with each preset's changes, limits and classifier.
+
+## Limits
+
+`limits` sets caps on a document. Every key is optional, and a missing key means no cap.
+
+<TypeTable path="text/limits.ts" name="Limits" />
+
+A preset's limits are the default, and the `limits` prop replaces them as a whole. For example, `comment` has `{ maxCharacters: 2000 }`, and passing `limits={{ maxWords: 50 }}` removes the character cap.
+
+Limits do not stop typing or cut text. A broken limit becomes a **problem** (an error message that the status bar shows, and the `comment` preset has no status bar), and the insert items for media turn off at the cap. Check `getProblems(editor)` before you save, and enforce the same limits on your server, because the browser is not a place to trust. Mentions and hashtags together are capped at 20 per document; more of them stay plain text.
+
+## Classify: post or article
+
+A classifier looks at the document and decides what kind of thing it is. The `social` preset has one. Its rule is:
+
+- A **post** is at most one run of text plus at most one media block, and up to 500 words. It is a `text`, `photo`, `video` or `embed` post.
+- Anything more is an **article**: more than 500 words, more than one media block, or text on both sides of a media block.
+
+The status bar shows the result, for example "Photo post, 3 photos, Masonry" or "Article, 612 words, 3 min read". Title and cover fields show only for an article, and an article without a title is a problem, so the writer cannot publish it by accident.
+
+The `classify` prop replaces the preset's classifier. Pass `null` to turn classification off: then the title and cover fields show whenever their features are on.
+
+```tsx
+import { PostCanvas, type Classifier } from 'post-canvas';
+
+// Notes up to 200 words need no title. Longer writing does.
+const classify: Classifier = ({ stats }) => {
+  const long = stats.words > 200;
+  return {
+    kind: long ? 'article' : 'note',
+    summary: long ? `Article, ${stats.words} words` : 'Note',
+    reason: null,
+    showFields: long,
+    requireTitle: long,
+  };
+};
+
+<PostCanvas preset="social" classify={classify} />;
+```
+
+A classifier receives `{ json, stats, t }` (the document, its statistics and the translator) and returns a `Classification`:
+
+<TypeTable path="text/classify.ts" name="Classification" />
+
+The `article` preset has no classifier, so its title and cover are always visible and a missing title is not a problem. If you want articles to require a title, pass a classifier that sets `requireTitle`. To read the social rules in your own code, `classifySocial(json, t)`, `socialKind(stats)` and `getDocStats(json)` are exported from `post-canvas`.
+
+## Next steps
+
+- [Fields](/docs/concepts/fields): how the title and cover are held.
+- [Adapters](/docs/concepts/adapters): what each preset needs from your app.
+- [`PostCanvas` reference](/docs/reference/post-canvas): every prop.

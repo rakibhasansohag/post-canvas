@@ -1,0 +1,142 @@
+---
+title: 'Rendering documents'
+description: 'Show a saved Post Canvas document with renderToHTML, PostCanvasView or a read-only editor, and control how videos and embeds load for readers.'
+---
+
+A saved post is JSON. To show it to a reader you turn it into something the browser can display. Post Canvas gives you three ways, and all of them read the same JSON.
+
+| Way                                             | Returns            | Runs                             | Best for                                                                         |
+| ----------------------------------------------- | ------------------ | -------------------------------- | -------------------------------------------------------------------------------- |
+| `renderToHTML(json)`                            | An HTML string     | Server or browser, no DOM needed | Static pages, emails, feeds, plain HTML sites, storing the HTML next to the JSON |
+| `<PostCanvasView content={json} />`             | A React element    | Server Component or browser      | React and Next.js pages                                                          |
+| `<PostCanvas readOnly defaultContent={json} />` | The editor, locked | Browser                          | A preview that looks exactly like the editor                                     |
+
+Pick the first two for readers. Both import from `post-canvas/render`, and both sanitize the document before they render it.
+
+## renderToHTML
+
+```ts
+import { renderToHTML } from 'post-canvas/render';
+
+const html = renderToHTML(post.content);
+```
+
+The result is wrapped in `<div class="pc-view"><div class="pc-content">...</div></div>`. Load `post-canvas/styles.css` on the page, and the post looks like it did in the editor.
+
+Run it on your server or when the post is saved, and send readers the finished HTML. It needs Tiptap and ProseMirror, so calling it in the browser adds that code to the page.
+
+<TypeTable path="output/html.ts" name="RenderHTMLOptions" />
+
+Leave `sanitize` on. Turn it off only for a document that you sanitized when you saved it, and then render the stored, clean copy.
+
+## PostCanvasView
+
+```tsx
+import { PostCanvasView } from 'post-canvas/render';
+import 'post-canvas/styles.css';
+
+export default function Post({ post }) {
+  return <PostCanvasView content={post.content} />;
+}
+```
+
+In a React Server Component, the schema, the sanitizer and Tiptap stay on the server. The browser receives only the small client parts: the click-to-load player and the carousel. Rendered in the browser instead, the view carries Tiptap and ProseMirror.
+
+<TypeTable path="output/react-view.tsx" name="PostCanvasViewProps" />
+
+`views` lets you replace how one node type renders. For example, give `image` your own component that uses `next/image`.
+
+## The editor, read-only
+
+`<PostCanvas readOnly defaultContent={json} />` shows the editor without its chrome. The title shows as a heading and the cover is hidden. It does not run `sanitizeDocument` for you, so sanitize a document from another source first. Use it when you need the exact editing look, not for a public reader page.
+
+## Videos and embeds
+
+Third-party players (YouTube, Vimeo, Spotify and so on) load other sites' code into your page. You choose when. Both `renderToHTML` and `PostCanvasView` take `embeds`:
+
+| Mode               | What the reader gets                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `facade` (default) | A thumbnail and a play button that link to the provider. No player or provider script loads until the reader clicks. |
+| `iframe`           | The provider's player straight away.                                                                                 |
+| `link`             | A plain link. Good for feeds and email.                                                                              |
+
+```ts
+renderToHTML(post.content, { embeds: 'iframe' });
+```
+
+Two things to know about facades:
+
+- A facade is not free of requests. Its thumbnail still loads from the provider's image host (YouTube's `i.ytimg.com`, for example), so a page with facades makes those image requests. Use `embeds: 'link'` if even that is a problem.
+- In `PostCanvasView`, the facade turns into a player on click by itself. In an HTML string from `renderToHTML`, nothing runs until you call `activateEmbeds`.
+
+### activateEmbeds
+
+For pages without React, call `activateEmbeds(root)` after you insert the HTML. It listens for clicks on facades under `root`, and replaces the clicked facade with a sandboxed iframe. It returns a function that stops listening.
+
+```ts
+import { renderToHTML, activateEmbeds } from 'post-canvas/render';
+
+container.innerHTML = renderToHTML(post.content);
+const stop = activateEmbeds(container);
+// Later, if the container goes away:
+stop();
+```
+
+`activateEmbeds` is also in `post-canvas/vanilla` and on the CDN global as `PostCanvas.activateEmbeds`. It builds the player address from the facade's stored link through the provider registry, so markup that came from somewhere else on the page cannot choose an iframe address. A custom provider must be registered on the page with `registerEmbedProvider()` for its facade to activate. A modifier key or a middle click still opens the provider's page in a new tab.
+
+### Sizes
+
+Most players keep an aspect ratio, so they scale with the column. Audio players (Spotify, SoundCloud) and X, Instagram and CodePen embeds use a fixed height, because a player from another site cannot tell your page how tall it is. Google Maps short links (`maps.app.goo.gl`) need a server lookup to find the place, so they become link cards.
+
+### embedConsent in the editor
+
+The same choice exists inside the editor, for the writer. `embedConsent` is a prop of `PostCanvas` and an option of `createPostCanvas` and the CDN:
+
+- `click` (default): a video or embed shows a facade until the writer clicks it, so nothing loads from a third party until they ask.
+- `auto`: players load straight away.
+
+```tsx
+<PostCanvas embedConsent="auto" />
+```
+
+It affects the editor only. For readers, use `embeds`.
+
+## Other formats
+
+More functions turn a document into other forms, and back. They live in `post-canvas/render` and run without a DOM, except `fromHTML`.
+
+```ts
+import { toMarkdown, fromMarkdown, toPlainText, excerpt, getCover } from 'post-canvas/render';
+
+toMarkdown(json); // GitHub-flavoured Markdown
+toPlainText(json); // Blocks separated by blank lines
+excerpt(json, 160); // The first paragraph with words, cut at a word boundary
+getCover(json); // The first image or gallery photo (or video thumbnail), or null
+
+const doc = fromMarkdown('# Hello\n\nA **bold** idea.'); // sanitized JSON
+```
+
+- **Markdown.** Galleries become a list of images. Videos, embeds and link cards become a link on their own line. Formatting that Markdown cannot hold, such as underline and colour, is left out. `fromMarkdown` sanitizes its result, and syntax for features that are off ends up as plain text.
+- **HTML in.** `fromHTML(html)` reads HTML from other editors (TinyMCE, Froala, Word, Google Docs) into a sanitized document. In a browser it uses `DOMParser`. On a server, pass a window from a DOM library: `fromHTML(html, { window: new (await import('happy-dom')).Window() })`.
+- `getCover` skips pictures whose size is unknown (`width` or `height` of `0`).
+
+## Styles
+
+Two class names matter:
+
+- `.pc-view` is the root of a read-only view. It holds the design tokens (colours, fonts, spacing) as CSS variables.
+- `.pc-content` is the text column inside it, with the styling for paragraphs, lists, tables, galleries and embeds. The editor's text area has the same class, which is why a post looks the same in both.
+
+`PostCanvasView` takes `theme` (`light`, `dark` or `auto`) and sets `data-pc-theme` for you. The string from `renderToHTML` has no theme attribute, so it uses the light palette. To follow the reader's system setting, render with `wrapper: false` and wrap the output yourself:
+
+```ts
+const inner = renderToHTML(post.content, { wrapper: false });
+const html = `<div class="pc-view" data-pc-theme="auto"><div class="pc-content">${inner}</div></div>`;
+```
+
+You can override any `--pc-*` variable under `.pc-view` to match your brand. See [theming](/docs/guides/theming).
+
+## Next steps
+
+- [Server-side rendering](/docs/guides/ssr-rendering): caching and the options in practice.
+- [Security](/docs/concepts/security): why the output is safe, and what you still own.

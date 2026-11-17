@@ -1,0 +1,274 @@
+---
+title: 'Shared types'
+description: 'The shared TypeScript types of post-canvas: document attributes, features, adapters, translation, insert items, problems and views.'
+---
+
+These types are exported from `post-canvas`. They are shared across the package: the document model, the feature set, the adapters your app plugs in, translation, and the extension points. Types that belong to one function or component are described next to it: see [PostCanvas](/docs/reference/post-canvas), [Hooks](/docs/reference/hooks), [Render](/docs/reference/render), [Server](/docs/reference/server), [Embed providers](/docs/reference/embed-providers) and [Utilities](/docs/reference/utilities).
+
+`JSONContent` is Tiptap's type for a document node, re-exported so you do not need to import it from `@tiptap/core`:
+
+```ts
+import type { JSONContent } from 'post-canvas';
+```
+
+## Document attributes
+
+These types describe the attributes that nodes store in a saved document. The rules that clean each attribute are on [Nodes and marks](/docs/reference/nodes-and-marks).
+
+### Text
+
+```ts
+type TextAlign = 'left' | 'center' | 'right' | 'justify' | null;
+```
+
+`TextAlign` is the horizontal alignment of a paragraph or heading. `null` means the default (start).
+
+```ts
+type PaletteColor = 'gray' | 'brown' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'red';
+```
+
+`PaletteColor` is a named colour from the theme palette. Text colour and highlight store the name, never a hex value, so themes and dark mode recolour it and nothing unsafe reaches a `style` attribute. The `paletteColors` constant lists the names in menu order.
+
+```ts
+type HeadingLevel = 1 | 2 | 3 | 4;
+```
+
+`HeadingLevel` is a heading level the editor offers.
+
+### Media
+
+```ts
+type GalleryLayout = 'carousel' | 'grid' | 'masonry' | 'collage';
+type ImageAlign = 'center' | 'wide' | 'full' | 'left' | 'right';
+```
+
+`GalleryLayout` is how a gallery lays out its photos (`galleryLayouts` lists them in menu order). `ImageAlign` is where a single image sits in the column.
+
+`MediaSource` is an uploaded picture, shared by the image node, gallery photos and the cover:
+
+<TypeTable path="core/types.ts" name="MediaSource" />
+
+In a stored document, `width` and `height` can be `0`, meaning unknown. `renderHTML` leaves them out, and the editor measures the picture on load, outside the undo history.
+
+`CollagePlace` is where a collage photo sits on the base photo:
+
+<TypeTable path="core/types.ts" name="CollagePlace" />
+
+`GalleryPhoto` is one photo in a gallery. It has every `MediaSource` field, plus:
+
+<TypeTable path="core/types.ts" name="GalleryPhoto" />
+
+`ImageAttrs` are the attributes of the `image` block node. It has every `MediaSource` field, plus:
+
+<TypeTable path="core/types.ts" name="ImageAttrs" />
+
+`GalleryAttrs` are the attributes of the `gallery` block node:
+
+<TypeTable path="core/types.ts" name="GalleryAttrs" />
+
+`FileAttrs` are the attributes of the `file` block node:
+
+<TypeTable path="core/types.ts" name="FileAttrs" />
+
+### Embeds
+
+Player URLs are built at render time and never stored.
+
+`VideoAttrs` are the attributes of the `video` block node:
+
+<TypeTable path="core/types.ts" name="VideoAttrs" />
+
+`EmbedAttrs` are the attributes of the `embed` block node. The iframe URL is built from `provider` and `ref` at render time:
+
+<TypeTable path="core/types.ts" name="EmbedAttrs" />
+
+`LinkCardAttrs` are the attributes of the `linkCard` block node:
+
+<TypeTable path="core/types.ts" name="LinkCardAttrs" />
+
+`EmbedInputAttrs` are the attributes of the transient `embedInput` node, the inline "paste a link" field. It is never saved:
+
+<TypeTable path="core/types.ts" name="EmbedInputAttrs" />
+
+The node also carries `status` (`idle`, `loading` or `error`), `error` (a message key or `null`) and `kind` (an `EmbedInputKind`). They are editor state too.
+
+### Post fields
+
+`CoverImage` is a post's cover picture. It is a `MediaSource` without `uploadKey`, because a cover is only saved once its upload is done:
+
+```ts
+type CoverImage = Omit<MediaSource, 'uploadKey'>;
+```
+
+`PostFields` are the optional fields outside the body, shown above the canvas by some presets:
+
+<TypeTable path="core/types.ts" name="PostFields" />
+
+## Features and presets
+
+`Features` says which parts of the editor are on. `resolveFeatures()` builds a complete set from a preset and overrides (see [Utilities](/docs/reference/utilities#resolvefeatures)).
+
+<TypeTable path="core/types.ts" name="Features" />
+
+```ts
+type PresetName = 'full' | 'article' | 'social' | 'comment';
+
+type FeatureOverrides = { [K in keyof Features]?: Features[K] };
+```
+
+`PresetName` is a named starting set of features. `FeatureOverrides` is a partial set of features that replaces the matching keys of a preset. It is the type of the `features` prop of `PostCanvas`.
+
+```tsx
+<PostCanvas
+  preset="article"
+  features={{ table: false, gallery: { layouts: ['grid', 'carousel'], maxPhotos: 8 } }}
+/>
+```
+
+## Adapters
+
+Adapters are how the editor talks to your app. `Adapters` is the object of everything you plug in, and every one is optional. It goes in the `adapters` prop.
+
+<TypeTable path="core/types.ts" name="Adapters" />
+
+### Uploads
+
+`UploadAdapter` uploads files to your storage. Without one, `image`, `gallery` and `file` are off unless you set them in `features`.
+
+<TypeTable path="core/types.ts" name="UploadAdapter" />
+
+`upload` receives the file and an `UploadContext`:
+
+<TypeTable path="core/types.ts" name="UploadContext" />
+
+It resolves with an `UploadResult`. Only `src` is required, and it must be an http or https URL.
+
+<TypeTable path="core/types.ts" name="UploadResult" />
+
+HEIC pictures need a converter. Pass `convertHeic` on the upload adapter. Post Canvas does not bundle one. The `heic-to` package is LGPL, and your app installs it itself.
+
+```ts
+import type { UploadAdapter } from 'post-canvas';
+
+export const upload: UploadAdapter = {
+  async upload(file, { signal, onProgress }) {
+    const body = new FormData();
+    body.append('file', file);
+    const response = await fetch('/api/uploads', { method: 'POST', body, signal });
+    if (!response.ok) throw new Error('Upload failed');
+    onProgress(1);
+    const { url, width, height } = (await response.json()) as { url: string; width: number; height: number };
+    return { src: url, width, height };
+  },
+  accept: { image: 'image/jpeg,image/png,image/webp' },
+  maxBytes: { image: 10 * 1024 * 1024, file: 25 * 1024 * 1024 },
+};
+```
+
+### Mentions and hashtags
+
+`SuggestionSource` looks up mentions (`@`) or hashtags (`#`):
+
+<TypeTable path="core/types.ts" name="SuggestionSource" />
+
+`search` resolves with `SuggestionItem` entries, one per person or tag. The editor shows at most 8.
+
+<TypeTable path="core/types.ts" name="SuggestionItem" />
+
+### Embeds and link cards
+
+These two adapters usually call your server. See [Server](/docs/reference/server) for resolvers you can wire to them.
+
+`EmbedMetadataResolver` looks up an embed's title, description and thumbnail:
+
+```ts
+type EmbedMetadataResolver = (url: string, ctx: { signal: AbortSignal }) => Promise<EmbedMetadata>;
+```
+
+<TypeTable path="core/types.ts" name="EmbedMetadata" />
+
+`LinkPreviewResolver` fetches a link card's preview:
+
+```ts
+type LinkPreviewResolver = (url: string, ctx: { signal: AbortSignal }) => Promise<LinkPreview>;
+```
+
+<TypeTable path="core/types.ts" name="LinkPreview" />
+
+A lookup that takes longer than 10 seconds is given up, and the node stays as it is. Metadata is optional: the video or embed works without it.
+
+### Drafts
+
+`DraftStorage` is where autosaved drafts live. The default is `localStorage`, in a try/catch. A method can return a value or a promise.
+
+<TypeTable path="core/types.ts" name="DraftStorage" />
+
+`DraftSnapshot` is one autosaved draft:
+
+<TypeTable path="core/types.ts" name="DraftSnapshot" />
+
+## i18n
+
+```ts
+type TranslateValues = Record<string, string | number>;
+
+type Translator = (key: string, values?: TranslateValues) => string;
+```
+
+`TranslateValues` fill a message's placeholders. A `Translator` looks up a message by its dotted key, such as `core.frame.remove`, and fills in its placeholders. `createTranslator` builds one, and `useTranslator` reads the one in the current provider.
+
+`Locale` is a language: its BCP 47 code and its flat, dotted messages.
+
+<TypeTable path="core/types.ts" name="Locale" />
+
+## Editor core
+
+```ts
+type NotifyKind = 'info' | 'error';
+```
+
+`NotifyKind` is how a notice is announced. `PostCanvasCoreStorage` is what every extension reads through `editor.storage.postCanvasCore`:
+
+<TypeTable path="core/types.ts" name="PostCanvasCoreStorage" />
+
+### Insert items and problems
+
+Extensions provide these through the `postCanvasInsert` and `postCanvasProblems` fields. See [Extension fields](/docs/reference/extensions#extension-fields).
+
+```ts
+type InsertGroup = 'basic' | 'lists' | 'media' | 'embeds' | 'advanced';
+
+type InsertSource = 'slash' | 'insert-button' | 'toolbar';
+```
+
+`InsertGroup` is where an insert item appears in the `+` and `/` menus. `InsertSource` is where an insert item was chosen from, and `run` receives it.
+
+`InsertItem` is one entry in the `+` and `/` menus:
+
+<TypeTable path="core/types.ts" name="InsertItem" />
+
+`Problem` is something that blocks or warns before publishing. These are the codes the package reports: `limit.words`, `limit.characters`, `limit.media`, `limit.photos`, `limit.mentions`, `title.missing`, `media.uploading`, `media.failed`, `embeds.loading` and `embeds.unresolved`. A problem with `severity: 'error'` blocks publishing, and one with `'warning'` only warns.
+
+<TypeTable path="core/types.ts" name="Problem" />
+
+### Sanitizers
+
+```ts
+type AttrsSanitizer = (attrs: Record<string, unknown>) => Record<string, unknown> | null;
+```
+
+An `AttrsSanitizer` cleans one node's or mark's attributes. It returns `null` to drop the node or mark. It is pure, so it runs on the server too. Set it as `postCanvasSanitize` on a node or mark. See [Extensions](/docs/reference/extensions#sanitizers).
+
+### Read-only views
+
+`ViewProps` are the props of a read-only view for one node type. The attributes are the sanitized ones.
+
+<TypeTable path="core/types.ts" name="ViewProps" />
+
+```ts
+type ViewComponent = (props: ViewProps) => ReactNode;
+
+type ViewMap = Partial<Record<string, ViewComponent>>;
+```
+
+A `ViewComponent` renders one node type in the read-only `PostCanvasView`. A `ViewMap` is a set of them by node type. Pass one as the `views` prop of `PostCanvasView` to replace a built-in view. See [Render](/docs/reference/render#postcanvasview).

@@ -1,0 +1,216 @@
+---
+title: 'Vanilla CDN example'
+description: 'Two plain HTML files that use the CDN build: one page edits a post, the other shows it with renderToHTML and activateEmbeds.'
+---
+
+This example needs no build step and no React in your code. The CDN build is one script and one stylesheet. The script adds a global named `PostCanvas`, and the editor mounts into any element.
+
+The example is two files. `editor.html` edits a post and keeps the saved JSON in `localStorage`. `view.html` reads that JSON and shows it as a finished post. Save both files in the same folder and open `editor.html` in a browser. Serve the folder over `http` (any static file server will do) so that both pages share the same `localStorage`.
+
+The CDN build has no upload adapter in this example, so image, gallery and file blocks are off: the editor turns them off when no upload adapter is set. Text, links, tables, code, video and embeds work. To add uploads you pass `adapters.upload` to `create()`, as in the [Uploads guide](/docs/guides/uploads). Embeds in this build show a click-to-load placeholder (`embedConsent: 'click'`).
+
+The URLs below have no version. Put the version you tested in them (`post-canvas@x.y.z`) before you ship.
+
+## The editor page
+
+```html title="editor.html"
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Post Canvas from the CDN</title>
+    <link rel="stylesheet" href="https://unpkg.com/post-canvas/dist/cdn/post-canvas.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: system-ui, sans-serif;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        display: grid;
+        gap: 12px;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      pre {
+        max-height: 240px;
+        overflow: auto;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Edit a post</h1>
+      <div class="bar">
+        <button type="button" id="theme">Switch to dark</button>
+        <button type="button" id="sample">Load a sample</button>
+        <button type="button" id="json">Show JSON</button>
+        <button type="button" id="destroy">Destroy the editor</button>
+        <a href="view.html">Open the saved post</a>
+      </div>
+      <div id="editor"></div>
+      <p id="status" aria-live="polite"></p>
+      <pre id="output" hidden></pre>
+    </main>
+
+    <script src="https://unpkg.com/post-canvas/dist/cdn/post-canvas.iife.js"></script>
+    <script>
+      var storageKey = 'post-canvas-demo';
+      var statusLine = document.getElementById('status');
+
+      // The saved post: { fields: { title }, content: <document JSON> }.
+      var saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(storageKey));
+      } catch (error) {
+        saved = null;
+      }
+      var post = saved || { fields: {}, content: null };
+
+      var canvas = PostCanvas.create(document.getElementById('editor'), {
+        preset: 'article',
+        theme: 'light',
+        embedConsent: 'click',
+        defaultFields: post.fields,
+        defaultContent: post.content || '<h2>A first heading</h2><p>Start writing here.</p>',
+      });
+
+      function save() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(post));
+          statusLine.textContent = 'Saved at ' + new Date().toLocaleTimeString();
+        } catch (error) {
+          statusLine.textContent = 'Could not save in this browser.';
+        }
+      }
+
+      // `change` gives the document as JSON, at most once per animation frame.
+      canvas.on('change', function (json) {
+        post.content = json;
+        save();
+      });
+
+      // `fieldsChange` gives the title (and cover, when uploads are set up).
+      canvas.on('fieldsChange', function (fields) {
+        post.fields = fields;
+        save();
+      });
+
+      // getJSON() reads the document on demand.
+      document.getElementById('json').addEventListener('click', function () {
+        var output = document.getElementById('output');
+        output.hidden = false;
+        output.textContent = JSON.stringify(canvas.getJSON(), null, 2);
+      });
+
+      // setContent() replaces the document. A string is HTML. Add 'markdown' as the second argument for Markdown.
+      document.getElementById('sample').addEventListener('click', function () {
+        canvas.setContent(
+          '<h2>Weeknight lentil soup</h2><p>Ready in <strong>30 minutes</strong>. Add the lemon at the end.</p>' +
+            '<ul><li>Red lentils</li><li>Carrot and onion</li><li>Cumin</li></ul>',
+        );
+      });
+
+      // update() changes options and re-renders.
+      var dark = false;
+      document.getElementById('theme').addEventListener('click', function (event) {
+        dark = !dark;
+        canvas.update({ theme: dark ? 'dark' : 'light' });
+        event.target.textContent = dark ? 'Switch to light' : 'Switch to dark';
+      });
+
+      // destroy() unmounts the editor and empties the element.
+      document.getElementById('destroy').addEventListener('click', function () {
+        canvas.destroy();
+        statusLine.textContent = 'The editor was destroyed.';
+      });
+    </script>
+  </body>
+</html>
+```
+
+What the script uses:
+
+- `PostCanvas.create(element, options)` mounts the editor and returns an instance. Its options are the props of the React `PostCanvas`, minus the callbacks, plus `embedConsent`.
+- `canvas.on(event, listener)` listens to `change`, `fieldsChange` or `ready`. It returns a function that stops listening.
+- `canvas.getJSON()` returns the document. `canvas.getHTML()` returns it as sanitized HTML.
+- `canvas.setContent(content, format)` replaces the document. `content` is JSON, or a string that is HTML by default.
+- `canvas.update(options)` changes options such as `theme`, `readOnly`, `locale` and `features`.
+- `canvas.destroy()` unmounts the editor.
+- `canvas.ready` is a promise for the underlying Tiptap editor.
+
+## The page that shows the post
+
+This page does not create an editor. It takes the saved JSON and calls `PostCanvas.renderToHTML()`, which returns sanitized HTML. Then `PostCanvas.activateEmbeds()` makes video and embed placeholders load their player when a reader clicks them.
+
+```html title="view.html"
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A saved post</title>
+    <link rel="stylesheet" href="https://unpkg.com/post-canvas/dist/cdn/post-canvas.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: system-ui, sans-serif;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="editor.html">Back to the editor</a></p>
+      <h1 id="title"></h1>
+      <div id="post"></div>
+    </main>
+
+    <script src="https://unpkg.com/post-canvas/dist/cdn/post-canvas.iife.js"></script>
+    <script>
+      var raw = null;
+      try {
+        raw = JSON.parse(localStorage.getItem('post-canvas-demo'));
+      } catch (error) {
+        raw = null;
+      }
+
+      var container = document.getElementById('post');
+
+      if (!raw || !raw.content) {
+        container.textContent = 'Nothing saved yet. Write something in the editor first.';
+      } else {
+        // textContent, so the title can never become markup.
+        document.getElementById('title').textContent = (raw.fields && raw.fields.title) || 'Untitled';
+
+        // Sanitizes the JSON, then returns <div class="pc-view"><div class="pc-content">...</div></div>.
+        container.innerHTML = PostCanvas.renderToHTML(raw.content);
+
+        // Follow the reader's light or dark setting. The wrapper has no theme attribute by default.
+        container.firstElementChild.setAttribute('data-pc-theme', 'auto');
+
+        // Turn the click-to-load placeholders into players.
+        PostCanvas.activateEmbeds(container);
+      }
+    </script>
+  </body>
+</html>
+```
+
+Two notes on the second page:
+
+- **It loads the whole editor to show a post.** The CDN script carries React, Tiptap and the editor, because it is one file. For a public site, render the HTML on your server and send readers that HTML (see [Server rendering](/docs/guides/ssr-rendering)). The script is still needed on the page, or a smaller one of your own, to call `activateEmbeds()`. A slimmer CDN bundle is on the [roadmap](/docs/roadmap).
+- **`localStorage` is only for the demo.** A real site would save the JSON on a server and run `sanitizeDocument()` there before storing it. `renderToHTML()` sanitizes again when it renders.

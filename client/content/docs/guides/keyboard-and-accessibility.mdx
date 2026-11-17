@@ -1,0 +1,133 @@
+---
+title: 'Keyboard and accessibility'
+description: 'Every keyboard shortcut in Post Canvas, how focus and screen reader announcements work, and the gaps we know about.'
+---
+
+This page lists what the code does. It is not an accessibility audit, and it does not claim conformance with a standard. Where something is missing or untested, it says so.
+
+In the tables, **Mod** means Cmd on macOS and Ctrl on Windows and Linux. Tooltips on the toolbar show the shortcut for the reader's platform.
+
+## Text formatting
+
+These work when the matching feature is on (see [Presets and features](/docs/concepts/presets-and-features)).
+
+| Action                             | Shortcut                                           |
+| ---------------------------------- | -------------------------------------------------- |
+| Bold                               | Mod-B                                              |
+| Italic                             | Mod-I                                              |
+| Underline                          | Mod-U                                              |
+| Strikethrough                      | Mod-Shift-S                                        |
+| Inline code                        | Mod-E                                              |
+| Highlight                          | Mod-Shift-H                                        |
+| Subscript                          | Mod-,                                              |
+| Superscript                        | Mod-.                                              |
+| Link                               | Mod-K                                              |
+| Undo                               | Mod-Z                                              |
+| Redo                               | Mod-Shift-Z or Mod-Y                               |
+| Paragraph                          | Mod-Alt-0                                          |
+| Heading 1 to 4                     | Mod-Alt-1 to Mod-Alt-4                             |
+| Bulleted list                      | Mod-Shift-8                                        |
+| Numbered list                      | Mod-Shift-7                                        |
+| Task list                          | Mod-Shift-9                                        |
+| Quote                              | Mod-Shift-B                                        |
+| Code block                         | Mod-Alt-C                                          |
+| Align left, center, right, justify | Mod-Shift-L, Mod-Shift-E, Mod-Shift-R, Mod-Shift-J |
+| Line break inside a paragraph      | Shift-Enter or Mod-Enter                           |
+
+Mod-K opens the link popover. In the popover, Enter applies the link and Escape closes it and returns focus to the text.
+
+## Markdown shortcuts
+
+Typing these patterns changes the text as you type. They come from Tiptap's input rules.
+
+| Type                                                     | Result         |
+| -------------------------------------------------------- | -------------- |
+| `# ` to `#### ` at the start of a line                   | Heading 1 to 4 |
+| `- `, `* ` or `+ `                                       | Bulleted list  |
+| `1. `                                                    | Numbered list  |
+| `[ ] ` or `[x] `                                         | Task list      |
+| `> `                                                     | Quote          |
+| Three backticks, with an optional language, then a space | Code block     |
+| `---`                                                    | Divider        |
+| `**text**` or `__text__`                                 | Bold           |
+| `*text*` or `_text_`                                     | Italic         |
+| `` `text` ``                                             | Inline code    |
+| `~~text~~`                                               | Strikethrough  |
+| `==text==`                                               | Highlight      |
+
+## Menus: `/`, `@` and `#`
+
+- **`/`** at the start of a text block opens the insert menu. Keep typing to filter it. It does not open inside a code block.
+- **`@`** and **`#`** open mention and hashtag lists, when you pass the `mentions` or `hashtags` adapter.
+- In any of these lists, ArrowDown and ArrowUp move through the items, Enter or Tab picks one, and Escape closes the list. Focus stays in the text. The editor points at the active item with `aria-activedescendant`, and the list is a `listbox`.
+- Inserting a block by keyboard goes through `/`, or through the Insert button in the toolbar. The round `+` button next to a block is for the mouse and for touch, and it is not in the tab order.
+
+## Blocks
+
+These shortcuts act on the top-level block that holds the caret, whether it is a paragraph, a list, a table or a picture:
+
+| Action          | Shortcut            |
+| --------------- | ------------------- |
+| Move block up   | Alt-Shift-Up        |
+| Move block down | Alt-Shift-Down      |
+| Duplicate block | Alt-Shift-D         |
+| Delete block    | Alt-Shift-Backspace |
+
+The grip beside a block (the block handle) opens a menu with the same actions. It is a button that appears beside the block the caret is in, so Tab reaches it from the text, and Enter or Space opens the menu. Dragging it by mouse, or with a long press on touch, moves the block. The shortcuts above are the quicker keyboard route.
+
+### Picture, gallery and embed blocks
+
+A media block takes focus when you click it. While it has focus:
+
+- Backspace or Delete removes it.
+- ArrowUp or ArrowLeft puts the caret before it. ArrowDown, ArrowRight or Enter puts the caret after it.
+- Escape lets go of focus.
+
+In the collage editor, each photo is a button. With a photo focused, the arrow keys move it (hold Shift for larger steps), `+` and `-` resize it, `[` and `]` rotate it (Shift for larger steps), PageUp and PageDown change its layer, Delete or Backspace removes it, and Escape deselects. Mod-Z and Mod-Shift-Z undo and redo inside the collage.
+
+## Toolbar, menus and popovers
+
+- The toolbar is a single Tab stop. Once focus is in it, ArrowLeft and ArrowRight move between buttons, Home and End go to the first and last, and Tab leaves the toolbar. Buttons that do not fit move into a More panel with the same keys.
+- Menus (block type, color, align, insert, the block handle menu) open with Enter or Space. Inside, ArrowDown, ArrowUp, Home and End move between items, typing a letter jumps to the next item that starts with it, and Escape closes the menu and returns focus to the button that opened it.
+- Popovers, such as the link popover, close on Escape and on a press outside, and focus goes back to where it was.
+
+## Tab, Enter and Escape
+
+| Key                                        | Where                                   | What it does                                                                           |
+| ------------------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------- |
+| Tab, Shift-Tab                             | In a list item                          | Indents and outdents the item                                                          |
+| Tab                                        | In a table                              | Moves to the next cell. In the last cell it adds a row                                 |
+| Shift-Tab                                  | In a table                              | Moves to the previous cell                                                             |
+| Tab                                        | In a paragraph, heading or code block   | Not captured: focus moves on to the next control, so the editor is not a keyboard trap |
+| Enter or ArrowDown at the end of the title | Title field                             | Moves the caret into the body                                                          |
+| Enter                                      | With `submitOnEnter`                    | Calls `onSubmit`, unless a suggestion list is open                                     |
+| Shift-Enter                                | With `submitOnEnter`                    | Adds a line break                                                                      |
+| Escape                                     | Menus, popovers, suggestion lists       | Closes them                                                                            |
+| Escape                                     | During a drag of a media block or photo | Cancels the drag                                                                       |
+| Escape                                     | In the paste-a-link field               | Cancels it                                                                             |
+
+## Screen readers
+
+- The editable area has `role="textbox"`, `aria-multiline="true"` and a label that follows the locale ("Post editor" in English).
+- The toolbar and the selection menu are `role="toolbar"` with labels. Toggle buttons use `aria-pressed` and `aria-keyshortcuts`.
+- Menus use `menu`, `menuitem` and `menuitemradio` roles, with `aria-expanded` and `aria-haspopup` on the buttons that open them.
+- Media frames are `role="group"` with a label such as "Gallery, 3 photos". Each collage photo has a label with its position, size and rotation.
+- Notices (an upload failed, a limit was reached) are announced through two live regions: errors assertively, everything else politely. The same message also shows as a toast.
+- The suggestion list announces its state through a polite live region.
+- Form errors, such as an invalid link or a missing title, use `role="alert"`, `aria-invalid` and `aria-describedby`.
+- The restored-draft banner is `role="status"`.
+
+All of these labels come from the locale, so translating the editor translates what a screen reader says. See [Internationalization](/docs/guides/i18n).
+
+## Touch and reduced motion
+
+On touch devices (a coarse primary pointer) buttons and menu items grow to at least 44 by 44 pixels, and the controls on pictures stay visible. When the reader asks for reduced motion, animations and transitions are cut to nearly zero length. Both live in the stylesheet. See [Theming](/docs/guides/theming).
+
+## What is not covered
+
+- **The `+` button** is for the mouse and for touch, and it is not in the tab order. Keyboard users insert with `/` or the toolbar's Insert button, and move, duplicate or delete blocks with the Alt-Shift shortcuts or the block handle's menu.
+- **Drag to reorder with a long press on touch** has not been tested on a real device. It is built on pointer events.
+- **Trackpad pinch (Ctrl and wheel) in the collage editor** zooms the page instead of the collage. Touch pinch and Safari's gesture events work.
+- **Right-to-left layout** is not supported yet.
+- **Spell check and grammar** are whatever the browser does for an editable area. There is no spell-check interface of our own.
+- **Screen reader testing.** The roles and live regions above are in the code. We have not published results from testing with specific screen readers, so test with the ones your readers use.

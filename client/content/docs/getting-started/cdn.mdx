@@ -1,0 +1,156 @@
+---
+title: 'CDN and plain HTML'
+description: 'Add the Post Canvas editor to any web page with one script and one stylesheet from a CDN, with no build step and no React code to write.'
+---
+
+The CDN bundle is the editor and its dependencies in a single file, exposed as the global `PostCanvas`. Use it for a plain HTML page, a server-rendered template (PHP, Rails, Django) or a CMS where you cannot run a bundler. React is inside the bundle, so the page needs nothing else.
+
+The same functions are available from npm as `post-canvas/vanilla`, if you do have a bundler but not React.
+
+## Add the files
+
+The npm package ships two files for this, in `dist/cdn/`:
+
+- `post-canvas.iife.js`: the script (an IIFE, a script that runs at once and sets one global).
+- `post-canvas.css`: the stylesheet.
+
+Load them from unpkg or jsDelivr. Pin an exact version in the URL, so a new release cannot change your page:
+
+<Tabs items={['unpkg', 'jsDelivr']}>
+<Tab value="unpkg">
+
+```html
+<link rel="stylesheet" href="https://unpkg.com/post-canvas@0.1.0/dist/cdn/post-canvas.css" />
+<script src="https://unpkg.com/post-canvas@0.1.0/dist/cdn/post-canvas.iife.js"></script>
+```
+
+</Tab>
+<Tab value="jsDelivr">
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/post-canvas@0.1.0/dist/cdn/post-canvas.css" />
+<script src="https://cdn.jsdelivr.net/npm/post-canvas@0.1.0/dist/cdn/post-canvas.iife.js"></script>
+```
+
+</Tab>
+</Tabs>
+
+Replace `0.1.0` with the version you want. If you cannot rely on a third-party CDN, copy both files from the npm package into your own static folder and serve them yourself.
+
+## Mount the editor
+
+`PostCanvas.create(element, options)` mounts the editor into an element and returns an instance. The options are the props of the React `PostCanvas` component (see the [`PostCanvas` reference](/docs/reference/post-canvas)), except the callbacks, which you attach with `on()`, and with one addition: `embedConsent`.
+
+```html title="index.html"
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Write a post</title>
+    <link rel="stylesheet" href="https://unpkg.com/post-canvas@0.1.0/dist/cdn/post-canvas.css" />
+  </head>
+  <body>
+    <div id="editor"></div>
+    <button type="button" id="save">Save</button>
+
+    <script src="https://unpkg.com/post-canvas@0.1.0/dist/cdn/post-canvas.iife.js"></script>
+    <script>
+      const canvas = PostCanvas.create(document.getElementById('editor'), {
+        preset: 'article',
+        defaultContent: '<h2>Hello</h2><p>Start writing here.</p>',
+      });
+
+      let latest = canvas.getJSON();
+      canvas.on('change', (json) => {
+        latest = json;
+      });
+
+      document.getElementById('save').addEventListener('click', () => {
+        fetch('/api/posts', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ content: latest }),
+        });
+      });
+    </script>
+  </body>
+</html>
+```
+
+`defaultContent` is read once. It can be Tiptap JSON or an HTML string. For a Markdown string, add `contentFormat: 'markdown'`.
+
+### The instance
+
+| Member                        | What it does                                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `getJSON()`                   | The document as Tiptap JSON. This is what you save.                                                                                                                      |
+| `getHTML()`                   | The document as sanitized HTML, without the `.pc-view` wrapper.                                                                                                          |
+| `setContent(content, format)` | Replaces the document. Takes JSON, an HTML string, or Markdown with `format: 'markdown'`.                                                                                |
+| `update(options)`             | Changes options such as `theme`, `readOnly`, `locale` or `features`, and re-renders.                                                                                     |
+| `on(event, listener)`         | Listens to `change` (receives the JSON), `fieldsChange` (receives the title and cover) or `ready` (receives the Tiptap editor). Returns a function that stops listening. |
+| `ready`                       | A promise that resolves with the Tiptap editor once it has mounted.                                                                                                      |
+| `editor`                      | The Tiptap editor, or `null` until it has mounted.                                                                                                                       |
+| `destroy()`                   | Unmounts the editor and empties the element.                                                                                                                             |
+
+`change` fires at most once per animation frame. Fields (the title and the cover) are separate from the document JSON: listen to `fieldsChange` to save them. See [fields](/docs/concepts/fields).
+
+### Options worth knowing
+
+```js
+const canvas = PostCanvas.create(element, {
+  preset: 'social',
+  theme: 'dark', // 'light', 'dark' or 'auto'
+  locale: PostCanvas.locales.de, // en, de, es, fr, it, pt
+  embedConsent: 'auto', // players load straight away; the default 'click' shows a facade
+  adapters: {
+    upload: {
+      async upload(file, { signal }) {
+        const body = new FormData();
+        body.append('file', file);
+        const response = await fetch('/api/upload', { method: 'POST', body, signal });
+        if (!response.ok) throw new Error('Upload failed');
+        const { url } = await response.json();
+        return { src: url };
+      },
+    },
+  },
+});
+```
+
+Without an upload adapter, image, gallery and file are off, as in React. See [adapters](/docs/concepts/adapters).
+
+## Show a saved post
+
+Fetch the saved JSON, turn it into HTML with `PostCanvas.renderToHTML`, put the HTML in the page, and call `PostCanvas.activateEmbeds` on the container:
+
+```html title="post.html"
+<link rel="stylesheet" href="https://unpkg.com/post-canvas@0.1.0/dist/cdn/post-canvas.css" />
+<div id="post"></div>
+
+<script src="https://unpkg.com/post-canvas@0.1.0/dist/cdn/post-canvas.iife.js"></script>
+<script>
+  fetch('/api/posts/42')
+    .then((response) => response.json())
+    .then((post) => {
+      const container = document.getElementById('post');
+      container.innerHTML = PostCanvas.renderToHTML(post.content);
+      PostCanvas.activateEmbeds(container);
+    });
+</script>
+```
+
+`renderToHTML` sanitizes the document first, then wraps the result in `.pc-view` and `.pc-content`. Videos and embeds come out as facades: a thumbnail and a play button that link to the provider. `activateEmbeds(container)` makes a click load the player in a sandboxed iframe instead of opening the link. It returns a function that stops listening, and it keeps working for facades you add under the same container later.
+
+`renderToHTML` accepts the same options as on the server, for example `{ embeds: 'iframe' }` to load players at once or `{ embeds: 'link' }` for plain links. See [rendering](/docs/concepts/rendering).
+
+If your server can render HTML (for example with `post-canvas/server` on Node), prefer that and send finished HTML, so the reader's page does not need the bundle at all. Then you only need `post-canvas.css` and a call to `activateEmbeds`.
+
+## Things to know
+
+- **Subresource Integrity.** A third-party CDN can be compromised. For production, add an `integrity` hash and `crossorigin="anonymous"` to the `link` and `script` tags (compute the hash from the pinned file), or host the two files yourself.
+- **Sanitize on your server.** The browser can send anything to your API. Run `sanitizeDocument` from `post-canvas/server` on the JSON before you store it. See [security](/docs/concepts/security).
+- **Fewer code languages.** To keep the single file smaller, the CDN bundle offers eight languages in code blocks: Bash, CSS, HTML, JavaScript, JSON, Python, SQL and TypeScript. The npm build has more and loads them on demand.
+- **The global is `PostCanvas`.** It holds `create`, `createPostCanvas`, `renderToHTML`, `activateEmbeds`, `sanitizeDocument` and `locales`. Do not name your own variable `PostCanvas`.
+- **Custom embed providers** need the npm build, because the registration functions are not part of the CDN global.
+- **Theme.** The editor has `theme`. The saved-post wrapper from `renderToHTML` has no theme attribute, so it follows the light palette unless you add `data-pc-theme="auto"` to the `.pc-view` element.

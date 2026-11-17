@@ -1,0 +1,96 @@
+---
+title: 'Title and cover fields'
+description: "How Post Canvas holds a post's title and cover picture outside the document, and when each preset shows them."
+---
+
+A post often has a title and a cover picture that are not part of the body. Post Canvas keeps them in a small object called `PostFields`, next to the document JSON but not inside it. The editor shows them above the text when the preset asks for them.
+
+<TypeTable path="core/types.ts" name="PostFields" />
+
+- `title` is plain text, at most 200 characters. Line breaks become spaces. Enter or the down arrow at the end of the title moves the caret into the body.
+- `cover` is a picture with the same fields as an image in the body (`src`, `width`, `height`, `alt`, `srcset`, `placeholder`, `uploadId`) but without `uploadKey`, because a cover is only stored after its upload has finished. See [document JSON](/docs/concepts/document-json).
+
+## Read and set the fields
+
+Fields work in two ways, like a normal React input.
+
+**Uncontrolled.** Pass a starting value with `defaultFields` (read once on mount) and listen with `onFieldsChange`:
+
+```tsx
+import { PostCanvas, type PostFields } from 'post-canvas';
+
+function Editor({ saved }: { saved: PostFields }) {
+  return (
+    <PostCanvas
+      preset="article"
+      defaultFields={saved}
+      onFieldsChange={(fields) => console.log(fields.title, fields.cover)}
+    />
+  );
+}
+```
+
+**Controlled.** Pass `fields` and update it in `onFieldsChange`. This is the way to go when the title also appears somewhere else in your page.
+
+```tsx
+import { useState } from 'react';
+import { PostCanvas, type PostFields } from 'post-canvas';
+
+function Editor() {
+  const [fields, setFields] = useState<PostFields>({ title: 'Three days in Lisbon' });
+  return (
+    <>
+      <h1>{fields.title || 'Untitled'}</h1>
+      <PostCanvas preset="article" fields={fields} onFieldsChange={setFields} />
+    </>
+  );
+}
+```
+
+`onFieldsChange` receives the whole `PostFields` object each time. The document and the fields change independently: `onChange` does not fire when only the title changes, and `onFieldsChange` does not fire when only the body changes. Save both. The `ref` handle's `clear()` empties the document and the fields together.
+
+<TypeTable path="react/post-canvas.tsx" name="PostCanvasHandle" />
+
+## When the fields show
+
+Two things must be true for a field to show:
+
+1. The feature is on: `features.title` for the title, `features.cover` for the cover.
+2. The classifier, if the preset has one, says to show fields.
+
+| Preset    | Title and cover                                                                                                                                                         |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `full`    | Off. Turn them on with `features={{ title: true, cover: true }}`.                                                                                                       |
+| `article` | On. There is no classifier, so they always show, and a missing title is not an error.                                                                                   |
+| `social`  | On, but the classifier shows them only when the post is an article. A text, photo, video or embed post has no title. Once it becomes an article, the title is required. |
+| `comment` | Off.                                                                                                                                                                    |
+
+If you pass `classify={null}` to `social`, the classifier goes away and the fields show whenever their features are on. See [classify](/docs/concepts/presets-and-features).
+
+In read-only mode (`readOnly`), the editor shows the title as a heading and no cover. To show a saved post to readers, build the page yourself from your stored fields and the document, as in [rendering](/docs/concepts/rendering).
+
+## The cover needs an upload adapter
+
+The cover picture uploads through `adapters.upload`, the same one the body uses. Without it, the "Add cover" button is disabled. `CoverField` reports a finished upload only: its `value` never holds a local preview.
+
+## Use CoverField on its own
+
+`CoverField` is exported, so you can place the cover control elsewhere in your own layout:
+
+<TypeTable path="media/cover/cover-field.tsx" name="CoverFieldProps" />
+
+It reads the upload adapter and the translator from the nearest `PostCanvasProvider`. Inside `PostCanvas` that is automatic. On its own, wrap it in a `PostCanvasProvider`. The [headless guide](/docs/guides/headless) covers using the pieces without `PostCanvas`.
+
+## Check fields on the server
+
+`sanitizeDocument` and `validateDocument` look at the document only. They never see `PostFields`. Treat the title and the cover as untrusted input of your own:
+
+- Store the title as text and escape it when you render it. React and most template engines do this for you.
+- Accept a cover only when its `src` is an `https` URL on your upload host, and its `width` and `height` are numbers.
+
+See [security](/docs/concepts/security).
+
+## Next steps
+
+- [Presets and features](/docs/concepts/presets-and-features): the classifier that gates the fields.
+- [Autosave](/docs/guides/autosave): drafts keep the fields too.

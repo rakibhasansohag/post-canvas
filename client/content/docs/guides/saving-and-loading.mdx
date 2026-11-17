@@ -1,0 +1,186 @@
+---
+title: 'Saving and loading'
+description: "Save the editor's JSON from onChange, check it before publishing, load it back, and convert to and from HTML, Markdown and plain text."
+---
+
+Post Canvas stores a post as **JSON**: a tree of blocks and text in Tiptap's document format. This is the canonical format. Save the JSON, and make HTML, Markdown or plain text from it when you need them. See [Document JSON](/docs/concepts/document-json) for the shape.
+
+The editor keeps its own copy of the document (it is **uncontrolled**). You read changes out through `onChange` and put content in through `defaultContent` and the `ref` handle. There is no `value` prop.
+
+## Save the JSON
+
+`onChange` receives `{ json, editor }`. It runs at most once per animation frame, which is often, so do not send every call to your server. Keep the latest JSON and save on a timer, on a button or both.
+
+```tsx title="app/editor.tsx"
+'use client';
+import { useRef } from 'react';
+import { PostCanvas, hasPendingUploads, type JSONContent, type PostCanvasHandle } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export function Editor({ postId, initial }: { postId: string; initial: JSONContent }) {
+  const canvas = useRef<PostCanvasHandle>(null);
+  const latest = useRef<JSONContent>(initial);
+
+  async function save() {
+    const json = latest.current;
+    if (hasPendingUploads(json)) return; // an upload is still running, failed or staged
+    await fetch(`/api/posts/${postId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: json }),
+    });
+  }
+
+  return (
+    <>
+      <PostCanvas
+        ref={canvas}
+        defaultContent={initial}
+        onChange={({ json }) => {
+          latest.current = json;
+        }}
+      />
+      <button type="button" onClick={save}>Save</button>
+    </>
+  );
+}
+```
+
+Store the JSON in a JSON column (`jsonb` in Postgres) or as text. A title and cover from the `article` or `social` preset are not part of this JSON: they come through `fields` and `onFieldsChange`. See [Fields](/docs/concepts/fields).
+
+### Before you publish
+
+Check three things on the client, and one on the server.
+
+**1. No uploads in progress.** `hasPendingUploads(json)` is `true` while an upload is running, failed or staged. A staged upload is a pasted picture on its way in, marked with the source `https://staged.post-canvas.invalid/<key>`. Do not save a document while it is `true`: the pictures would be dropped. `hasTransientContent(json)` is wider. It also covers an open paste-a-link field and any `blob:` source, which exist only in the writer's browser.
+
+**2. No problems.** `getProblems(editor)` returns what blocks publishing: a missing title in an article, words or photos over your limits, uploads still running, a link that is still loading. Each problem has a `code`, a translated `message` and a `severity` of `error` or `warning`.
+
+```tsx
+import { getProblems } from 'post-canvas';
+
+function publish() {
+  const editor = canvas.current?.editor;
+  if (!editor) return;
+  const errors = getProblems(editor).filter((problem) => problem.severity === 'error');
+  if (errors.length > 0) {
+    showMessage(errors[0].message);
+    return;
+  }
+  // Safe to send.
+}
+```
+
+**3. Limits.** Pass `limits` to set caps. They show up in `getProblems()`.
+
+```tsx
+<PostCanvas limits={{ maxWords: 2000, maxMedia: 12, maxPhotos: 20 }} />
+```
+
+The available caps are `maxWords`, `maxCharacters`, `maxMedia` (photos, videos, embeds, link cards and files together) and `maxPhotos`. A document can also hold at most 20 mentions and hashtags.
+
+**4. Validate on the server.** The checks above run in the writer's browser, so someone can skip them. On your server, do not store what a client sends without checking it. `validateDocument()` from `post-canvas/server` says whether the JSON is clean and savable exactly as it is:
+
+```ts title="app/api/posts/[id]/route.ts"
+import { validateDocument } from 'post-canvas/server';
+
+export async function PUT(request: Request) {
+  const { content } = await request.json();
+  const { ok, errors } = validateDocument(content);
+  if (!ok) return Response.json({ errors }, { status: 422 });
+  // Store content.
+  return Response.json({ saved: true });
+}
+```
+
+It checks the schema, the size caps, every node's attributes and editor-only state (a running upload counts as an error here too). `ok` is `true` only when `sanitizeDocument()` would change nothing. If you would rather clean than reject, use `sanitizeDocument(content)`, which returns `{ doc, removed }`: the cleaned document and a list of what it removed.
+
+If the editor uses a preset or features that differ from the defaults, pass the same `features` to `validateDocument()`, or it checks against every feature. See [Security](/docs/concepts/security).
+
+## Load a document
+
+Pass saved JSON as `defaultContent`. It is read once, when the editor mounts. Changing the prop later does nothing.
+
+```tsx
+<PostCanvas defaultContent={post.content} />
+```
+
+To show a different post in the same place, give the editor a new `key` so it starts again:
+
+```tsx
+<PostCanvas key={post.id} defaultContent={post.content} />
+```
+
+To replace the content of a mounted editor, use the handle's `setContent()`:
+
+```tsx
+canvas.current?.setContent(post.content);
+```
+
+`setContent(content, format)` takes JSON, or a string. A string is HTML by default, or Markdown when you pass `'markdown'`.
+
+If `autosave` is on and a draft exists, the draft replaces `defaultContent`. See [Autosave](/docs/guides/autosave).
+
+## HTML and Markdown in
+
+You can start from HTML or Markdown, for example when you move posts from another editor.
+
+`defaultContent` accepts a string. `contentFormat` says how to read it: `'html'` (the default) or `'markdown'`.
+
+```tsx
+<PostCanvas defaultContent={'# A heading\n\nSome **bold** text.'} contentFormat="markdown" />
+```
+
+To convert once and store the result, use the converters from `post-canvas/render`. Both clean the result with the sanitizer.
+
+```ts
+import { fromHTML, fromMarkdown } from 'post-canvas/render';
+
+const fromWord = fromHTML(oldPost.html);
+const fromNotes = fromMarkdown(note.markdown);
+```
+
+`fromHTML()` reads HTML from other editors such as TinyMCE, Froala, CKEditor and Word: headings, lists, tables, links, formatting, and YouTube, Vimeo and other player iframes (which become video and embed blocks). Scripts and styles are removed.
+
+In a browser, `fromHTML()` uses the built-in `DOMParser`. On a server there is no `DOMParser`, so pass a window from a DOM library such as happy-dom:
+
+```ts title="scripts/import.ts"
+import { fromHTML } from 'post-canvas/render';
+
+const { Window } = await import('happy-dom');
+const content = fromHTML(oldPost.html, { window: new Window() });
+```
+
+Syntax for features that are off ends up as plain text or is removed. Pass `features` to both functions when you use a preset or turn features off.
+
+## Out: HTML, Markdown and text
+
+Run these on the server, or when you save, and keep or send the result. All of them take the saved JSON.
+
+| Function             | Gives you                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| `renderToHTML(json)` | Sanitized HTML, wrapped in `.pc-view` for `post-canvas/styles.css`.                         |
+| `toMarkdown(json)`   | GitHub-flavoured Markdown.                                                                  |
+| `toPlainText(json)`  | Plain text, blocks separated by blank lines.                                                |
+| `excerpt(json, max)` | The first paragraph or heading with words, cut at a word to `max` characters (default 160). |
+| `getCover(json)`     | The first image or gallery photo, or a video thumbnail, or `null`.                          |
+
+```ts title="lib/publish.ts"
+import type { JSONContent } from 'post-canvas';
+import { excerpt, getCover, renderToHTML, toPlainText } from 'post-canvas/render';
+
+export function derive(content: JSONContent) {
+  return {
+    html: renderToHTML(content),
+    description: excerpt(content, 160),
+    cover: getCover(content), // { src, width, height, alt, ... } or null
+    text: toPlainText(content), // for search indexes
+  };
+}
+```
+
+`renderToHTML()` and `PostCanvasView` sanitize by default, so they are safe on JSON from a client. How embeds appear in the HTML is covered in [Embeds and link previews](/docs/guides/embeds-and-link-previews), and showing posts in a page in [Server rendering](/docs/guides/ssr-rendering).
+
+`toMarkdown()` loses what Markdown cannot show. Underline and colour are dropped, a gallery becomes a list of images, and videos, embeds and link cards become a link on their own line. Mentions and hashtags become `@label` and `#label`.
+
+Keep the JSON as the source of truth. If you store HTML as well, regenerate it when you upgrade Post Canvas, because the markup can change between versions.

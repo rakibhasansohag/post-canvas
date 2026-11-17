@@ -1,0 +1,244 @@
+---
+title: 'Social composer'
+description: 'A post composer with photo uploads, mentions, hashtags, link previews and a publish button, built on the social preset in Next.js.'
+---
+
+This example builds the kind of composer you find in a social app. It uses the `social` preset, which allows text, photos, galleries, video, embeds and link cards, and decides by itself whether the writer is making a short post or an article. The status bar shows which one.
+
+The pieces:
+
+- Photo uploads through an upload adapter, with a small development endpoint behind it.
+- `@` mentions and `#` hashtags from two static lists.
+- Link previews through a server route that uses `post-canvas/server`.
+- A Publish button in the `slots.footer` slot. It waits for uploads with `hasPendingUploads()`, checks `getProblems()`, and calls `clear()` after the post is saved.
+
+It assumes a Next.js App Router project with Post Canvas installed (`npm install post-canvas`). See [Next.js](/docs/getting-started/nextjs) for setup.
+
+## The composer
+
+```tsx title="components/social-composer.tsx"
+'use client';
+
+import { useRef, useState } from 'react';
+import {
+  PostCanvas,
+  getDocStats,
+  getProblems,
+  hasPendingUploads,
+  type Adapters,
+  type JSONContent,
+  type PostCanvasHandle,
+  type PostFields,
+  type SuggestionItem,
+  type SuggestionSource,
+} from 'post-canvas';
+import 'post-canvas/styles.css';
+
+const people: SuggestionItem[] = [
+  { id: 'maya', label: 'Maya Torres', description: 'Travel photographer' },
+  { id: 'jonas', label: 'Jonas Weber', description: 'Recipe developer' },
+  { id: 'priya', label: 'Priya Nair', description: 'Product designer' },
+];
+
+const tags: SuggestionItem[] = ['travel', 'recipes', 'photography', 'productupdate'].map((tag) => ({
+  id: tag,
+  label: tag,
+}));
+
+function listSource(items: SuggestionItem[]): SuggestionSource {
+  return {
+    async search(query) {
+      const q = query.trim().toLowerCase();
+      return items.filter((item) => item.label.toLowerCase().includes(q));
+    },
+  };
+}
+
+// Defined outside the component so the editor sees the same object on every render.
+const adapters: Adapters = {
+  upload: {
+    accept: { image: 'image/*' },
+    maxBytes: { image: 10 * 1024 * 1024 },
+    async upload(file, { signal, onProgress }) {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await fetch('/api/upload', { method: 'POST', body, signal });
+      if (!response.ok) throw new Error('The upload failed.');
+      onProgress(1);
+      return (await response.json()) as { src: string; width?: number; height?: number };
+    },
+  },
+  mentions: listSource(people),
+  hashtags: listSource(tags),
+  links: async (url, { signal }) => {
+    const response = await fetch('/api/previews', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url, kind: 'link' }),
+      signal,
+    });
+    if (!response.ok) throw new Error('No preview for this link.');
+    return response.json();
+  },
+};
+
+export function SocialComposer() {
+  const canvas = useRef<PostCanvasHandle>(null);
+  const [json, setJson] = useState<JSONContent | null>(null);
+  const [fields, setFields] = useState<PostFields>({});
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const uploading = json !== null && hasPendingUploads(json);
+
+  async function publish() {
+    const editor = canvas.current?.editor;
+    if (!editor) return;
+    const content = editor.getJSON();
+
+    const stats = getDocStats(content);
+    if (stats.words === 0 && stats.mediaBlocks === 0) {
+      setMessage('Write something first.');
+      return;
+    }
+    if (hasPendingUploads(content)) {
+      setMessage('Wait for the uploads to finish, or remove the ones that failed.');
+      return;
+    }
+    const blocking = getProblems(editor).filter((problem) => problem.severity === 'error');
+    if (blocking.length > 0) {
+      setMessage(blocking.map((problem) => problem.message).join(' '));
+      return;
+    }
+
+    setBusy(true);
+    const response = await fetch('/api/posts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: fields.title ?? '', cover: fields.cover ?? null, content }),
+    });
+    setBusy(false);
+
+    if (!response.ok) {
+      setMessage('Could not publish. Your draft is still here.');
+      return;
+    }
+    canvas.current?.clear(); // empties the document and the fields, and forgets the autosaved draft
+    setMessage('Published.');
+  }
+
+  return (
+    <PostCanvas
+      ref={canvas}
+      preset="social"
+      adapters={adapters}
+      autosave={{ key: 'social-composer' }}
+      onChange={({ json: next }) => setJson(next)}
+      onFieldsChange={setFields}
+      slots={{
+        footer: (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12 }}>
+            <button type="button" onClick={publish} disabled={busy || uploading}>
+              {uploading ? 'Uploading…' : busy ? 'Publishing…' : 'Publish'}
+            </button>
+            <p role="status" style={{ margin: 0 }}>
+              {message}
+            </p>
+          </div>
+        ),
+      }}
+    />
+  );
+}
+```
+
+A few details:
+
+- `hasPendingUploads(json)` is `true` while an upload is running, after one failed, and for a pasted picture that is staged for upload. Do not save a document while it is `true`.
+- `getProblems(editor)` returns what the status bar would show: limits, a missing title once the post becomes an article, and unfinished embed fields. Only `error` entries block publishing here.
+- The title and cover fields appear once the post becomes an article (more than 500 words, more than one media block, or text around a media block). `fields` carries them, and `onFieldsChange` keeps your state in step.
+- The editor does not re-render React on each keystroke, so the button's `disabled` state follows your own `json` state.
+
+## The page
+
+```tsx title="app/page.tsx"
+import { SocialComposer } from '@/components/social-composer';
+
+export default function Page() {
+  return (
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
+      <SocialComposer />
+    </main>
+  );
+}
+```
+
+## Link previews
+
+The browser cannot fetch other sites' pages for a preview, so the adapter asks your server. `createLinkPreviewResolver()` fetches the page, reads its title and image, and refuses private network addresses. `createEmbedResolver()` does the same for video and embed titles and thumbnails, so you can pass an `embeds` adapter the same way.
+
+```ts title="app/api/previews/route.ts"
+import { createEmbedResolver, createLinkPreviewResolver } from 'post-canvas/server';
+
+const embeds = createEmbedResolver();
+const links = createLinkPreviewResolver();
+
+export async function POST(request: Request) {
+  const { url, kind } = (await request.json()) as { url: string; kind: 'embed' | 'link' };
+  try {
+    const resolve = kind === 'embed' ? embeds : links;
+    return Response.json(await resolve(url, { signal: request.signal }));
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? String(error.code) : 'unavailable';
+    return Response.json({ code }, { status: 422 });
+  }
+}
+```
+
+## Uploads in development
+
+This route writes pictures into `public/uploads`. It works with `next dev` and on a server with a writable disk. Replace it with your real storage (an S3 bucket, for example) before you deploy. See [Uploads](/docs/guides/uploads).
+
+```ts title="app/api/upload/route.ts"
+import { mkdir, writeFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
+
+const allowed = /^\.(png|jpe?g|gif|webp|avif)$/;
+
+export async function POST(request: Request) {
+  const form = await request.formData();
+  const file = form.get('file');
+  if (!(file instanceof File)) return Response.json({ code: 'no_file' }, { status: 400 });
+
+  const extension = extname(file.name).toLowerCase();
+  if (!allowed.test(extension)) return Response.json({ code: 'bad_type' }, { status: 415 });
+
+  const name = `${crypto.randomUUID()}${extension}`;
+  const directory = join(process.cwd(), 'public', 'uploads');
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, name), Buffer.from(await file.arrayBuffer()));
+
+  // The editor needs a full address. Width and height may be left out: the editor measures the picture on load.
+  return Response.json({ src: new URL(`/uploads/${name}`, request.url).href });
+}
+```
+
+## Saving the post
+
+Treat JSON that comes from a browser as untrusted. Run it through `sanitizeDocument()` before you store it:
+
+```ts title="app/api/posts/route.ts"
+import { sanitizeDocument } from 'post-canvas/server';
+
+export async function POST(request: Request) {
+  const { title, content } = await request.json();
+  const { doc, removed } = sanitizeDocument(content);
+  if (removed.length > 0) console.warn('Sanitizer removed', removed);
+
+  // Store `title` and `doc` in your database here.
+  console.log('Saving post', title, doc);
+  return Response.json({ ok: true });
+}
+```
+
+To show saved posts, see [Server rendering](/docs/guides/ssr-rendering). For the other presets, see the [article editor](/docs/examples/article-editor) and the [comment box](/docs/examples/comment-box).

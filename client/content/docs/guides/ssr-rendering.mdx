@@ -1,0 +1,219 @@
+---
+title: 'Server rendering'
+description: 'Show saved posts on the server with renderToHTML or PostCanvasView, choose an embed mode, and keep the editor itself on the client.'
+---
+
+Post Canvas saves a post as JSON. To show it to readers you turn that JSON into HTML, and you can do that on the server without loading the editor. This page covers the two server-side ways to do it, how videos and embeds behave, and what to know about hydration and caching.
+
+## Pick a way to show a post
+
+| You want                                                     | Use                       | Runs where                                           |
+| ------------------------------------------------------------ | ------------------------- | ---------------------------------------------------- |
+| An HTML string you can store, cache or send from any backend | `renderToHTML()`          | Any server or edge runtime, with no DOM and no React |
+| A React component in a Next.js App Router page               | `PostCanvasView`          | React Server Components, or the browser              |
+| An editor that cannot be edited                              | `<PostCanvas readOnly />` | The browser only                                     |
+
+Reader pages should use the first two. The read-only editor loads Tiptap and ProseMirror (the editing libraries) in the browser, which a reader page does not need.
+
+## Import the styles
+
+Both outputs are wrapped in a `.pc-view` element and styled by the same stylesheet as the editor. Import it once, for example in your root layout:
+
+```tsx title="app/layout.tsx"
+import 'post-canvas/styles.css';
+```
+
+See [Theming](/docs/guides/theming) for the tokens you can override.
+
+## Render to an HTML string
+
+`renderToHTML()` takes the document JSON and returns an HTML string. It uses `@tiptap/static-renderer`, so it needs no DOM. On a server that does not use React, import it from `post-canvas/server`, which pulls in neither React nor a DOM.
+
+```ts title="server/render-post.ts"
+import { renderToHTML } from 'post-canvas/server';
+import type { JSONContent } from 'post-canvas';
+
+export function renderPost(content: JSONContent): string {
+  return renderToHTML(content);
+}
+```
+
+The result looks like `<div class="pc-view"><div class="pc-content">...</div></div>`. By default `renderToHTML()` runs `sanitizeDocument()` first, so a document that was tampered with cannot put a script or an unsafe link on the page. Player and iframe URLs are never stored in the JSON. They are built at render time from the provider and a validated id.
+
+<TypeTable path="output/html.ts" name="RenderHTMLOptions" />
+
+`renderToHTML()` also takes `locale`, so the few strings in the output ("Watch on YouTube" and similar) follow your language. See [Internationalization](/docs/guides/i18n).
+
+### Dark mode for HTML output
+
+The wrapper that `renderToHTML()` adds has no `data-pc-theme` attribute, so it renders with the light tokens. To follow the reader's system setting, turn the wrapper off and write your own:
+
+```ts title="server/render-post.ts"
+import { renderToHTML } from 'post-canvas/server';
+import type { JSONContent } from 'post-canvas';
+
+export function renderPost(content: JSONContent): string {
+  const body = renderToHTML(content, { wrapper: false });
+  return `<div class="pc-view" data-pc-theme="auto"><div class="pc-content">${body}</div></div>`;
+}
+```
+
+## Render with React Server Components
+
+`PostCanvasView` is a component with no hooks and no `"use client"`, so it works in a Server Component. In a Server Component the schema, the sanitizer and Tiptap stay on the server. The browser receives only the small client parts: the click-to-load player and the carousel.
+
+```tsx title="app/posts/[slug]/page.tsx"
+import { PostCanvasView } from 'post-canvas/render';
+import { notFound } from 'next/navigation';
+import { getPost } from '@/lib/posts';
+
+export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await getPost(slug);
+  if (!post) notFound();
+
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      <PostCanvasView content={post.json} theme="auto" />
+    </article>
+  );
+}
+```
+
+<TypeTable path="output/react-view.tsx" name="PostCanvasViewProps" />
+
+Use `views` to replace how one node type is drawn. Custom nodes need their own entry in `renderToHTML()`'s `extensions` option instead: `PostCanvasView` has no `extensions` prop. See [Headless usage](/docs/guides/headless).
+
+## Embed modes
+
+The `embeds` option decides how videos and social embeds appear in the output.
+
+| Mode               | What the reader gets                                                                                               | Use it for                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `facade` (default) | A thumbnail or placeholder with a play button that links to the provider. The player loads when the reader clicks. | Article pages                                       |
+| `iframe`           | The provider's player straight away.                                                                               | Pages where you accept third-party requests on load |
+| `link`             | A plain link.                                                                                                      | RSS feeds, email and other places without scripts   |
+
+A facade keeps third-party players and scripts off the page until a click. It does not remove every request: YouTube and Vimeo thumbnails still load from the providers' image hosts.
+
+Embeds from X, Instagram and CodePen use a fixed iframe height, because a player on another origin cannot report its size to the page.
+
+In the editor the same choice is the `embedConsent` prop: `click` (default) or `auto`. See [Embeds and link previews](/docs/guides/embeds-and-link-previews).
+
+## Why the editor renders on the client
+
+`PostCanvas` is a client component. Tiptap works on the browser's DOM, and the editor needs selection, focus and pointer events, none of which exist on a server. The editor is created with `immediatelyRender: false`, so the server and the first client render produce the same shell, and the editor mounts after hydration. Until then the `editor` on the ref handle is `null`.
+
+Two practical points:
+
+- Put `PostCanvas` inside your own component marked `"use client"`. Callbacks such as `onChange` are functions, and a Server Component cannot pass functions to a client component.
+- Give the editor area a minimum height so the page does not jump when the editor mounts.
+
+```tsx title="app/editor/editor.tsx"
+'use client';
+
+import { PostCanvas } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export function Editor({ save }: { save: (json: unknown) => Promise<void> }) {
+  return <PostCanvas preset="article" onChange={({ json }) => void save(json)} />;
+}
+```
+
+## Pages without React
+
+If the page that shows a post has no React, render the HTML on the server and add `activateEmbeds()` in the browser. Facades are links to the provider until something turns a click into a player, and `activateEmbeds(root)` does that.
+
+```html title="post.html"
+<link rel="stylesheet" href="https://unpkg.com/post-canvas/dist/cdn/post-canvas.css" />
+<div id="post"><!-- HTML from renderToHTML() --></div>
+<script src="https://unpkg.com/post-canvas/dist/cdn/post-canvas.iife.js"></script>
+<script>
+  PostCanvas.activateEmbeds(document.getElementById('post'));
+</script>
+```
+
+The CDN URLs above have no version in them. In production, put the version you tested in the URL (`post-canvas@x.y.z`), so a new release cannot change your page unannounced.
+
+Details of `activateEmbeds(root)`:
+
+- It listens for clicks under `root` and replaces the facade with the player, rebuilt from the provider and the id.
+- Facades added under `root` later also work. A click with Ctrl, Cmd or Shift, or with a non-primary button, keeps its normal link behaviour.
+- It returns a function that stops listening.
+- Custom embed providers must be registered on the page with `registerEmbedProvider()`.
+- It is exported from `post-canvas/render`, `post-canvas/vanilla` and the CDN global.
+
+## Hydration
+
+- **`PostCanvasView` in a Server Component** has nothing to hydrate except the facade and carousel client parts, so there is no mismatch to chase.
+- **`renderToHTML()` output inside React** needs `dangerouslySetInnerHTML`. Render the same JSON with the same options on both sides, and call `activateEmbeds()` after mount:
+
+```tsx title="components/post-html.tsx"
+'use client';
+
+import { useEffect, useRef } from 'react';
+import { activateEmbeds } from 'post-canvas/render';
+
+export function PostHtml({ html }: { html: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => (ref.current ? activateEmbeds(ref.current) : undefined), [html]);
+  return <div ref={ref} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+```
+
+- **`theme="auto"`** is handled in CSS with `prefers-color-scheme`, so it does not depend on JavaScript and does not cause a mismatch.
+
+## Cache the rendered HTML
+
+Rendering is a pure function of the JSON, the features, the options and the package version. You can render once when a post is saved and serve the stored string:
+
+```ts title="server/save-post.ts"
+import { renderToHTML, sanitizeDocument } from 'post-canvas/server';
+import type { JSONContent } from 'post-canvas';
+
+export async function savePost(id: string, input: JSONContent) {
+  const { doc, removed } = sanitizeDocument(input);
+  if (removed.length > 0) console.warn(`post ${id}: removed ${removed.length} items`);
+  // `doc` is already sanitized, so rendering does not need to repeat it.
+  const html = renderToHTML(doc, { sanitize: false });
+  await db.post.update({ where: { id }, data: { json: doc, html } });
+}
+```
+
+Keep the JSON as the source of truth. The markup of a later Post Canvas release can differ from the one you stored, so keep a way to re-render every post after an upgrade, or after you change `features`, `locale` or `embeds`.
+
+## Parse HTML on a server
+
+`fromHTML(html, options)` turns HTML into a sanitized document. In a browser it uses the global `DOMParser`. A server has none, so pass `{ window }` from a DOM library. Anything with a `DOMParser` constructor works. Our own tests run on happy-dom.
+
+<Tabs items={['happy-dom', 'linkedom']}>
+  <Tab value="happy-dom">
+
+```ts title="server/import-html.ts"
+import { fromHTML } from 'post-canvas/server';
+import { Window } from 'happy-dom';
+
+const window = new Window();
+
+export function importHtml(html: string) {
+  return fromHTML(html, { window });
+}
+```
+
+  </Tab>
+  <Tab value="linkedom">
+
+```ts title="server/import-html.ts"
+import { fromHTML } from 'post-canvas/server';
+import { DOMParser } from 'linkedom';
+
+export function importHtml(html: string) {
+  return fromHTML(html, { window: { DOMParser } });
+}
+```
+
+  </Tab>
+</Tabs>
+
+Create the window once and reuse it. Without `window` on a server, `fromHTML()` throws an error that says so. Scripts in the HTML never run: it is parsed into an inert document. For moving content from another editor, see [Migrating from TinyMCE or Froala](/docs/guides/migrating-from-tinymce-froala).

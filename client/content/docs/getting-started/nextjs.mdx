@@ -1,0 +1,182 @@
+---
+title: 'Use with Next.js'
+description: 'Use Post Canvas with the Next.js App Router: the editor in a client component, a route handler that sanitizes on save, and server-side rendering of posts.'
+---
+
+In the App Router, the editor lives in a Client Component, and saved posts render in a Server Component. That split keeps Tiptap and ProseMirror out of the reader's page: the browser gets only the small client parts, which are the click-to-load player and the carousel. This guide shows the editor, a route handler that checks what it receives, and the read-only page.
+
+The editor itself renders on the client only: it creates its Tiptap instance after the page loads in the browser, and `usePostCanvasEditor` returns `editor: null` until then. Server rendering the page that contains it is fine.
+
+## Install
+
+```bash
+npm install post-canvas
+```
+
+Import the stylesheet once in the root layout. It styles both the editor and the read-only view.
+
+```tsx title="app/layout.tsx"
+import 'post-canvas/styles.css';
+import type { ReactNode } from 'react';
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+## The editor in a client component
+
+Anything that passes functions to `PostCanvas` (`onChange`, adapters) must be a Client Component, so wrap it in a file that starts with `'use client'`.
+
+```tsx title="app/write/post-editor.tsx"
+'use client';
+
+import { useRef, useState } from 'react';
+import { PostCanvas, hasPendingUploads, type JSONContent, type PostFields } from 'post-canvas';
+import { adapters } from './adapters';
+
+export function PostEditor() {
+  const latest = useRef<JSONContent | null>(null);
+  const [fields, setFields] = useState<PostFields>({});
+  const [status, setStatus] = useState('');
+
+  async function save() {
+    if (!latest.current || hasPendingUploads(latest.current)) {
+      setStatus('Wait for the uploads to finish.');
+      return;
+    }
+    const response = await fetch('/api/posts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: fields.title ?? '', content: latest.current }),
+    });
+    setStatus(response.ok ? 'Saved.' : 'Could not save.');
+  }
+
+  return (
+    <>
+      <PostCanvas
+        preset="article"
+        adapters={adapters}
+        onChange={({ json }) => {
+          latest.current = json;
+        }}
+        onFieldsChange={setFields}
+      />
+      <button type="button" onClick={save}>
+        Save
+      </button>
+      <p role="status">{status}</p>
+    </>
+  );
+}
+```
+
+```tsx title="app/write/page.tsx"
+import { PostEditor } from './post-editor';
+
+export default function WritePage() {
+  return <PostEditor />;
+}
+```
+
+The `adapters` module is the same upload adapter as in the [React and Vite guide](/docs/getting-started/react-vite). Keep it in its own file (or at module level) so its identity stays the same between renders.
+
+## A route handler that sanitizes on save
+
+Do not store the JSON as it arrives. Anyone can call your API with any body: your editor is not the only client. `sanitizeDocument` rebuilds the document so it fits the schema, drops unknown nodes, unsafe URLs and editor-only state, and cuts it at size limits. It returns the clean document and a list of what it removed.
+
+```ts title="app/api/posts/route.ts"
+import { sanitizeDocument } from 'post-canvas/server';
+import { savePost } from '@/lib/posts'; // your own storage
+
+export async function POST(request: Request) {
+  const body = (await request.json()) as { title?: unknown; content?: unknown };
+  const { doc, removed } = sanitizeDocument(body.content);
+  const title = typeof body.title === 'string' ? body.title.slice(0, 200) : '';
+  const post = await savePost({ title, content: doc });
+  return Response.json({ id: post.id, removed });
+}
+```
+
+If you would rather reject a bad document than clean it, use `validateDocument(body.content)`. It returns `{ ok, errors }`, and `ok` is `true` only when sanitizing would change nothing. See [security](/docs/concepts/security) for the difference, and for what is not covered: the title and the cover are not part of the document, so check them yourself.
+
+Also limit the size of the request body in your own code or at your host. The sanitizer caps nodes, depth and text, but it runs after the body has been parsed.
+
+## Show a saved post in a Server Component
+
+`PostCanvasView` renders a document read-only and sanitizes it first. In a Server Component the schema, the sanitizer and Tiptap stay on the server.
+
+```tsx title="app/posts/[id]/page.tsx"
+import { PostCanvasView } from 'post-canvas/render';
+import { getPost } from '@/lib/posts'; // your own storage
+
+export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const post = await getPost(id);
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      <PostCanvasView content={post.content} />
+    </article>
+  );
+}
+```
+
+Videos and embeds show as facades (a thumbnail and a play button) and load the player when clicked. Pass `embeds="iframe"` to load players straight away, or `embeds="link"` for plain links.
+
+If you prefer an HTML string, `renderToHTML(post.content)` also runs on the server. Insert it with `dangerouslySetInnerHTML`, and add a small Client Component that calls `activateEmbeds` so the facades work (see [rendering](/docs/concepts/rendering)). `PostCanvasView` does not need that step.
+
+## Link previews and embed titles
+
+The editor can show a title and thumbnail when a writer pastes a video link, and a card when they paste a page link. Both lookups must run on your server, because the browser cannot fetch other sites freely. `post-canvas/server` has two resolvers for this. Put them behind one route handler:
+
+```ts title="app/api/previews/route.ts"
+import { createEmbedResolver, createLinkPreviewResolver } from 'post-canvas/server';
+
+const embeds = createEmbedResolver();
+const links = createLinkPreviewResolver();
+
+export async function POST(request: Request) {
+  const { url, kind } = (await request.json()) as { url: string; kind: 'embed' | 'link' };
+  try {
+    const resolve = kind === 'embed' ? embeds : links;
+    return Response.json(await resolve(url, { signal: request.signal }));
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? String(error.code) : 'unavailable';
+    return Response.json({ code }, { status: 422 });
+  }
+}
+```
+
+Then pass two functions as adapters in the client file:
+
+```ts title="app/write/adapters.ts"
+import type { Adapters } from 'post-canvas';
+
+const post =
+  (kind: 'embed' | 'link') =>
+  async (url: string, { signal }: { signal: AbortSignal }) => {
+    const response = await fetch('/api/previews', { method: 'POST', body: JSON.stringify({ url, kind }), signal });
+    if (!response.ok) throw new Error(((await response.json()) as { code: string }).code);
+    return response.json();
+  };
+
+export const adapters: Adapters = {
+  // upload: { ... } from the React and Vite guide
+  embeds: post('embed'),
+  links: post('link'),
+};
+```
+
+The resolvers block private network addresses. They need Node, so keep that route on the Node runtime, not the edge runtime. See [embeds and link previews](/docs/guides/embeds-and-link-previews) and the SSRF note in [security](/docs/concepts/security).
+
+## Next steps
+
+- [Saving and loading](/docs/guides/saving-and-loading): load a post back into the editor.
+- [Server-side rendering](/docs/guides/ssr-rendering): caching and the HTML options.
+- [Presets and features](/docs/concepts/presets-and-features): sanitize with the same feature set as your editor.

@@ -1,8 +1,68 @@
 ---
-title: Post Canvas
-description: A rich-text editor for posts and articles, with a media canvas.
+title: 'Introduction to Post Canvas'
+description: 'Post Canvas is a React editor for posts and articles, with rich text, photo galleries, embeds and a safe way to show what people write.'
 ---
 
-Draft.
+Post Canvas is a React editor for posts and articles. It is built on [Tiptap](https://tiptap.dev) 3 (a toolkit on top of ProseMirror, the editing engine) and stores every document as Tiptap JSON. You get a full rich-text editor and a media canvas in one package, plus the server code to check and show what people write. It is MIT licensed.
 
-<TypeTable path="react/post-canvas.tsx" name="PostCanvasHandle" />
+## What you get
+
+- **Rich text.** Headings, lists, task lists, tables, code blocks with syntax highlighting, quotes, colours, links, mentions and hashtags, and a toolbar, a selection menu and a `/` menu.
+- **A media canvas.** Images, files, and galleries in four layouts: carousel, grid, masonry and collage. Blocks have a `+` button and a handle, and you can drag them to reorder.
+- **Embeds.** YouTube and Vimeo videos, social and map embeds, and link cards. Players load only after a click, unless you choose otherwise.
+- **Presets.** `full`, `article`, `social` and `comment` turn on the right parts for a long article, a post composer or a comment box. See [presets and features](/docs/concepts/presets-and-features).
+- **A safe output pipeline.** `post-canvas/render` and `post-canvas/server` sanitize, validate and render documents without the editor, on the server or in the browser. See [security](/docs/concepts/security).
+- **No-React builds.** `post-canvas/vanilla` and a CDN bundle mount the editor on any page. See [CDN and plain HTML](/docs/getting-started/cdn).
+- **Languages.** English, German, Spanish, French, Italian and Portuguese.
+
+Try it in the [live playground](/playground).
+
+## Install
+
+```bash
+npm install post-canvas
+```
+
+The package is ESM only. React and React DOM 18.2 or newer (including 19) are peer dependencies. [Installation](/docs/getting-started) lists every entry point and the browser support.
+
+## A first editor
+
+```tsx title="src/App.tsx"
+import { PostCanvas } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export default function App() {
+  return <PostCanvas preset="article" onChange={({ json }) => console.log(json)} />;
+}
+```
+
+`onChange` receives the document as JSON. Save that JSON, and show it later with `renderToHTML` or `PostCanvasView`. Content is uncontrolled: you pass `defaultContent` once and read changes through `onChange`.
+
+## How it fits together
+
+1. The editor (`PostCanvas`) produces a [document as JSON](/docs/concepts/document-json).
+2. Your [adapters](/docs/concepts/adapters) connect the editor to your app: file uploads, mentions, link previews and draft storage. Post Canvas has no backend of its own.
+3. Your server runs `sanitizeDocument` on the JSON it receives, then stores it.
+4. Readers see the saved document through [rendering](/docs/concepts/rendering): an HTML string or a React component, with no editor code.
+
+## What it does not do
+
+Be aware of these before you pick it:
+
+- No real-time collaboration, comments, AI features, emoji shortcodes or right-to-left text yet.
+- No Vue or Angular wrappers. The vanilla build and the CDN bundle work in any page, but the editor itself is React.
+- No upload storage. Without an upload adapter the image, gallery and file features are off.
+- No HEIC converter. You pass one in; see the [uploads guide](/docs/guides/uploads).
+- On a trackpad, pinch (ctrl and wheel) in the collage editor zooms the page instead of the collage. Touch pinch and Safari gesture events work. This is a known gap.
+- The `+` button is made for mouse and touch. Keyboard users insert blocks through `/` and the toolbar's Insert button, and move blocks with Alt-Shift-Up and Alt-Shift-Down. See [keyboard and accessibility](/docs/guides/keyboard-and-accessibility).
+
+## Where to go next
+
+| You want to                   | Read                                                                                                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install and set up            | [Installation](/docs/getting-started), then [React and Vite](/docs/getting-started/react-vite), [Next.js](/docs/getting-started/nextjs) or [CDN](/docs/getting-started/cdn) |
+| Understand the data           | [Document JSON](/docs/concepts/document-json)                                                                                                                               |
+| Choose what the editor offers | [Presets and features](/docs/concepts/presets-and-features)                                                                                                                 |
+| Connect uploads and previews  | [Adapters](/docs/concepts/adapters)                                                                                                                                         |
+| Show saved posts              | [Rendering](/docs/concepts/rendering)                                                                                                                                       |
+| Accept documents safely       | [Security](/docs/concepts/security)                                                                                                                                         |

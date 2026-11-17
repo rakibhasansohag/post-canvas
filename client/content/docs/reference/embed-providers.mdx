@@ -1,0 +1,220 @@
+---
+title: 'Embed providers'
+description: 'The embed provider registry: built-in providers with their link forms and sizes, plus functions to parse links and add your own.'
+---
+
+An embed provider turns a pasted page link into a small `ref` of validated ids, and builds every iframe, canonical and oEmbed URL from that `ref` alone. A saved document stores the provider name and the `ref`. It never stores a player URL: the player URL is built at render time from the provider and the validated ids, and the sanitizer re-checks every `ref` against its provider. That is why a tampered document cannot smuggle in an iframe.
+
+YouTube and Vimeo belong to the `video` node and have their own functions. The nine other built-in providers belong to the `embed` node and live in a registry that you can add to.
+
+All functions on this page are exported from `post-canvas`. `registerEmbedProvider` and `defineEmbedProvider` are also exported from `post-canvas/server` and `post-canvas/extensions`.
+
+## Built-in providers
+
+`builtInProviders` lists all eleven: YouTube and Vimeo (for the `video` node), then the nine `embed` providers. `builtInEmbedProviderNames` lists the nine `embed` names, which is the default of the `embed` feature's `providers`:
+
+```ts
+const builtInEmbedProviderNames: readonly string[];
+// 'spotify', 'soundcloud', 'x', 'instagram', 'tiktok', 'codepen', 'loom', 'figma', 'google-maps'
+```
+
+Every link must pass `parseEmbedUrl`: http or https only, no user name or password, no port, no whitespace, at most 2048 characters. Each provider then checks the host against an exact list and every id against a strict pattern.
+
+| Provider                          | Links it accepts                                                                                                                                                                                                                                                                                               | Player and size                                                                                   |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| YouTube (`youtube`, `video` node) | `youtube.com`, `www.`, `m.` and `music.youtube.com`, and `youtube-nocookie.com`: `/watch?v=<id>`, `/shorts/<id>`, `/embed/<id>`, `/live/<id>`, `/v/<id>`. Also `youtu.be/<id>`. The id has 11 characters. A start time comes from `t` or `start` in the query: `90`, `90s`, `1m30s`, `1h2m3s`, up to 12 hours. | The `youtube-nocookie.com` player. 16:9, or 9:16 for a Short. Thumbnails come from `i.ytimg.com`. |
+| Vimeo (`vimeo`, `video` node)     | `vimeo.com/<id>`, `vimeo.com/<id>/<hash>` or `?h=<hash>` for an unlisted video, videos in `/channels/`, `/groups/` and `/showcase/`, and `player.vimeo.com/video/<id>`. A start time comes from `#t=`.                                                                                                         | `player.vimeo.com` with `dnt=1`. 16:9.                                                            |
+| Spotify (`spotify`)               | `open.spotify.com/<type>/<id>` for `track`, `album`, `playlist`, `episode`, `show` and `artist`. An `intl-xx` prefix and `/embed` are accepted. The id has 22 characters.                                                                                                                                      | Fixed height: 152 px for a track or episode, 352 px for the others.                               |
+| SoundCloud (`soundcloud`)         | `soundcloud.com`, `www.` and `m.soundcloud.com`: `/<user>/<track>` and `/<user>/sets/<set>`.                                                                                                                                                                                                                   | Fixed height: 166 px for a track, 450 px for a set.                                               |
+| X (`x`)                           | `x.com`, `twitter.com` and their `www.` and `mobile.` forms: `/<user>/status/<id>`, also with `/photo/<n>` or `/video/<n>` after the id.                                                                                                                                                                       | Fixed height: 560 px.                                                                             |
+| Instagram (`instagram`)           | `instagram.com/p/<code>`, `/reel/<code>` and `/tv/<code>`, also as `/<user>/p/<code>` and with `/embed`.                                                                                                                                                                                                       | Fixed height: 640 px.                                                                             |
+| TikTok (`tiktok`)                 | `tiktok.com/@<user>/video/<id>`, `/embed/v2/<id>` and `/player/v1/<id>`.                                                                                                                                                                                                                                       | 9:16.                                                                                             |
+| CodePen (`codepen`)               | `codepen.io/<user>/pen/<slug>`, also `embed`, `full` and `details` instead of `pen`, and the `/team/<team>/pen/<slug>` form.                                                                                                                                                                                   | Fixed height: 420 px.                                                                             |
+| Loom (`loom`)                     | `loom.com/share/<id>` and `loom.com/embed/<id>`. The id is 32 hex characters.                                                                                                                                                                                                                                  | 16:9.                                                                                             |
+| Figma (`figma`)                   | `figma.com/<kind>/<key>`, where `<kind>` is `file`, `design`, `proto`, `board` or `slides`, with an optional file name after the key and `?node-id=`.                                                                                                                                                          | 16:10.                                                                                            |
+| Google Maps (`google-maps`)       | `google.com/maps?q=<place>`, `/maps/place/<name>`, `/maps/search/<query>`, `/maps/@<lat>,<lng>,<zoom>z`, and `maps.google.com/?q=<place>`.                                                                                                                                                                     | 4:3.                                                                                              |
+
+Players with a fixed height (Spotify, SoundCloud, X, Instagram and CodePen) cannot size themselves, because a cross-origin player cannot report its height. The others scale from an aspect ratio.
+
+Google Maps short links (`maps.app.goo.gl`) need a server lookup to find the place, so the `google-maps` provider does not match them. A pasted short link becomes a link card when `adapters.links` is set, and a plain link otherwise.
+
+Instagram, Figma and Google Maps have no oEmbed endpoint in Post Canvas, so [`createEmbedResolver`](/docs/reference/server#createembedresolver) returns no title for them.
+
+## Types
+
+`EmbedProvider` is the contract of a provider. Create one with `defineEmbedProvider`.
+
+<TypeTable path="embeds/providers/types.ts" name="EmbedProvider" />
+
+`EmbedFrame` says how to load the player. Every field is built from the `ref`, never from stored HTML or a stored URL.
+
+<TypeTable path="embeds/providers/types.ts" name="EmbedFrame" />
+
+`EmbedMatch` is a pasted URL that a provider recognised.
+
+<TypeTable path="embeds/providers/types.ts" name="EmbedMatch" />
+
+`EmbedRef` is the validated ids that identify one embed, such as `{ type: "track", id: "4uLU6hMCjMI75M1A2tKUQC" }`. It is a flat record of at most 8 short strings. Keys start with a lower-case letter and use letters and digits, up to 20 characters. Values are 1 to 200 characters.
+
+```ts
+type EmbedRef = Record<string, string>;
+```
+
+`VideoProvider` names the two video providers, and `VideoRef` is a parsed video link: everything the `video` node stores about where the video lives.
+
+```ts
+type VideoProvider = 'youtube' | 'vimeo';
+```
+
+<TypeTable path="embeds/providers/video.ts" name="VideoRef" />
+
+`EmbedInputKind` is what a paste-a-link field asks for. `any` tries video, then embed, then link card.
+
+```ts
+type EmbedInputKind = 'any' | 'video' | 'embed' | 'link';
+```
+
+## Registry functions
+
+### defineEmbedProvider
+
+```ts
+function defineEmbedProvider(provider: EmbedProvider): EmbedProvider;
+```
+
+`defineEmbedProvider` checks a provider and returns a frozen copy. It throws when `name` is not lower-case letters, digits and dashes (it must start with a letter, at most 40 characters), or when `match()`, `frame()` or `canonicalUrl()` is missing. See [Add a provider](#add-a-provider) below.
+
+### registerEmbedProvider
+
+```ts
+function registerEmbedProvider(provider: EmbedProvider): void;
+```
+
+`registerEmbedProvider` adds a provider to the `embed` node's registry, so the editor, the sanitizer and the renderers know it. It runs `defineEmbedProvider` on it first. Register it everywhere that renders or sanitizes documents, including your server. A built-in name, and the names `youtube` and `vimeo`, cannot be replaced: it throws.
+
+### getEmbedProvider
+
+```ts
+function getEmbedProvider(name: unknown): EmbedProvider | undefined;
+```
+
+`getEmbedProvider` returns the `embed` provider registered under `name`, or `undefined`. YouTube and Vimeo belong to the `video` node, so they are not found here.
+
+### listEmbedProviders
+
+```ts
+function listEmbedProviders(): EmbedProvider[];
+```
+
+`listEmbedProviders` returns every registered `embed` provider, built-in ones first.
+
+### parseEmbedUrl
+
+```ts
+function parseEmbedUrl(input: unknown): URL | null;
+```
+
+`parseEmbedUrl` parses a pasted link for embedding, or returns `null`. A bare `example.com/path` is read as https. It refuses anything that is not http or https, carries a user name or password (`https://youtube.com@evil.com`), names a port, holds whitespace or control characters, or is longer than 2048 characters. The returned URL's host is lower-case and has no trailing dot. Every provider's `match()` gets a URL that already passed it.
+
+### matchEmbedUrl
+
+```ts
+function matchEmbedUrl(input: string, names?: readonly string[]): EmbedMatch | null;
+```
+
+`matchEmbedUrl` finds the provider for a pasted link among `names` (default: every registered `embed` provider), or returns `null`. The link must pass `parseEmbedUrl()`, and the returned `ref` must round-trip through the provider's canonical URL. It does not look at YouTube and Vimeo: use `parseVideoUrl` for those.
+
+```ts
+import { matchEmbedUrl } from 'post-canvas';
+
+const match = matchEmbedUrl('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC');
+// match.provider.name === 'spotify'
+// match.ref is { type: 'track', id: '4uLU6hMCjMI75M1A2tKUQC' }
+// match.url is the canonical page URL
+```
+
+### parseVideoUrl
+
+```ts
+function parseVideoUrl(input: string): VideoRef | null;
+```
+
+`parseVideoUrl` reads a YouTube or Vimeo link, or returns `null`. Lookalike hosts (`youtube.com.evil.com`), user-name tricks, other protocols and malformed ids are all `null`. Shorts come back vertical, and an unlisted Vimeo link keeps its hash.
+
+### canonicalVideoUrl
+
+```ts
+function canonicalVideoUrl(video: VideoRef): string;
+```
+
+`canonicalVideoUrl` returns the video's own page: what oEmbed is asked about and what "Watch on" links to.
+
+```ts
+import { canonicalVideoUrl, parseVideoUrl } from 'post-canvas';
+
+const video = parseVideoUrl('https://youtu.be/aqz-KE-bpKQ?t=1m30s');
+// { provider: 'youtube', videoId: 'aqz-KE-bpKQ', hash: null, vertical: false, start: 90 }
+if (video) console.log(canonicalVideoUrl(video)); // https://www.youtube.com/watch?v=aqz-KE-bpKQ&t=90s
+```
+
+## Add a provider
+
+A provider needs a unique `name`, a `label`, and three functions: `match()` reads a URL and returns the validated ids, `frame()` builds the player, and `canonicalUrl()` builds the provider's own page. Check the host against an exact list and every id against a strict pattern. Return `null` from `match()` for anything you do not recognise.
+
+```ts title="lib/peertube.ts"
+import type { EmbedProvider } from 'post-canvas';
+
+export const peertube: EmbedProvider = {
+  name: 'peertube',
+  label: 'PeerTube',
+  aspectRatio: 16 / 9,
+  match: (url) =>
+    url.hostname === 'video.example.org' && /^\/w\/[A-Za-z0-9]{22}$/.test(url.pathname)
+      ? { id: url.pathname.slice(3) }
+      : null,
+  frame: (ref) => ({
+    src: `https://video.example.org/videos/embed/${ref.id}`,
+    title: 'PeerTube video',
+    allow: 'fullscreen',
+    sandbox: 'allow-scripts allow-same-origin',
+    aspectRatio: 16 / 9,
+    height: null,
+  }),
+  canonicalUrl: (ref) => `https://video.example.org/w/${ref.id}`,
+};
+```
+
+Register it on the client and on the server, and add its name to the `embed` feature's `providers`:
+
+```tsx title="components/editor.tsx"
+'use client';
+import { PostCanvas, builtInEmbedProviderNames, registerEmbedProvider } from 'post-canvas';
+import 'post-canvas/styles.css';
+import { peertube } from '../lib/peertube';
+
+registerEmbedProvider(peertube);
+
+const features = { embed: { providers: [...builtInEmbedProviderNames, 'peertube'] } };
+
+export function Editor() {
+  return <PostCanvas features={features} />;
+}
+```
+
+```ts title="app/api/posts/route.ts"
+import { registerEmbedProvider, sanitizeDocument } from 'post-canvas/server';
+import { builtInEmbedProviderNames, resolveFeatures } from 'post-canvas';
+import { peertube } from '../../../lib/peertube';
+
+registerEmbedProvider(peertube);
+
+const features = resolveFeatures('full', { embed: { providers: [...builtInEmbedProviderNames, 'peertube'] } });
+
+export async function POST(request: Request) {
+  const { content } = (await request.json()) as { content: unknown };
+  const { doc } = sanitizeDocument(content, { features });
+  return Response.json(doc);
+}
+```
+
+`sanitizeDocument` removes an `embed` node whose provider is not registered or not in `providers`, so the server must register the same providers and use the same features as the editor. A provider can also define `oembed(ref)` (a fixed oEmbed endpoint, used only on the server by `createEmbedResolver`) and `thumbnail(ref)` (a thumbnail URL built from the `ref`).

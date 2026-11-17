@@ -1,0 +1,38 @@
+[
+  {
+    "name": "post-canvas (editor)",
+    "path": "dist/index.js",
+    "import": "{ PostCanvas }",
+    "ignore": ["react", "react-dom", "lowlight", "highlight.js"],
+    "limit": "310 kB",
+    "gzip": true
+  },
+  {
+    "name": "post-canvas/render (renderToHTML)",
+    "path": "dist/render.js",
+    "import": "{ renderToHTML }",
+    "ignore": ["react", "react-dom", "lowlight", "highlight.js"],
+    "limit": "185 kB",
+    "gzip": true
+  },
+  {
+    "name": "post-canvas/render (PostCanvasView)",
+    "path": "dist/render.js",
+    "import": "{ PostCanvasView }",
+    "ignore": ["react", "react-dom", "lowlight", "highlight.js"],
+    "limit": "186 kB",
+    "gzip": true
+  },
+  {
+    "name": "CDN bundle (post-canvas.iife.js)",
+    "path": "dist/cdn/post-canvas.iife.js",
+    "limit": "430 kB",
+    "gzip": true
+  },
+  {
+    "name": "post-canvas.css",
+    "path": "dist/styles.css",
+    "limit": "11 kB",
+    "gzip": true
+  }
+]

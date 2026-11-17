@@ -1,0 +1,152 @@
+---
+title: 'Document JSON'
+description: 'How Post Canvas stores a post: the Tiptap JSON shape, node ids, media fields, and the editor-only state you must not save.'
+---
+
+A Post Canvas document is plain JSON in the format of Tiptap (and ProseMirror, the engine under it). The editor gives it to you in `onChange`, you store it as it is, and you pass it back to the editor, to `renderToHTML` or to `PostCanvasView` later. The document holds the body only. The title and the cover picture are separate (see [fields](/docs/concepts/fields)).
+
+## The shape
+
+Every node is an object with a `type`. Depending on the type, it also has `attrs` (settings of the node), `content` (child nodes) and, for text, `text` and `marks` (formatting such as bold or a link).
+
+- The root is `{ "type": "doc", "content": [...] }`. Its children are block nodes.
+- A **block** node is a paragraph, heading, list, table, image, gallery, video, embed and so on. Blocks stack from top to bottom.
+- An **inline** node sits inside a text block. Text itself is inline, and so are `mention` (which also stores hashtags) and `hardBreak`.
+- A **mark** is a style on a run of text: `bold`, `italic`, `underline`, `strike`, `code`, `link`, `highlight`, `textStyle` (text colour), `subscript` and `superscript`.
+
+Text nodes carry marks in a `marks` array. Colours are stored as palette names, never as hex values: `gray`, `brown`, `orange`, `yellow`, `green`, `blue`, `purple`, `pink` or `red`. That is why themes and dark mode can recolour a post, and why nothing from a colour field can reach a `style` attribute.
+
+[Nodes and marks](/docs/reference/nodes-and-marks) lists every node and mark with its attributes.
+
+## Node ids
+
+The block nodes that carry media get a unique `id` (a UUID) when they are created: `image`, `gallery`, `file`, `video`, `embed` and `linkCard`. Text blocks such as paragraphs have no id. Gallery photos have a `key` instead, which is unique within their gallery.
+
+Ids help your own code point at a block (for example, to attach a caption or a comment to it). They are not secret and not proof of anything. The sanitizer keeps an id only if it is 1 to 64 letters, digits, hyphens or underscores. Otherwise it sets it to `null`, and the editor assigns a new one when it opens the document.
+
+## An example
+
+This document has a paragraph with bold text, one image, and a grid gallery of two photos. It is in the exact form the sanitizer produces, so `validateDocument` accepts it unchanged.
+
+```json title="post.json"
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "paragraph",
+      "attrs": { "textAlign": null },
+      "content": [
+        { "type": "text", "text": "We landed on " },
+        { "type": "text", "text": "Friday", "marks": [{ "type": "bold" }] },
+        { "type": "text", "text": " and walked straight to the market." }
+      ]
+    },
+    {
+      "type": "image",
+      "attrs": {
+        "id": "6f1c2b9e-3d4a-4c1e-9a52-0b7d8e1f4a10",
+        "src": "https://cdn.example.com/lisbon/tram.jpg",
+        "width": 1600,
+        "height": 1067,
+        "alt": "A yellow tram on a hill",
+        "srcset": null,
+        "placeholder": null,
+        "uploadId": null,
+        "uploadKey": null,
+        "caption": "Tram 28",
+        "align": "center"
+      }
+    },
+    {
+      "type": "gallery",
+      "attrs": {
+        "id": "a2b9d7c4-8e10-4f6b-b3c1-5d9e7a2f6c33",
+        "layout": "grid",
+        "caption": "",
+        "photos": [
+          {
+            "key": "p0",
+            "src": "https://cdn.example.com/lisbon/a.jpg",
+            "width": 1200,
+            "height": 800,
+            "alt": "Tiled wall",
+            "srcset": null,
+            "placeholder": null,
+            "uploadId": null,
+            "uploadKey": null,
+            "place": null
+          },
+          {
+            "key": "p1",
+            "src": "https://cdn.example.com/lisbon/b.jpg",
+            "width": 0,
+            "height": 0,
+            "alt": "River at dusk",
+            "srcset": null,
+            "placeholder": null,
+            "uploadId": null,
+            "uploadKey": null,
+            "place": null
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+You do not write documents by hand. When you load one from another source, run it through `sanitizeDocument` (see [security](/docs/concepts/security)), which fills in missing attributes with their defaults.
+
+## Media source fields
+
+An `image` node and every gallery photo share the same picture fields:
+
+| Field             | Meaning                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `src`             | An absolute `https` URL from your upload adapter. Only `http` and `https` survive the sanitizer.                          |
+| `width`, `height` | The picture's size in pixels. `0` means unknown.                                                                          |
+| `alt`             | Alternative text for screen readers. An empty string marks a decorative picture.                                          |
+| `srcset`          | A `srcset` string such as `"url 640w, url 1280w"`, or `null`. Each entry is checked as an absolute `http` or `https` URL. |
+| `placeholder`     | A tiny `data:image` preview (JPEG, PNG or WebP, up to about 2 KB), or `null`.                                             |
+| `uploadId`        | The id your upload adapter returned, for your own bookkeeping, or `null`.                                                 |
+| `uploadKey`       | Editor-only. Set while an upload runs or after it failed, `null` otherwise. Not saved.                                    |
+
+A `width` or `height` of `0` is valid. `renderHTML` leaves the two attributes out of the `img` tag when they are `0`, and the editor measures the picture when it loads, outside the undo history, so the saved size gets filled in. Other code, such as `getCover`, treats a picture with an unknown size as unusable, so supply the size from your adapter when you can.
+
+A gallery photo adds `key` and `place`. `place` positions a photo on the base photo in the `collage` layout (`x`, `y`, `w`, `r`), and is `null` for the base photo and in every other layout. `layout` is `carousel`, `grid`, `masonry` or `collage`. A gallery holds at least one photo and at most the feature's `maxPhotos` (10 by default).
+
+## Embeds store ids, not URLs
+
+A `video` or `embed` node stores a provider name and validated ids, such as a YouTube video id. It does not store a player URL. Post Canvas builds the iframe address at render time, and a tampered document cannot swap in another address. See [security](/docs/concepts/security).
+
+## Editor-only state
+
+Some state exists only while someone edits. It does not belong in a saved document:
+
+- An **open link field**: the `embedInput` node, which is the "paste a link" box.
+- A **running or failed upload**: a media node with an `uploadKey`.
+- A **local file preview**: a `src` that starts with `blob:`. It only works in that one browser.
+- A **staged upload**: a picture whose `src` is `https://staged.post-canvas.invalid/<key>`. The editor uses this reserved address (it can never load anything) for a picture on its way in, for example from a paste.
+
+Two functions tell you about it:
+
+```ts
+import { hasPendingUploads, hasTransientContent } from 'post-canvas';
+
+if (hasPendingUploads(json) || hasTransientContent(json)) {
+  // Do not save yet.
+}
+```
+
+- `hasPendingUploads(json)` is `true` when an upload is running, failed or staged. It covers images, gallery photos and files, and counts `uploadKey` values, `blob:` sources and the staged marker. Do not save a document while it is `true`.
+- `hasTransientContent(json)` covers editor-only state: an open link field, a `blob:` source or an `uploadKey`. It does not report the staged marker.
+
+`hasTransientContent` is also exported from `post-canvas/render` and `post-canvas/server`. `hasPendingUploads` is only in `post-canvas`, because it is for the editor side: call it before you send the document.
+
+On the server, `sanitizeDocument` removes the upload keys, the link field and `blob:` pictures. It does not remove the staged marker, and neither does `validateDocument`: a picture with that address is a valid, harmless-looking image that never loads. The client check is what keeps it out of storage. If you want a server check as well, reject any `src` that starts with `https://staged.post-canvas.invalid/`.
+
+## Where next
+
+- [Nodes and marks](/docs/reference/nodes-and-marks): every node and mark and its attributes.
+- [Security](/docs/concepts/security): what the sanitizer removes.
+- [Saving and loading](/docs/guides/saving-and-loading): the round trip between editor, server and reader.

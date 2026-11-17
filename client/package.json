@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --port 3100",
     "build": "next build",
-    "start": "next start --port 3100",
+    "start": "serve out -l 3100",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
@@ -34,6 +34,7 @@
     "postcss": "^8.5.32",
     "prettier": "^3.10.1",
     "prettier-plugin-tailwindcss": "^0.8.1",
+    "serve": "^14.2.8",
     "tailwindcss": "^4.3.5",
     "typescript": "~6.0.3"
   }

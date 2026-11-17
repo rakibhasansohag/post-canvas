@@ -1,0 +1,72 @@
+---
+title: 'Install Post Canvas'
+description: 'Install Post Canvas, import its stylesheet, and learn which entry point to use for the editor, the server and plain HTML pages.'
+---
+
+This page covers the package, its peer dependencies, the stylesheet and the entry points. For a full walkthrough, pick your setup: [React and Vite](/docs/getting-started/react-vite), [Next.js](/docs/getting-started/nextjs) or [plain HTML from a CDN](/docs/getting-started/cdn).
+
+## Install the package
+
+```bash
+npm install post-canvas
+```
+
+Post Canvas lists `react` and `react-dom` as peer dependencies, version 18.2 or newer (19 works too). Your app provides them. Tiptap, ProseMirror and the other libraries the editor needs come with the package, so you do not install them yourself.
+
+The package is ESM only and ships TypeScript types. The server entries need Node 20.19 or newer.
+
+## Import the stylesheet
+
+The editor and the read-only view share one stylesheet. Import it once, near the root of your app:
+
+```tsx title="src/main.tsx"
+import 'post-canvas/styles.css';
+```
+
+The editor and `PostCanvasView` are themed with CSS custom properties, and the `theme` prop picks `light`, `dark` or `auto` (follow the reader's system setting). If you show saved HTML from `renderToHTML`, load the same stylesheet on that page: the output is wrapped in `.pc-view` and `.pc-content`, and those classes carry the styling. See [rendering](/docs/concepts/rendering).
+
+## Entry points
+
+Each entry has one job. Import only from these paths.
+
+| Entry                        | Use it for                                                                                                                                                    | Needs React               | Needs a DOM                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------ |
+| `post-canvas`                | The `PostCanvas` editor, `usePostCanvasEditor`, presets, `resolveFeatures`, `hasPendingUploads`, `CoverField`, embed provider helpers and all shared types    | Yes                       | Yes, to run the editor                     |
+| `post-canvas/extensions`     | The Tiptap extensions and schema pieces, for a custom editor setup or a custom node                                                                           | No                        | No for the schema, yes for node views      |
+| `post-canvas/render`         | Showing documents: `renderToHTML`, `PostCanvasView`, `toMarkdown`, `fromMarkdown`, `fromHTML`, `toPlainText`, `excerpt`, `sanitizeDocument`, `activateEmbeds` | Only for `PostCanvasView` | No, except `fromHTML` and `activateEmbeds` |
+| `post-canvas/server`         | What a backend needs: `validateDocument`, `sanitizeDocument`, `renderToHTML`, `fromHTML`, and the embed and link preview resolvers                            | No                        | No                                         |
+| `post-canvas/vanilla`        | The editor without writing React: `createPostCanvas`, plus `renderToHTML`, `activateEmbeds` and `sanitizeDocument`                                            | Bundled inside            | Yes                                        |
+| `post-canvas/locales/<code>` | A language other than English: `de`, `es`, `fr`, `it`, `pt` (and `en`)                                                                                        | No                        | No                                         |
+| `post-canvas/styles.css`     | The stylesheet                                                                                                                                                | No                        | No                                         |
+
+A few details that save time:
+
+- `validateDocument`, `sanitizeDocument` and `renderToHTML` run on a server, in a Server Component and in edge runtimes. The two resolvers (`createEmbedResolver` and `createLinkPreviewResolver`) load `undici` and `node:dns` when they first run, so they need Node.
+- `fromHTML` parses HTML. In a browser it uses `DOMParser`. On a server you pass a window from a DOM library such as happy-dom (see [security](/docs/concepts/security) and the [server reference](/docs/reference/server)).
+- `hasPendingUploads` lives in `post-canvas`, not in `post-canvas/server`, because it checks editor state before you save. `hasTransientContent` is in `post-canvas`, `post-canvas/render` and `post-canvas/server`.
+- The editor renders on the client only. Server-rendering your page is fine, but the editor itself mounts in the browser. The [Next.js guide](/docs/getting-started/nextjs) shows the setup.
+
+## A second language
+
+English is the default. To use another language, import its locale and pass it as `locale`:
+
+```tsx title="src/App.tsx"
+import { PostCanvas } from 'post-canvas';
+import de from 'post-canvas/locales/de';
+
+export default function App() {
+  return <PostCanvas locale={de} />;
+}
+```
+
+See the [i18n guide](/docs/guides/i18n) for writing your own locale.
+
+## Browser support
+
+Post Canvas targets current evergreen browsers: recent versions of Chrome, Edge, Firefox and Safari, on desktop and on phones. We do not publish a list of exact versions, and we do not target Internet Explorer or other old browsers. If you need a specific older version, test the [playground](/playground) on it first.
+
+## Next steps
+
+1. Follow a setup guide: [React and Vite](/docs/getting-started/react-vite), [Next.js](/docs/getting-started/nextjs) or [CDN](/docs/getting-started/cdn).
+2. Read how a document is stored in [document JSON](/docs/concepts/document-json).
+3. Choose a [preset](/docs/concepts/presets-and-features) and connect [adapters](/docs/concepts/adapters).

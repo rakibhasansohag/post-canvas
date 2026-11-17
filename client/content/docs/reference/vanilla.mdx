@@ -1,0 +1,125 @@
+---
+title: 'Vanilla and CDN entry'
+description: 'The post-canvas/vanilla entry and the CDN bundle: mount the editor on any page without writing React, with the PostCanvas global.'
+---
+
+`post-canvas/vanilla` mounts the editor into an element with its own React root, so you can use it on any page without writing React. The same functions are on the global `PostCanvas` when you load the CDN bundle. The bundle includes React, so you do not install it.
+
+## Load it
+
+From npm, in a bundler project:
+
+```ts
+import { create } from 'post-canvas/vanilla';
+import 'post-canvas/styles.css';
+```
+
+From a CDN, with one stylesheet and one script:
+
+```html title="index.html"
+<link rel="stylesheet" href="https://unpkg.com/post-canvas/dist/cdn/post-canvas.css" />
+<div id="editor"></div>
+<script src="https://unpkg.com/post-canvas/dist/cdn/post-canvas.iife.js"></script>
+<script>
+  const canvas = PostCanvas.create(document.getElementById('editor'), { preset: 'article' });
+  canvas.on('change', (json) => console.log(json));
+</script>
+```
+
+The two files are `dist/cdn/post-canvas.css` and `dist/cdn/post-canvas.iife.js`. The script is an IIFE that sets the global `PostCanvas`. In production, pin a version in the URL (for example `https://unpkg.com/post-canvas@0.1.0/dist/cdn/post-canvas.iife.js`), so a new release does not change your page.
+
+The CDN build is a single file, so it carries a smaller set of code block languages than the npm package: Bash, CSS, HTML, JavaScript, JSON, Python, SQL and TypeScript. The npm package offers 20 and loads them on first use.
+
+## createPostCanvas
+
+```ts
+function createPostCanvas(element: HTMLElement, options?: CreatePostCanvasOptions): PostCanvasInstance;
+```
+
+`createPostCanvas` mounts the editor into `element` and returns a `PostCanvasInstance`. Content is uncontrolled: pass `defaultContent`, listen to `change`, and call `getJSON()` when saving.
+
+**Parameters.** `element` is the container. `options` is a `CreatePostCanvasOptions` object.
+
+<TypeTable path="vanilla.ts" name="CreatePostCanvasOptions" />
+
+The options are the props of the [`PostCanvas`](/docs/reference/post-canvas) component, minus the callbacks (`onChange`, `onReady`, `onFieldsChange`) and `slots`. Use `on()` for the callbacks. The other callbacks, such as `onSubmit`, still work as options. `embedConsent` is `click` by default, so players show a facade until clicked. See [PostCanvas](/docs/reference/post-canvas#embedconsent).
+
+**Returns.** A `PostCanvasInstance`.
+
+## create
+
+```ts
+const create: typeof createPostCanvas;
+```
+
+`create` is `createPostCanvas` under the short name the CDN global uses: `PostCanvas.create(element, options)`.
+
+## PostCanvasInstance
+
+A mounted editor.
+
+<TypeTable path="vanilla.ts" name="PostCanvasInstance" />
+
+```js
+const canvas = PostCanvas.create(document.getElementById('editor'), {
+  preset: 'social',
+  defaultContent: '<p>Hello</p>',
+  autosave: { key: 'post:new' },
+});
+
+await canvas.ready; // the Tiptap editor
+canvas.setContent('<h1>Spring menu</h1><p>New dishes.</p>');
+canvas.update({ theme: 'dark', readOnly: true });
+const json = canvas.getJSON();
+const html = canvas.getHTML(); // sanitized HTML, without the .pc-view wrapper
+canvas.destroy();
+```
+
+`setContent(content, format)` reads a string as HTML. The `'markdown'` format works only when the editor was created with `contentFormat: 'markdown'` and a string `defaultContent`, because that is what loads Tiptap's Markdown extension. To load Markdown into any editor, convert it first with `fromMarkdown` from `post-canvas/render` and pass the JSON.
+
+`update()` merges the changes into the current options and renders again. A change to `features` or `preset` rebuilds the editor and keeps its content. `getJSON()` returns an empty document with one paragraph before the editor has mounted. `getHTML()` returns an empty string before then.
+
+## PostCanvasEvents
+
+`on(event, listener)` takes an event name from `PostCanvasEvents` and a listener that gets the value shown. It returns a function that stops listening.
+
+<TypeTable path="vanilla.ts" name="PostCanvasEvents" />
+
+```js
+const stop = canvas.on('change', (json) => saveDraft(json));
+canvas.on('fieldsChange', ({ title }) => console.log(title));
+canvas.on('ready', (editor) => editor.commands.focus('end'));
+stop();
+```
+
+`change` fires at most once per animation frame. Here `saveDraft` is your own function.
+
+## locales
+
+```ts
+const locales: Record<'en' | 'de' | 'es' | 'fr' | 'it' | 'pt', Locale>;
+```
+
+`locales` holds every built-in language by code. Pass one as the `locale` option.
+
+```js
+PostCanvas.create(document.getElementById('editor'), { locale: PostCanvas.locales.de });
+```
+
+With a bundler, import one language only (for example `post-canvas/locales/de`) to keep the others out of your build.
+
+## renderToHTML, activateEmbeds and sanitizeDocument
+
+`post-canvas/vanilla` re-exports three functions from [`post-canvas/render`](/docs/reference/render), so a page without React can show saved posts too. In the CDN build they are `PostCanvas.renderToHTML`, `PostCanvas.activateEmbeds` and `PostCanvas.sanitizeDocument`. `RenderHTMLOptions` is exported as a type.
+
+- `renderToHTML(json, options?)` renders a document to sanitized HTML. It bundles Tiptap and ProseMirror, so on a public page prefer to render on your server (or when the post is saved) and send only the HTML.
+- `activateEmbeds(root?)` makes click-to-load players work after you insert that HTML. It returns a function that stops listening.
+- `sanitizeDocument(json, options?)` cleans untrusted JSON.
+
+```js
+const html = PostCanvas.renderToHTML(post.content);
+document.getElementById('post').innerHTML = html;
+const stop = PostCanvas.activateEmbeds(document.getElementById('post'));
+```
+
+Without `activateEmbeds`, a click on a video or embed facade follows its link to the provider.

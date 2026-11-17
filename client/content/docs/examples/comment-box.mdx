@@ -1,0 +1,154 @@
+---
+title: 'Comment box'
+description: 'A compact comment box on the comment preset with Enter to send, mentions, and a server route that sanitizes every comment.'
+---
+
+This example is a comment box under an article. It uses the `comment` preset: paragraphs, bold, italic, links and mentions, with no toolbar and no menus except the small selection menu that appears when text is selected. Enter sends the comment and Shift-Enter adds a line break.
+
+It assumes a Next.js App Router project with Post Canvas installed (`npm install post-canvas`).
+
+## The comment box
+
+`submitOnEnter` makes the Enter key call `onSubmit` instead of starting a new paragraph. While an `@` mention list is open, Enter picks the highlighted person instead, so choosing a name does not send the comment by accident.
+
+```tsx title="components/comment-box.tsx"
+'use client';
+
+import { useRef, useState } from 'react';
+import {
+  PostCanvas,
+  getDocStats,
+  getProblems,
+  type Adapters,
+  type JSONContent,
+  type PostCanvasHandle,
+  type SuggestionItem,
+} from 'post-canvas';
+import 'post-canvas/styles.css';
+
+const people: SuggestionItem[] = [
+  { id: 'maya', label: 'Maya Torres', description: 'Travel photographer' },
+  { id: 'jonas', label: 'Jonas Weber', description: 'Recipe developer' },
+  { id: 'priya', label: 'Priya Nair', description: 'Product designer' },
+];
+
+// Defined outside the component so the editor sees the same object on every render.
+const adapters: Adapters = {
+  mentions: {
+    async search(query) {
+      const q = query.trim().toLowerCase();
+      return people.filter((person) => person.label.toLowerCase().includes(q));
+    },
+  },
+};
+
+/** The ids of the people mentioned in a document, without hashtags. */
+function mentionIds(node: JSONContent): string[] {
+  const own = node.type === 'mention' && node.attrs?.mentionSuggestionChar !== '#' ? [String(node.attrs?.id)] : [];
+  return [...own, ...(node.content ?? []).flatMap(mentionIds)];
+}
+
+export function CommentBox({ articleId }: { articleId: string }) {
+  const canvas = useRef<PostCanvasHandle>(null);
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
+
+  async function send(content: JSONContent) {
+    const editor = canvas.current?.editor;
+    if (!editor || sending) return;
+
+    if (getDocStats(content).words === 0) return; // nothing to send
+    const problems = getProblems(editor).filter((problem) => problem.severity === 'error');
+    if (problems.length > 0) {
+      setError(problems.map((problem) => problem.message).join(' '));
+      return;
+    }
+
+    setSending(true);
+    setError('');
+    const response = await fetch('/api/comments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ articleId, content, mentions: mentionIds(content) }),
+    });
+    setSending(false);
+
+    if (!response.ok) {
+      setError('Could not post your comment. Try again.');
+      return;
+    }
+    canvas.current?.clear();
+  }
+
+  return (
+    <div>
+      <PostCanvas
+        ref={canvas}
+        preset="comment"
+        adapters={adapters}
+        placeholder="Write a comment. Press Enter to send."
+        submitOnEnter
+        onSubmit={({ json }) => void send(json)}
+      />
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+```
+
+What each part does:
+
+- **`onSubmit`** receives `{ json, editor }`. Here it hands the JSON to `send()`.
+- **`getDocStats(content).words`** counts the words in the document, so an empty comment is ignored. A mention counts as one word.
+- **`getProblems(editor)`** reports broken limits. The `comment` preset allows up to 2000 characters, and the status bar that normally shows the count is off in this preset, so the problem message is how the writer finds out. Pass `limits` to change the cap.
+- **`clear()`** empties the box after the comment is saved. It also forgets any autosaved draft, which does nothing here because this box does not use `autosave`.
+- **`mentionIds()`** reads the mentions out of the saved JSON. A mention node has `attrs.id` (the `id` from your adapter's `SuggestionItem`), `attrs.label` and `attrs.mentionSuggestionChar` (`@` for a person). Use the ids to notify people. Do not take names from the text.
+
+## The route
+
+Comments come from the public, so the server should not accept more than the preset allows. Resolve the same feature set the editor uses and sanitize against it. A request that includes a picture, a table or a video then loses those nodes, even if someone sends the JSON by hand.
+
+```ts title="app/api/comments/route.ts"
+import { resolveFeatures } from 'post-canvas';
+import { sanitizeDocument } from 'post-canvas/server';
+
+const features = resolveFeatures('comment');
+
+export async function POST(request: Request) {
+  const { articleId, content } = await request.json();
+  const { doc, removed } = sanitizeDocument(content, { features });
+  if (removed.length > 0) console.warn(`Comment on ${articleId}: sanitizer removed`, removed);
+
+  // Store `doc` with the article id, and notify the mentioned people, here.
+  console.log('Saving comment on', articleId, doc);
+  return Response.json({ ok: true });
+}
+```
+
+Take the mentioned ids from the sanitized `doc` on the server, not from the `mentions` array the browser sent, because that array is only as honest as the browser.
+
+## Showing comments
+
+Render each stored comment with the same features. This is a Server Component:
+
+```tsx title="components/comment-list.tsx"
+import { resolveFeatures } from 'post-canvas';
+import { PostCanvasView } from 'post-canvas/render';
+import type { JSONContent } from 'post-canvas';
+
+const features = resolveFeatures('comment');
+
+export function CommentList({ comments }: { comments: { id: string; content: JSONContent }[] }) {
+  return (
+    <ul style={{ listStyle: 'none', padding: 0 }}>
+      {comments.map((comment) => (
+        <li key={comment.id}>
+          <PostCanvasView content={comment.content} features={features} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+Passing `features` makes the view sanitize against the comment feature set, which is the same rule as the route. See the [social composer](/docs/examples/social-composer) and the [article editor](/docs/examples/article-editor) for the other presets.

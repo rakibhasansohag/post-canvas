@@ -1,0 +1,145 @@
+---
+title: 'Internationalization'
+description: 'Use the six bundled languages, write your own locale, and translate your own interface text with the same translator.'
+---
+
+Every string the editor shows (toolbar labels, menus, status bar, error messages, screen reader text) comes from a locale. Post Canvas bundles six: English (`en`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`) and Portuguese (`pt`). English is the default. Right-to-left languages are not supported yet.
+
+## Use a bundled locale
+
+Each locale is its own entry, so you load only the languages you use. Import it and pass it to the `locale` prop:
+
+```tsx title="components/editor.tsx"
+'use client';
+
+import { PostCanvas } from 'post-canvas';
+import de from 'post-canvas/locales/de';
+import 'post-canvas/styles.css';
+
+export function Editor() {
+  return <PostCanvas locale={de} />;
+}
+```
+
+The import path is `post-canvas/locales/<code>`, with `<code>` one of `en`, `de`, `es`, `fr`, `it` or `pt`. English is also exported from the main entry as `en`. With the [CDN build](/docs/getting-started/cdn), all six are on the global as `PostCanvas.locales`, for example `PostCanvas.locales.de`.
+
+The read side takes the same prop, for the few strings in the output such as "Watch on YouTube". It is an option of `renderToHTML()` and a prop of `PostCanvasView`:
+
+```ts
+import { renderToHTML } from 'post-canvas/server';
+import fr from 'post-canvas/locales/fr';
+
+const html = renderToHTML(post.json, { locale: fr });
+```
+
+```tsx
+<PostCanvasView content={post.json} locale={fr} />
+```
+
+The locale does not change the document. A post written in one language reads the same whichever interface language the editor used.
+
+## Write a custom locale
+
+A locale is an object with a language code and a flat map of messages:
+
+```ts
+interface Locale {
+  code: string; // a BCP 47 tag such as "nl" or "de-CH"
+  messages: Record<string, string>;
+}
+```
+
+The `code` also sets number formatting and plural rules, through the browser's `Intl.NumberFormat` and `Intl.PluralRules`.
+
+Keys are flat strings with dots, and the first part is the namespace:
+
+| Prefix    | What it holds                                                   |
+| --------- | --------------------------------------------------------------- |
+| `core.`   | Editor label, placeholder, media frame actions, popover         |
+| `text.`   | Insert menu, limits, post kind summaries, problems              |
+| `ui.`     | Toolbar, menus, link popover, status bar, block handle, notices |
+| `media.`  | Uploads, images, galleries, the collage editor, files, cover    |
+| `embeds.` | Videos, embeds and link cards                                   |
+
+The English files in `package/src/locales/en` are the full list of keys. You do not have to translate all of them. A key your locale leaves out falls back to English, and a key English does not have either returns the key itself. In development, each fallback logs one console warning.
+
+The quickest start is to copy a bundled locale and change what you need:
+
+```ts title="lib/locale-nl.ts"
+import type { Locale } from 'post-canvas';
+import en from 'post-canvas/locales/en';
+
+export const nl: Locale = {
+  code: 'nl',
+  messages: {
+    ...en.messages, // keeps English for anything not translated yet
+    'core.editor.placeholder': 'Schrijf iets…',
+    'ui.mark.bold': 'Vet',
+    'ui.history.undo': 'Ongedaan maken',
+    'ui.status.words': '{count, plural, one {# woord} other {# woorden}}',
+  },
+};
+```
+
+Leaving out the spread works too, and then the fallback applies. Spreading makes the English text visible in your file, which helps when you translate in several passes.
+
+### Message syntax
+
+Messages use a small subset of ICU message format, with no dependency:
+
+| Syntax                                                   | Result                                                                                                                                                                                                     |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{name}`                                                 | The value, inserted as given. A number is formatted for the locale.                                                                                                                                        |
+| `{n, number}`                                            | The number, formatted with `Intl.NumberFormat` for the locale's code.                                                                                                                                      |
+| `{n, plural, =0 {none} one {# item} other {# items}}`    | A branch chosen by the number. `=0`, `=1` and so on match an exact value. Otherwise the branch is the locale's plural category: `zero`, `one`, `two`, `few`, `many` or `other`. `#` stands for the number. |
+| `{kind, select, photo {A photo} other {Something else}}` | A branch chosen by the value as a string, with `other` as the default.                                                                                                                                     |
+
+Branches can contain more placeholders, and a plural branch can nest a `{name}` as in `one {{words} word}`. Other ICU types (dates, `selectordinal`, tags) are not supported. A message that cannot be parsed shows as written, with a console warning in development. A placeholder with no value stays as `{name}` in the output.
+
+Give every plural an `other` branch: it is what a number falls back to, and without it the output is empty. Languages with more categories, such as Polish or Arabic, can add `few` and `many`.
+
+## Translate your own text
+
+`createTranslator(locale, fallback?)` builds a function `t(key, values?)` from a locale. Use it for your own interface text so one set of tools handles both. The fallback is English by default.
+
+```ts
+import { createTranslator } from 'post-canvas';
+import { nl } from './locale-nl';
+
+const t = createTranslator(nl);
+t('ui.status.words', { count: 12 }); // "12 woorden"
+```
+
+`useTranslator()` returns the translator of the nearest `PostCanvas`, so a component you render inside the editor, for example in a slot, follows the editor's language. Outside the editor it returns an English translator.
+
+```tsx title="components/publish-hint.tsx"
+'use client';
+
+import { PostCanvas, useTranslator } from 'post-canvas';
+import { nl } from '@/lib/locale-nl';
+
+function Hint() {
+  const t = useTranslator();
+  return <p>{t('app.publish.hint', { count: 3 })}</p>;
+}
+
+const locale = {
+  ...nl,
+  messages: {
+    ...nl.messages,
+    'app.publish.hint': '{count, plural, one {# stap te gaan} other {# stappen te gaan}}',
+  },
+};
+
+export function Editor() {
+  return <PostCanvas locale={locale} slots={{ footer: <Hint /> }} />;
+}
+```
+
+Keys of your own, such as `app.publish.hint`, can use any prefix that Post Canvas does not use. The English fallback is Post Canvas's own English, so it does not have your keys: add them to every locale you pass, or the key shows instead of the text.
+
+## What a locale does not cover
+
+- The text of the post. That is the writer's.
+- Text direction. There is no right-to-left layout yet (see the [roadmap](/docs/roadmap)).
+- Strings your server returns, for example an upload error message. Translate those where you throw them.

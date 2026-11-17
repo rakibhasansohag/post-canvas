@@ -1,0 +1,105 @@
+---
+title: 'How adapters work'
+description: 'Adapters connect Post Canvas to your app: uploads, mentions, hashtags, embed and link lookups, and draft storage. All six are optional.'
+---
+
+Post Canvas has no backend. When the editor needs something from outside the browser, such as a place to put an uploaded photo or a list of people to mention, it asks your code through an **adapter**: a plain object or function you pass in the `adapters` prop.
+
+```tsx
+import { PostCanvas, type Adapters } from 'post-canvas';
+
+const adapters: Adapters = {
+  upload: { upload: async (file, ctx) => ({ src: await sendToStorage(file, ctx) }) },
+  mentions: { search: async (query) => findPeople(query) },
+};
+
+<PostCanvas adapters={adapters} />;
+```
+
+Every adapter is optional. A missing one turns off, or limits, the part of the editor that needs it. Define the `adapters` object once, outside your component or in `useMemo`, so its identity stays stable.
+
+| Adapter    | Used for                                    | Without it                                                        |
+| ---------- | ------------------------------------------- | ----------------------------------------------------------------- |
+| `upload`   | Photos, galleries, files and the cover      | Image, gallery and file are off, and the cover button is disabled |
+| `mentions` | `@` suggestions                             | Typing `@` shows no suggestions                                   |
+| `hashtags` | `#` suggestions                             | A typed hashtag can still be created, with no suggestions         |
+| `embeds`   | A title and thumbnail for videos and embeds | They are inserted without a fetched title or thumbnail            |
+| `links`    | Link cards from a pasted page link          | A pasted page link becomes a plain link                           |
+| `storage`  | Where autosaved drafts live                 | `localStorage`                                                    |
+
+## upload
+
+Sends a file to your storage and returns its final URL. It is called once per file, with a context for progress and cancelling.
+
+<TypeTable path="core/types.ts" name="UploadAdapter" />
+
+The context has `kind` (`image` or `file`), an `AbortSignal` that aborts when the writer cancels or removes the block, and `onProgress(fraction)` for a progress bar from `0` to `1`:
+
+<TypeTable path="core/types.ts" name="UploadContext" />
+
+Return an `UploadResult`. Only `src` is required. Add `id` to have it stored as `uploadId`, and `width`, `height`, `srcset` and `placeholder` if you have them:
+
+<TypeTable path="core/types.ts" name="UploadResult" />
+
+Throw an error when the upload fails. The block shows a failed state with a retry button, and `hasPendingUploads` stays `true` until it is resolved or removed.
+
+`convertHeic` is for photos from iPhones. Post Canvas does not bundle a HEIC converter. If you want one, install a package such as `heic-to` in your app and pass it in. That package is LGPL licensed, so check that the licence suits your project. See the [uploads guide](/docs/guides/uploads).
+
+## mentions and hashtags
+
+Both have the same shape: a `search` function that returns suggestions for what the writer has typed after `@` or `#`.
+
+<TypeTable path="core/types.ts" name="SuggestionSource" />
+
+Each result is a `SuggestionItem`:
+
+<TypeTable path="core/types.ts" name="SuggestionItem" />
+
+The editor shows up to 8 results. If `search` throws, the editor shows no suggestions and leaves the text as typed. A mention is stored as an inline `mention` node with your `id` and the `label`. Hashtags use the same node with a `#` character. See [mentions and hashtags](/docs/guides/mentions-and-hashtags).
+
+## embeds
+
+Looks up a title, description and thumbnail for a pasted video or embed URL. It is a function:
+
+```ts
+type EmbedMetadataResolver = (
+  url: string,
+  ctx: { signal: AbortSignal },
+) => Promise<EmbedMetadata>;
+```
+
+<TypeTable path="core/types.ts" name="EmbedMetadata" />
+
+The browser cannot fetch most of these pages because of cross-origin rules, so this runs on your server. `post-canvas/server` has `createEmbedResolver()` for it. The lookup is best effort: if it fails, the embed stays as it is, and it never overwrites a title the writer typed.
+
+## links
+
+Fetches the preview for a link card:
+
+```ts
+type LinkPreviewResolver = (
+  url: string,
+  ctx: { signal: AbortSignal },
+) => Promise<LinkPreview>;
+```
+
+<TypeTable path="core/types.ts" name="LinkPreview" />
+
+Like `embeds`, it must run on your server. Use `createLinkPreviewResolver()` from `post-canvas/server`, which refuses to fetch private network addresses. Wire both resolvers behind one route handler: see the [Next.js guide](/docs/getting-started/nextjs#link-previews-and-embed-titles) and [embeds and link previews](/docs/guides/embeds-and-link-previews).
+
+## storage
+
+Where autosaved drafts go. Turn autosave on with the `autosave` prop. By default drafts are kept in `localStorage`, under a key that starts with `post-canvas:`. Pass your own storage to keep drafts on your server or in IndexedDB:
+
+<TypeTable path="core/types.ts" name="DraftStorage" />
+
+Each method can return a value or a promise. A snapshot holds the document, the fields and the save time:
+
+<TypeTable path="core/types.ts" name="DraftSnapshot" />
+
+See the [autosave guide](/docs/guides/autosave).
+
+## Next steps
+
+- [Uploads](/docs/guides/uploads), [mentions and hashtags](/docs/guides/mentions-and-hashtags) and [embeds and link previews](/docs/guides/embeds-and-link-previews) show full implementations.
+- [Presets and features](/docs/concepts/presets-and-features): which features need which adapter.

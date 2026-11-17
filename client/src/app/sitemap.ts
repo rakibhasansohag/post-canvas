@@ -6,5 +6,9 @@ export const dynamic = 'force-static';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const url = (path: string) => `${siteUrl}${basePath}${path}/`.replace(/\/\/$/, '/');
-  return [{ url: url(''), priority: 1 }, { url: url('/playground') }, ...source.getPages().map((page) => ({ url: url(page.url) }))];
+  return [
+    { url: url(''), priority: 1 },
+    { url: url('/playground') },
+    ...source.getPages().map((page) => ({ url: url(page.url) })),
+  ];
 }

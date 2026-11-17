@@ -1,0 +1,92 @@
+---
+title: 'Contributing'
+description: 'How to set up the Post Canvas repository, run the checks, and where to find the full contributing guide.'
+---
+
+Post Canvas is MIT licensed and developed in the open at [github.com/saimulft/post-canvas](https://github.com/saimulft/post-canvas). This page gets you to a working checkout. The full guide, with the conventions for issues, pull requests and releases, is in [CONTRIBUTING.md](https://github.com/saimulft/post-canvas/blob/main/CONTRIBUTING.md).
+
+## How the repository is laid out
+
+| Folder     | What it is                                               |
+| ---------- | -------------------------------------------------------- |
+| `package/` | The library, published to npm as `post-canvas`           |
+| `client/`  | This documentation site, built with Next.js and Fumadocs |
+
+The two are separate projects. There are no npm workspaces, so each folder has its own `package.json` and its own `node_modules`, and you run `npm install` in each one you work on. The docs site depends on the library with `"post-canvas": "file:../package"`, so it uses your local copy of the code.
+
+You need Node 20.19 or later. The CI runs on Node 22 and 24.
+
+## Set up
+
+<Steps>
+<Step>
+
+### Install and build the package
+
+The docs site imports the built output in `package/dist`, so build the package first.
+
+```bash
+cd package
+npm install
+npm run build
+```
+
+</Step>
+<Step>
+
+### Install and start the docs site
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+The site runs at `http://localhost:3100`. The live editor is at `/playground`.
+
+</Step>
+<Step>
+
+### Rebuild after you change the package
+
+The docs site reads `package/dist`, so run `npm run build` in `package/` again after a change there. The reference tables in these docs read the TSDoc comments in `package/src` directly.
+
+</Step>
+</Steps>
+
+## Scripts
+
+In `package/`:
+
+| Script                  | What it does                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| `npm run build`         | Builds the npm files and the CDN bundle into `dist`, then bundles the CSS                  |
+| `npm test`              | Runs the tests once with Vitest                                                            |
+| `npm run typecheck`     | Checks types with `tsc --noEmit`                                                           |
+| `npm run lint`          | Runs ESLint, then checks file and folder names against `.ls-lint.yml`                      |
+| `npm run format`        | Formats with Prettier. `npm run format:check` only reports                                 |
+| `npm run playground`    | Starts a Vite playground with test pages, on port 5100. Add `-- --port N` for another port |
+| `npm run check:package` | Checks the packed package with publint and Are the Types Wrong. Build first                |
+| `npm run size`          | Checks the bundle size budgets in `.size-limit.json`. Build first                          |
+| `npm run changeset`     | Describes a change for the changelog                                                       |
+
+In `client/`:
+
+| Script              | What it does                                               |
+| ------------------- | ---------------------------------------------------------- |
+| `npm run dev`       | Starts the docs site on port 3100                          |
+| `npm run build`     | Builds the site as a static export into `client/out`       |
+| `npm run start`     | Serves `client/out` on port 3100                           |
+| `npm run typecheck` | Generates Next.js types, then checks with `tsc`            |
+| `npm run lint`      | Runs ESLint                                                |
+| `npm run format`    | Formats with Prettier. `npm run format:check` only reports |
+
+Install with `npm ci` if you want the exact versions in the lockfile. Before you open a pull request, run `lint`, `typecheck`, `test` and `build` in `package/`, and `lint`, `typecheck` and `build` in `client/`. These are the same checks the CI runs.
+
+## File names
+
+File and folder names are lowercase kebab-case, enforced by `ls-lint`. The rule file is `.ls-lint.yml` in the repository root.
+
+## Next steps
+
+Read the full guide in [CONTRIBUTING.md](https://github.com/saimulft/post-canvas/blob/main/CONTRIBUTING.md) before you send a larger change. For smaller fixes, such as a typo in these docs, a pull request with a clear description is enough. The [roadmap](/docs/roadmap) lists what is planned.

@@ -1,0 +1,186 @@
+---
+title: 'React and Vite'
+description: 'Set up the Post Canvas editor in a Vite and React app, save its JSON, and show a saved post with PostCanvasView or renderToHTML.'
+---
+
+This guide builds a small editor in a Vite app (a client-rendered React app). You end with an editor that reports its JSON, a Save button that checks the document first, and a preview that shows the saved post. If you use Next.js, read the [Next.js guide](/docs/getting-started/nextjs) instead, because it moves the rendering to the server.
+
+<Steps>
+<Step>
+
+### Create the app and install
+
+```bash
+npm create vite@latest my-blog -- --template react-ts
+cd my-blog
+npm install
+npm install post-canvas
+```
+
+</Step>
+<Step>
+
+### Add a minimal editor
+
+```tsx title="src/App.tsx"
+import { PostCanvas } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export default function App() {
+  return (
+    <main style={{ maxWidth: 760, margin: '0 auto', padding: 16 }}>
+      <PostCanvas preset="article" onChange={({ json }) => console.log(json)} />
+    </main>
+  );
+}
+```
+
+Run `npm run dev` and type in the editor. Each change logs the document as JSON. `onChange` runs at most once per animation frame and receives `{ json, editor }`.
+
+The `article` preset shows a title field and a cover field above the text. Without an upload adapter, the image, gallery and file features are off, and a dev-only console message says so. You add one in step 4.
+
+</Step>
+<Step>
+
+### Keep the latest JSON and save it
+
+The editor does not take a `value` prop. Content is uncontrolled: pass `defaultContent` once, read changes in `onChange`, and replace the content later through the `ref` handle's `setContent()`. Round-tripping a document through React state on every keystroke would lose the caret and re-parse the whole document.
+
+Title and cover are not part of the document JSON. They have their own `fields` state (see [fields](/docs/concepts/fields)), so keep both.
+
+```tsx title="src/App.tsx"
+import { useRef, useState } from 'react';
+import { PostCanvas, hasPendingUploads, type JSONContent, type PostFields } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+const emptyDoc: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] };
+
+export default function App() {
+  const latest = useRef<JSONContent>(emptyDoc);
+  const [fields, setFields] = useState<PostFields>({});
+  const [saved, setSaved] = useState<{ json: JSONContent; fields: PostFields } | null>(null);
+
+  function save() {
+    if (hasPendingUploads(latest.current)) {
+      alert('Wait for the uploads to finish.');
+      return;
+    }
+    // Send it to your server. Here it only stays in memory.
+    setSaved({ json: latest.current, fields });
+  }
+
+  return (
+    <main style={{ maxWidth: 760, margin: '0 auto', padding: 16 }}>
+      <PostCanvas
+        preset="article"
+        onChange={({ json }) => {
+          latest.current = json;
+        }}
+        onFieldsChange={setFields}
+      />
+      <button type="button" onClick={save}>
+        Save
+      </button>
+    </main>
+  );
+}
+```
+
+`hasPendingUploads(json)` says whether any image, gallery photo or file is still uploading, failed, or only staged. Do not save while it returns `true`. A real app would then `POST` the JSON to your server, which runs `sanitizeDocument` before storing it. See [security](/docs/concepts/security).
+
+`JSONContent` is a type that `post-canvas` re-exports from Tiptap.
+
+</Step>
+<Step>
+
+### Add an upload adapter
+
+An upload adapter is an object with one method, `upload(file, context)`. It sends the file to your storage and returns the final URL. Define it outside the component, or memoize it, so it keeps one identity between renders.
+
+```tsx title="src/adapters.ts"
+import type { Adapters } from 'post-canvas';
+
+export const adapters: Adapters = {
+  upload: {
+    async upload(file, { signal, onProgress }) {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await fetch('/api/upload', { method: 'POST', body, signal });
+      if (!response.ok) throw new Error('Upload failed');
+      const { url } = (await response.json()) as { url: string };
+      onProgress(1);
+      return { src: url };
+    },
+  },
+};
+```
+
+Pass it in: `<PostCanvas adapters={adapters} ... />`. Images, galleries and files turn on. Only `src` is required in the adapter's result. The [uploads guide](/docs/guides/uploads) covers progress, limits and HEIC photos.
+
+</Step>
+<Step>
+
+### Show a saved post
+
+For a client-rendered app, `PostCanvasView` shows a document read-only, with the same look as the editor. It sanitizes the JSON first.
+
+```tsx title="src/Post.tsx"
+import { PostCanvasView } from 'post-canvas/render';
+import type { JSONContent } from 'post-canvas';
+
+export function Post({ content }: { content: JSONContent }) {
+  return <PostCanvasView content={content} />;
+}
+```
+
+`renderToHTML` gives you an HTML string instead, for example to store next to the JSON or to put into an email:
+
+```tsx title="src/Post.tsx"
+import { renderToHTML } from 'post-canvas/render';
+import { activateEmbeds } from 'post-canvas/vanilla';
+import { useEffect, useRef } from 'react';
+import type { JSONContent } from 'post-canvas';
+
+export function PostHtml({ content }: { content: JSONContent }) {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => (root.current ? activateEmbeds(root.current) : undefined), []);
+  return <div ref={root} dangerouslySetInnerHTML={{ __html: renderToHTML(content) }} />;
+}
+```
+
+`renderToHTML` shows videos and embeds as click-to-load facades. `activateEmbeds(root)` turns a click into the player and returns a function that stops listening, which `useEffect` uses as its cleanup. `dangerouslySetInnerHTML` is acceptable here because `renderToHTML` sanitizes by default. Leave `sanitize` on unless you sanitized the document yourself when it was saved.
+
+In a Vite app both read-only options run in the browser, so they bring Tiptap and ProseMirror along. If page weight matters, render on the server and send HTML. See [rendering](/docs/concepts/rendering).
+
+</Step>
+</Steps>
+
+## Open a saved post for editing
+
+Pass the saved document as `defaultContent`, and the saved fields as `defaultFields`. They are read once, on mount. To load another post into a mounted editor, use the handle:
+
+```tsx title="src/Editor.tsx"
+import { useRef } from 'react';
+import { PostCanvas, type PostCanvasHandle } from 'post-canvas';
+
+export function Editor() {
+  const handle = useRef<PostCanvasHandle>(null);
+  return (
+    <>
+      <PostCanvas ref={handle} preset="article" />
+      <button type="button" onClick={() => handle.current?.setContent('<p>Loaded from HTML</p>')}>
+        Load
+      </button>
+    </>
+  );
+}
+```
+
+`setContent(content, format)` takes Tiptap JSON, an HTML string, or a Markdown string with `format: 'markdown'`. The handle also has `focus()`, `clear()`, `clearDraft()` and `editor`.
+
+## Next steps
+
+- [Fields](/docs/concepts/fields): the title and cover.
+- [Adapters](/docs/concepts/adapters): mentions, hashtags, link previews and draft storage.
+- [Autosave](/docs/guides/autosave): restore a draft after a reload.
+- [Saving and loading](/docs/guides/saving-and-loading): the full round trip with a server.

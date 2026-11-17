@@ -1,0 +1,186 @@
+---
+title: 'Migrating from TinyMCE or Froala'
+description: 'Move existing HTML content into Post Canvas with fromHTML, check what was lost, and see which TinyMCE and Froala features have an equivalent.'
+---
+
+TinyMCE and Froala store a post as an HTML string. Post Canvas stores a post as JSON (see [Document JSON](/docs/concepts/document-json)). To move over, you convert each HTML string once with `fromHTML()`, check the result, and save the JSON. The HTML is read through Post Canvas's schema, so anything the schema has no place for is left out, and then the result is sanitized.
+
+Keep the old HTML column until you have checked a sample of posts in the new editor.
+
+## Convert HTML to a document
+
+In a browser, `fromHTML()` uses the browser's own `DOMParser`:
+
+```ts
+import { fromHTML } from 'post-canvas/render';
+
+const doc = fromHTML(legacyHtml);
+```
+
+On a server there is no `DOMParser`, so pass `{ window }` from a DOM library such as happy-dom or linkedom. Both are shown in [Server rendering](/docs/guides/ssr-rendering#parse-html-on-a-server).
+
+```ts
+import { fromHTML } from 'post-canvas/server';
+import { Window } from 'happy-dom';
+
+const doc = fromHTML(legacyHtml, { window: new Window() });
+```
+
+Scripts in the HTML never run: it is parsed into an inert document first.
+
+To open an old post for editing, convert it first and pass the JSON as `defaultContent`. That way the document went through the sanitizer before it reached the editor.
+
+## What is kept and what is dropped
+
+| Kept                                                                        | Notes                                                                                                                                            |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Paragraphs, headings 1 to 4                                                 | `h5` and `h6` become paragraphs, keeping their text                                                                                              |
+| Text alignment                                                              | From `style="text-align: ..."`: left, center, right, justify                                                                                     |
+| Bold, italic, underline, strikethrough, inline code, subscript, superscript | From the tags, and bold and italic also from `font-weight` and `font-style` styles                                                               |
+| Links                                                                       | `http`, `https`, `mailto`, `tel` and relative addresses. `target="_blank"` is kept and `rel` is set to a safe value                              |
+| Bulleted, numbered and nested lists                                         | A numbered list keeps its start number                                                                                                           |
+| Tables                                                                      | Header cells, `colspan` and `rowspan`                                                                                                            |
+| Quotes, dividers, line breaks                                               |                                                                                                                                                  |
+| Code blocks                                                                 | A `language-...` class on `pre` or `code` sets the language                                                                                      |
+| Images                                                                      | With an `http` or `https` address. Width and height attributes are kept. A `figure` with a `figcaption` becomes an image with a caption          |
+| YouTube and Vimeo iframes                                                   | Become video blocks. A start time is kept                                                                                                        |
+| Other player iframes                                                        | Spotify, SoundCloud, X, Instagram, TikTok, CodePen, Loom, Figma and Google Maps become embed blocks, if the `embed` feature allows that provider |
+| CKEditor `oembed` elements                                                  | Treated like an iframe with the same address                                                                                                     |
+| Task lists                                                                  | Only from Tiptap's own markup (`data-type="taskList"`)                                                                                           |
+
+| Dropped                                                                               | What happens                                                                               |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `script`, `style`, `template`, `noscript`, `object`, `embed`, `link`, `meta` elements | Removed with their content                                                                 |
+| Classes, ids and inline styles                                                        | Removed. The few styles above are read before that                                         |
+| Text color, background color, font family, font size, line height, indentation        | Removed. Colors in Post Canvas are nine named palette colors, so there is no exact mapping |
+| `mark` and highlighted text                                                           | Becomes a highlight in the default color, whatever its original color                      |
+| Unknown tags and wrappers such as `div`, `section`, `font`, custom elements           | Unwrapped: the text and any known children stay                                            |
+| Images with a relative address or a `data:` address                                   | Dropped, leaving an empty paragraph                                                        |
+| Iframes from other sites, `video` and `audio` elements, forms                         | Dropped                                                                                    |
+| Table widths, borders, cell colors, `colgroup`                                        | Dropped                                                                                    |
+| Checkbox lists written as plain `input` elements                                      | Become plain bulleted lists                                                                |
+| Mentions from another editor's markup                                                 | Become plain text                                                                          |
+| Anchors with a `name` but no `href`                                                   | Unwrapped to text                                                                          |
+
+Two of these catch most migrations out: relative image paths (TinyMCE writes them by default) and base64 images. Resolve relative paths to full addresses before you convert, and upload base64 images to your storage first. The script below does the first.
+
+## A batch script
+
+This script reads `legacy-posts.json` (an array of `{ id, html }`), converts every post with happy-dom, checks each result, and writes `migrated-posts.json` and a report. Adapt the input and output to your database.
+
+```ts title="scripts/migrate-posts.ts"
+import { readFile, writeFile } from 'node:fs/promises';
+import { Window } from 'happy-dom';
+import { fromHTML, sanitizeDocument, toPlainText } from 'post-canvas/render';
+import { resolveFeatures } from 'post-canvas';
+import type { JSONContent } from 'post-canvas';
+
+const SITE = 'https://www.example.com'; // where relative image paths point
+const features = resolveFeatures('article'); // the features your editor will use
+
+const window = new Window();
+
+/** Makes relative image addresses absolute, because fromHTML drops anything that is not http or https. */
+function absolutizeImages(html: string): string {
+  const parsed = new window.DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  for (const img of Array.from(parsed.querySelectorAll('img'))) {
+    const src = img.getAttribute('src') ?? '';
+    if (src && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src)) img.setAttribute('src', new URL(src, SITE).href);
+  }
+  return parsed.body.innerHTML;
+}
+
+function count(doc: JSONContent, type: string): number {
+  return (doc.type === type ? 1 : 0) + (doc.content ?? []).reduce((sum, child) => sum + count(child, type), 0);
+}
+
+function words(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+const posts = JSON.parse(await readFile('legacy-posts.json', 'utf8')) as { id: string; html: string }[];
+const migrated: { id: string; doc: JSONContent }[] = [];
+const report: { id: string; warnings: string[] }[] = [];
+
+for (const { id, html } of posts) {
+  const source = absolutizeImages(html);
+  const doc = fromHTML(source, { window, features });
+  const warnings: string[] = [];
+
+  // 1. Anything the sanitizer still removes, such as a node type your features turn off.
+  const { removed, omitted } = sanitizeDocument(doc, { features });
+  if (removed.length > 0 || omitted > 0) {
+    warnings.push(`sanitizer removed ${removed.length + omitted}: ${removed.map((r) => r.type ?? r.reason).join(', ')}`);
+  }
+
+  // 2. Things the HTML step drops without a record: compare counts against the source.
+  const images = (source.match(/<img\b/gi) ?? []).length;
+  if (count(doc, 'image') < images) warnings.push(`${images - count(doc, 'image')} image(s) not kept`);
+  const frames = (source.match(/<iframe\b/gi) ?? []).length;
+  const kept = count(doc, 'video') + count(doc, 'embed');
+  if (kept < frames) warnings.push(`${frames - kept} iframe(s) not kept`);
+
+  // 3. A big drop in words means something went wrong.
+  const before = words(source.replace(/<(script|style)[\s\S]*?<\/\1>/gi, '').replace(/<[^>]+>/g, ' '));
+  const after = words(toPlainText(doc));
+  if (before > 0 && after < before * 0.9) warnings.push(`text shrank from ${before} to ${after} words`);
+
+  migrated.push({ id, doc });
+  report.push({ id, warnings });
+}
+
+await writeFile('migrated-posts.json', JSON.stringify(migrated));
+await writeFile('migration-report.json', JSON.stringify(report.filter((r) => r.warnings.length > 0), null, 2));
+console.log(`${migrated.length} posts converted, ${report.filter((r) => r.warnings.length > 0).length} with warnings`);
+```
+
+Run it with a TypeScript runner such as `npx tsx scripts/migrate-posts.ts`. The script uses top-level `await`, so the project needs `"type": "module"` in its `package.json`.
+
+### About `removed`
+
+`sanitizeDocument(doc).removed` lists what the sanitizer took out of a JSON document: unknown nodes, unsafe attributes, nodes your features turn off, anything over the size limits. It holds at most the first 100 items, and `omitted` counts the rest.
+
+It does not list what `fromHTML()` left out while reading the HTML, because that content never became part of the document. A relative image, a color or a foreign iframe leaves no entry. That is why the script also compares image and iframe counts and word counts with the source. Parsing with the full feature set and then running `sanitizeDocument()` with the features of your real editor, as the script does, shows what your preset would remove, for example a table in a `comment` preset.
+
+## Paste from Word and Google Docs
+
+Writers paste into the editor too, and pasting is cleaned the same way for every source. `cleanPastedHTML()` runs on every paste:
+
+- Keeps headings, paragraphs, lists, tables, links, quotes, code and inline formatting. Removes styles, classes, ids, event handlers, scripts, comments and Office markup.
+- Rebuilds real lists from Word's list paragraphs (`mso-list`), including nesting and the bullet or number kind.
+- Turns Word's Title and Subtitle styles into headings, and `h5` and `h6` into heading 4.
+- Unwraps the wrapper that Google Docs puts around a copied selection.
+- Turns bold, italic, underline, strikethrough, superscript and subscript written as inline styles into real formatting.
+- Splits pasted plain text into paragraphs at blank lines, and turns single line breaks into line breaks.
+- With an upload adapter, pictures pasted as `data:` addresses are uploaded through it. Without one they are dropped. Pictures with an `http` or `https` address stay as links to that address.
+
+`fromHTML()` does not rebuild Word lists. If you have Word HTML as a file, open it in a browser, copy it, and paste it into the editor, or run `cleanPastedHTML(html)` in a browser before `fromHTML()`. `cleanPastedHTML` needs a browser `DOMParser`.
+
+## Option mapping
+
+| TinyMCE or Froala                                         | In Post Canvas                                                                                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `toolbar`, `plugins` (TinyMCE), `toolbarButtons` (Froala) | `preset` and `features`. There is no toolbar builder: you turn features on or off, and the toolbar's order and groups are fixed |
+| `height`, `min_height`, `heightMin`                       | CSS on `.pc-content`, and a `className` on `PostCanvas`. See [Theming](/docs/guides/theming)                                    |
+| `skin`, `content_css`, dark mode                          | The `theme` prop and `--pc-*` tokens                                                                                            |
+| `images_upload_handler`, `imageUploadURL`                 | `adapters.upload`. See [Uploads](/docs/guides/uploads)                                                                          |
+| `file_picker_callback`, media library                     | No built-in file browser. Build your own and call `editor.commands.insertImage()`                                               |
+| `table` plugin                                            | `features.table`                                                                                                                |
+| `lists`, `advlist`                                        | `bulletList`, `orderedList`, `taskList`                                                                                         |
+| `codesample`                                              | `features.codeBlock`, with a language menu and syntax highlighting                                                              |
+| `link`, `autolink`                                        | `features.link`. Typed addresses become links as you type                                                                       |
+| `mentions`                                                | `adapters.mentions` and `adapters.hashtags`. See [Mentions and hashtags](/docs/guides/mentions-and-hashtags)                    |
+| `media`, `quickInsert`                                    | The `+` button, the `/` menu, and pasting a video or embed address                                                              |
+| `wordcount`, `charCounterMax`                             | The status bar, and `limits` (`maxWords`, `maxCharacters`, `maxMedia`, `maxPhotos`)                                             |
+| `autosave`                                                | The `autosave` prop. See [Autosave](/docs/guides/autosave)                                                                      |
+| `getContent()`, `html.get()`                              | `onChange` for JSON, `renderToHTML(json)` for HTML                                                                              |
+| `setContent()`, `html.set()`                              | The ref's `setContent(content, format)`                                                                                         |
+| `valid_elements`, `htmlAllowedTags`                       | No allow-list setting. The schema decides. Add your own node types with `extensions` ([Headless usage](/docs/guides/headless))  |
+| `forecolor`, `backcolor`, font family and size            | Nine named colors for text and highlight. No free color, font or size                                                           |
+| Source code view                                          | None                                                                                                                            |
+| Spell check, Froala's spell checker                       | The browser's own spell check. No spell-check interface                                                                         |
+| Comments, collaboration, revisions, track changes         | None. See the [roadmap](/docs/roadmap)                                                                                          |
+| Templates, merge tags, export to PDF or Word              | None. You can get Markdown and plain text with `toMarkdown()` and `toPlainText()`                                               |
+| Emoji picker                                              | None. The system emoji picker works, and shortcodes are on the roadmap                                                          |
+
+Content that depends on the lines marked None needs a separate decision before you move. In particular, if writers rely on exact colors, fonts or table styling, that formatting does not survive.

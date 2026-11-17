@@ -1,0 +1,70 @@
+---
+title: 'Roadmap'
+description: 'What Post Canvas does not do yet, and the work we are considering. These are plans, not promises, and none has a date.'
+---
+
+This is a list of gaps and ideas. It is not a schedule. Nothing here has a date, the order is not a ranking, and an item may change or never ship. If you need one of these, build around it today or open an issue to tell us it matters to you.
+
+Each item says what you can do now.
+
+## Not available yet
+
+### Vue and Angular wrappers
+
+Post Canvas is a React editor. The core is Tiptap, which also works with Vue and plain JavaScript, but the toolbar, menus, media views and block handle are React components, so there is no Vue or Angular version of them.
+
+**Today:** use the [CDN build or `post-canvas/vanilla`](/docs/getting-started/cdn) from any framework. It mounts the editor into an element, with its own copy of React inside the bundle, and exposes `create()`, `getJSON()`, `setContent()`, `update()` and events.
+
+### Real-time collaboration
+
+There is no shared editing with Yjs, no cursors for other people and no presence. Two writers editing the same document will overwrite each other.
+
+**Today:** save the JSON from one writer at a time, and use your own locking or "someone else is editing" rule.
+
+### Comments on a document
+
+There are no inline comment threads, suggestions or tracked changes. The `comment` preset is a small editor for writing comments, which is a different thing.
+
+**Today:** keep review notes in your own system.
+
+### AI assistance
+
+There is no built-in writing assistant, rewrite menu or generated content.
+
+**Today:** you can call a model from your own button using `editor.commands.insertContent()`, since the editor is a plain Tiptap editor. See [Headless usage](/docs/guides/headless).
+
+### Emoji shortcodes
+
+Typing `:smile:` does not turn into an emoji, and there is no emoji picker.
+
+**Today:** emoji typed or pasted from the system picker work as text.
+
+### Right-to-left languages
+
+The interface and the text layout are written for left-to-right languages. Arabic, Hebrew and similar languages are not supported yet. This also affects the bundled locales: there is none for a right-to-left language.
+
+**Today:** none that we can recommend.
+
+## Known gaps we want to close
+
+### Trackpad pinch in the collage editor
+
+Pinching on a laptop trackpad (which the browser reports as Ctrl and wheel) zooms the page instead of the collage. Touch pinch on a phone or tablet and Safari's gesture events work.
+
+**Today:** use the keyboard to resize a photo (`+` and `-` with the photo focused), or the touch pinch.
+
+### Touch testing of the block handle
+
+Dragging a block by its handle is built on pointer events, including a press-and-hold on touch. It has not been tested on real phones and tablets.
+
+**Today:** the handle menu and the Alt-Shift shortcuts move, duplicate and delete blocks without dragging.
+
+### A slimmer CDN bundle
+
+The CDN script is one file that carries React, Tiptap and the whole editor, because a plain page has no way to share them. That makes it a poor fit for pages that only show a post.
+
+**Today:** render posts on the server with `renderToHTML()` and load the CDN script only on pages where people edit. See [Server rendering](/docs/guides/ssr-rendering).
+
+## How to ask for something
+
+Open an issue on [GitHub](https://github.com/saimulft/post-canvas/issues) and say what you are trying to build. For how to work on one of these yourself, see [Contributing](/docs/contributing).

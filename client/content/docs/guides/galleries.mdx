@@ -1,0 +1,132 @@
+---
+title: 'Galleries'
+description: 'Add photo galleries in four layouts (carousel, grid, masonry, collage), set photo limits, and arrange photos with the manager and collage editor.'
+---
+
+A **gallery** is one block that holds several photos. Writers pick a layout, reorder photos, describe each one, and add a caption. Galleries need an upload adapter, because the editor has to put the photos somewhere: see [Uploads](/docs/guides/uploads).
+
+## The four layouts
+
+| Layout     | What it looks like                                              | Good for                     |
+| ---------- | --------------------------------------------------------------- | ---------------------------- |
+| `carousel` | A strip you swipe or drag sideways.                             | Many photos in little space  |
+| `grid`     | Even tiles, cropped to the same shape.                          | A tidy set of similar shots  |
+| `masonry`  | Columns of photos at their own proportions, uncropped.          | Mixed portrait and landscape |
+| `collage`  | Photos laid over a background photo, moved, resized and turned. | A designed, scrapbook look   |
+
+A collage needs at least two photos: the first is the background and the rest sit on it. A collage with one photo shows as a carousel until a second photo arrives.
+
+Writers add a gallery from the Insert button, the `/` menu or the toolbar, then pick files. Choosing one picture inserts an image. Choosing several inserts a gallery. Files dropped on an existing gallery join it, and so does the **Add photos** button.
+
+## Configure galleries
+
+Set `features.gallery` to `false` to turn galleries off, or to an object to change them.
+
+```tsx title="app/editor.tsx"
+<PostCanvas
+  adapters={adapters}
+  features={{
+    gallery: { layouts: ['carousel', 'grid'], maxPhotos: 6 },
+  }}
+/>
+```
+
+- `layouts`: the layouts a writer can choose. A new gallery starts with the first one in the list. The default is all four.
+- `maxPhotos`: the most photos in one gallery. The default is 10. The value is kept between 1 and 50. Photos beyond the limit are left out, and the editor says how many.
+
+`maxPhotos` in `features.gallery` is a limit for one gallery. The `limits` prop has its own `maxPhotos`, which counts photos across every image and gallery in the document and shows as a problem when it is passed.
+
+```tsx
+<PostCanvas adapters={adapters} limits={{ maxPhotos: 20 }} />
+```
+
+The `social` preset keeps galleries on. The `comment` preset turns them off. The `full` and `article` presets use the defaults above. See [Presets](/docs/concepts/presets-and-features).
+
+## The gallery manager
+
+Selecting a gallery shows a toolbar with the layout, **Add photos**, **Photos, order and alt text**, and remove. The manager opens from that button. In it a writer can:
+
+- **Reorder** photos by dragging a tile. On a touch screen, hold the tile first, then drag. Each photo also has **Earlier** and **Later** buttons, which work from the keyboard.
+- **Describe** a photo. Selecting a tile opens its alt text field. People who use screen readers hear this text, so ask writers to fill it in. Leave it empty for a photo that is only decoration.
+- **Retry** a photo whose upload failed, or **remove** any photo.
+- **Make background** in a collage, which swaps a photo into the first position.
+- Change the layout.
+
+The manager shows how many photos the gallery holds and how many more fit.
+
+## The collage editor
+
+In a collage, the toolbar has an **Arrange the collage** button. It opens the collage editor, which shows the collage as it will look.
+
+**Mouse and touch**
+
+- Drag a photo to move it.
+- Pinch a photo with two fingers to resize and turn it. Safari's gesture events work too.
+- Select a photo to see its handles: the corner handle resizes and the top handle turns.
+- The bar under the frame has bring forward, send back, turn, smaller, bigger, remove, **Change background**, **Reset positions** and undo.
+
+**Keyboard**
+
+Tab to a photo, then:
+
+| Key                   | What it does                                 |
+| --------------------- | -------------------------------------------- |
+| Arrow keys            | Move the photo (hold Shift for bigger steps) |
+| `+` and `-`           | Make it bigger or smaller                    |
+| `[` and `]`           | Turn it by 5 degrees (Shift: 15 degrees)     |
+| Page Up and Page Down | Move it a layer forward or back              |
+| Delete or Backspace   | Remove it from the collage                   |
+| Escape                | Deselect                                     |
+| Ctrl or Cmd + Z       | Undo (redo with Shift + Z, or Y)             |
+
+A live region announces moves, layer changes and removals. Under `prefers-reduced-motion: reduce`, the editor turns off its animations and transitions.
+
+<Callout type="warn">
+  **Known gap: trackpad pinch.** A pinch on a laptop trackpad (which browsers report as Ctrl and mouse wheel) zooms the
+  whole page instead of the collage photo. Touch pinch and Safari gesture events work. On a trackpad, use the corner and
+  top handles or the keyboard.
+</Callout>
+
+Each photo's position is stored as numbers between 0 and 1, relative to the background photo: `x` and `y` for the centre, `w` for the width and `r` for the rotation in degrees. A collage frame is never taller than 560 CSS pixels. It gets narrower instead.
+
+## Unknown sizes
+
+A photo's `width` and `height` can be `0`, which means unknown. This happens when your upload adapter does not return a size, or when you insert photos yourself. The static HTML from `renderToHTML()` leaves the `width` and `height` attributes out for such a photo, so the browser does not reserve the wrong space.
+
+A single image block measures its picture when it loads in the editor and stores the size, without adding an undo step. A photo inside a gallery is not measured this way, so return `width` and `height` from your adapter when you can: the editor measures every picture before it uploads, and your adapter's value replaces that measurement only when both numbers are above 0. If a collage's background photo has no size, the frame uses a 4:3 shape.
+
+## Captions
+
+A gallery has one caption for the whole block, below the photos. A single image has its own caption. Both are plain text, up to 1000 characters. Alt text is up to 500 characters.
+
+## Image alignment
+
+A single image block can sit in five places. Writers choose from the image's toolbar.
+
+| Value    | Where it sits                                                                  |
+| -------- | ------------------------------------------------------------------------------ |
+| `center` | In the text column. This is the default.                                       |
+| `wide`   | Reaches past the text column by the CSS variable `--pc-media-bleed-wide`.      |
+| `full`   | Reaches past the text column by `--pc-media-bleed-full`.                       |
+| `left`   | Floated left, up to half the column or 22rem, with text wrapping on the right. |
+| `right`  | Floated right, up to half the column or 22rem, with text wrapping on the left. |
+
+`--pc-media-bleed-wide` is `0px` by default, so `wide` looks like `center` until you set it. Set both variables on your content wrapper if your page is wider than the text column. On a phone (480px and narrower), floated images take the full width.
+
+The value is stored as `align` on the `image` node. The read-only [renderer](/docs/guides/ssr-rendering) and `post-canvas/styles.css` draw all five.
+
+## Insert a gallery from code
+
+If you already have finished photos with `https` URLs, you can insert a gallery without uploading:
+
+```tsx
+editor.commands.insertGallery({
+  layout: 'grid',
+  photos: [
+    { src: 'https://cdn.example.com/trip/1.jpg', width: 1600, height: 1067, alt: 'A market stall at dawn' },
+    { src: 'https://cdn.example.com/trip/2.jpg', width: 1067, height: 1600, alt: 'A tram on a hill' },
+  ],
+});
+```
+
+Get the editor from the `ref` handle's `editor` property or from `onChange`. See [Saving and loading](/docs/guides/saving-and-loading) for the handle.

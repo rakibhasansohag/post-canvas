@@ -1,0 +1,67 @@
+name: Release
+
+# On every push to main, the Changesets action either opens (or updates) a "Version packages" pull request, or, when that
+# pull request has just been merged, publishes the package to npm with provenance. The package is in package/.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the version branch
+  pull-requests: write # open the "Version packages" pull request
+  id-token: write # npm provenance, and npm trusted publishing (OIDC)
+
+jobs:
+  release:
+    name: Version or publish
+    if: github.repository == 'saimulft/post-canvas'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Node 24 ships npm 11, which supports trusted publishing through GitHub's OIDC token.
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: package/package-lock.json
+
+      - name: Install
+        working-directory: package
+        run: npm ci
+
+      - name: Lint, typecheck and test
+        working-directory: package
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+
+      - name: Build
+        working-directory: package
+        run: npm run build
+
+      - name: Check the package
+        working-directory: package
+        run: npm run check:package
+
+      - name: Version pull request or publish
+        uses: changesets/action@v1
+        with:
+          cwd: package
+          version: npm run changeset:version
+          publish: npm run release
+          title: 'Version packages'
+          commit: 'Version packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Trusted publishing needs no token. Until it is set up on npmjs.com, add an NPM_TOKEN secret (an automation
+          # token) and the action uses it instead. Provenance comes from publishConfig in package.json.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

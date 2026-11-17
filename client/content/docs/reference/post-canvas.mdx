@@ -1,0 +1,178 @@
+---
+title: 'PostCanvas component'
+description: 'Props, ref handle, slots, theme and provider of the PostCanvas React component, with the behaviour of each option.'
+---
+
+`PostCanvas` is the editor: a Tiptap editor with the toolbar, the selection menu, the `+` button, the slash menu, the block handle, the title and cover fields, the status bar, notifications and autosave. It is a client component and it is exported from `post-canvas`. Load the styles once with `post-canvas/styles.css`.
+
+Content is uncontrolled. You pass the starting document in `defaultContent`, read changes in `onChange`, and replace the content later with the `setContent()` method of the `ref` handle. There is no `value` prop: round-tripping the document through React state on every keystroke loses the selection and costs a full re-parse.
+
+```tsx title="components/composer.tsx"
+'use client';
+import { PostCanvas } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export function Composer({ save }: { save: (json: unknown) => void }) {
+  return <PostCanvas preset="article" onChange={({ json }) => save(json)} />;
+}
+```
+
+## Props
+
+`PostCanvasProps` is everything you can pass to the `PostCanvas` component. It extends `UsePostCanvasEditorOptions` (minus `notify`, `extensions` and `autofocus`, which `PostCanvas` handles itself), so the second table below lists the props it inherits.
+
+<TypeTable path="react/post-canvas.tsx" name="PostCanvasProps" />
+
+`UsePostCanvasEditorOptions` is also the options object of the [`usePostCanvasEditor`](/docs/reference/hooks) hook:
+
+<TypeTable path="react/use-post-canvas-editor.ts" name="UsePostCanvasEditorOptions" />
+
+### onChange
+
+`onChange` receives an object with the document and the editor. It runs after a change, at most once per animation frame.
+
+```tsx
+<PostCanvas onChange={({ json, editor }) => save(json)} />
+```
+
+The signature is `onChange?: (change: PostCanvasChange, editor: Editor) => void`. The editor also comes as a second argument, for code written against the first preview. Use the object form in new code. `PostCanvasChange` is described on the [hooks page](/docs/reference/hooks).
+
+Before you save `json`, check `hasPendingUploads(json)`. It is `true` while an upload is running, failed or staged. See [Utilities](/docs/reference/utilities).
+
+### Content
+
+`defaultContent` is read once, on mount. It is Tiptap JSON, or a string. A string is read as HTML, or as Markdown when you set `contentFormat="markdown"`. To replace the content later, call `ref.current?.setContent(content, format)`.
+
+Markdown strings need care. `contentFormat="markdown"` loads Tiptap's Markdown extension, and `setContent(content, 'markdown')` works only on an editor that has it. If you did not start from a Markdown `defaultContent`, convert first with `fromMarkdown` from [`post-canvas/render`](/docs/reference/render#markdown) and pass the JSON.
+
+### embedConsent
+
+`embedConsent` sets how video and social players load inside the editor.
+
+- `click` (default): a facade (a thumbnail and a play button, with no third-party iframe) stands in for the player until the writer clicks it.
+- `auto`: players load straight away.
+
+Facade thumbnails still load from the providers' image hosts (for example YouTube's), so a page with facades still makes those image requests. `embedConsent` is a prop of `PostCanvas`, an option of `createPostCanvas` and of the CDN build, and `setEmbedConsent(editor, consent)` from `post-canvas/extensions` changes it on a running editor. The read-only output has the same choice through its [embed render mode](/docs/reference/render).
+
+### readOnly
+
+`readOnly` makes the editor non-editable and hides the toolbar, the menus, the `+` button, the block handle, the status bar and the cover field. A title that has text shows as a heading. The editor still loads Tiptap, so to show a saved post to readers use [`PostCanvasView` or `renderToHTML`](/docs/reference/render) instead.
+
+### submitOnEnter and onSubmit
+
+With `submitOnEnter`, Enter calls `onSubmit` instead of starting a new paragraph, and Shift-Enter adds a line break. Enter still picks an entry while a mention, hashtag or slash list is open. `onSubmit` receives the same object as `onChange`. The `comment` preset is built for this.
+
+```tsx
+<PostCanvas
+  preset="comment"
+  submitOnEnter
+  onSubmit={({ json, editor }) => {
+    sendComment(json);
+    editor.commands.clearContent();
+  }}
+/>
+```
+
+Here `sendComment` is your own function.
+
+### autofocus
+
+`autofocus` puts the caret in the editor on mount. It takes `true`, `'start'`, `'end'`, a document position, or `false` (the default). It is a Tiptap `FocusPosition`.
+
+### onReady
+
+`onReady(editor)` is called with each new editor instance. A change to `features`, `preset` or the presence of the upload adapter rebuilds the editor and keeps its content, so `onReady` can run more than once. Keep the editor from the latest call, or read it from the `ref` handle.
+
+### Fields and autosave
+
+`fields` (controlled) or `defaultFields` (uncontrolled) hold the title and cover as `PostFields`. `onFieldsChange` reports edits. Which fields show depends on the preset and the `title` and `cover` features.
+
+`autosave` saves a draft while you type and brings it back on the next mount, with a banner that lets the writer discard it. Pass `true` for the defaults or `AutosaveOptions` (see [Utilities](/docs/reference/utilities)). Drafts go to `adapters.storage`, or to `localStorage` when there is none. Use one `key` per document.
+
+## Ref handle
+
+Pass a `ref` to get a `PostCanvasHandle`.
+
+<TypeTable path="react/post-canvas.tsx" name="PostCanvasHandle" />
+
+`clear()` and `clearDraft()` do different jobs:
+
+- `clear()` empties the document and the title and cover, and forgets the autosaved draft. Call it after your app has saved the post.
+- `clearDraft()` forgets the autosaved draft only. The document and fields stay as they are. It returns a promise.
+
+```tsx title="components/composer.tsx"
+'use client';
+import { useRef } from 'react';
+import { PostCanvas, hasPendingUploads, type PostCanvasHandle } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export function Composer({ publish }: { publish: (json: unknown) => Promise<void> }) {
+  const canvas = useRef<PostCanvasHandle>(null);
+
+  async function onPublish() {
+    const json = canvas.current?.editor?.getJSON();
+    if (!json || hasPendingUploads(json)) return;
+    await publish(json);
+    canvas.current?.clear();
+  }
+
+  return (
+    <>
+      <PostCanvas ref={canvas} preset="social" autosave={{ key: 'post:new' }} />
+      <button type="button" onClick={onPublish}>
+        Publish
+      </button>
+    </>
+  );
+}
+```
+
+## Slots
+
+`PostCanvasSlots` are places for your own content around the canvas. Pass them in the `slots` prop.
+
+<TypeTable path="react/post-canvas.tsx" name="PostCanvasSlots" />
+
+```tsx
+<PostCanvas slots={{ footer: <button type="button">Publish</button> }} />
+```
+
+## Theme
+
+`PostCanvasTheme` is the type of the `theme` prop. `auto` (the default) follows the reader's system setting.
+
+```ts
+type PostCanvasTheme = 'light' | 'dark' | 'auto';
+```
+
+## PostCanvasProvider
+
+`PostCanvasProvider` gives the editor, the translator, the adapters and the resolved features to the components inside it. `PostCanvas` renders one itself. Use your own when you build an editor from [`usePostCanvasEditor`](/docs/reference/hooks) and want parts such as `CoverField` to work outside `PostCanvas`.
+
+```tsx
+function PostCanvasProvider(props: { value: PostCanvasContextValue; children: ReactNode }): JSX.Element;
+```
+
+`value` is a `PostCanvasContextValue`:
+
+<TypeTable path="core/react/context.tsx" name="PostCanvasContextValue" />
+
+```tsx title="components/custom-editor.tsx"
+'use client';
+import { EditorContent } from '@tiptap/react';
+import { PostCanvasProvider, usePostCanvasEditor } from 'post-canvas';
+import 'post-canvas/styles.css';
+
+export function CustomEditor() {
+  const { editor, features, t, adapters } = usePostCanvasEditor({ preset: 'comment' });
+  return (
+    <PostCanvasProvider value={{ editor, features, t, adapters }}>
+      <div className="pc-root">
+        <EditorContent editor={editor} />
+      </div>
+    </PostCanvasProvider>
+  );
+}
+```
+
+`EditorContent` comes from `@tiptap/react`, which you add to your app. The hook gives you the editor without the toolbar, menus or fields: you build that chrome yourself.

@@ -1,0 +1,409 @@
+---
+title: 'Helpers and utilities'
+description: 'Helper functions, constants and small components exported from post-canvas: presets, stats, limits, autosave, uploads, URLs and UI parts.'
+---
+
+This page lists what `post-canvas` exports besides the editor component, the [hooks](/docs/reference/hooks), the [embed provider functions](/docs/reference/embed-providers) and the [types](/docs/reference/types). They are grouped by job. Most of them are pure functions that also run on a server, except where a section says it needs the browser.
+
+## Presets and features
+
+A preset is a named starting set of features. `presets` holds the four definitions, `defaultFeatures` is the `full` set, and `resolveFeatures` builds a complete `Features` object from a preset and your changes.
+
+### presets
+
+```ts
+const presets: Readonly<Record<PresetName, PresetDefinition>>;
+```
+
+Each preset is a `PresetDefinition`:
+
+<TypeTable path="text/presets.ts" name="PresetDefinition" />
+
+| Preset    | Features                                                                                                                                                                                                                                                                                                        | Limits                | Classifier         |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------ |
+| `full`    | Everything on. The title and cover fields are off.                                                                                                                                                                                                                                                              | none                  | none               |
+| `article` | Everything, plus the `title` and `cover` fields.                                                                                                                                                                                                                                                                | none                  | none               |
+| `social`  | A post composer: bold, italic, links, lists, mentions, hashtags, photos, galleries, video, embeds and link cards. No headings, tables, code, task lists, underline, strike, colour or alignment, and no file blocks. The status bar shows the post kind. Title and cover show once the post becomes an article. | none                  | `socialClassifier` |
+| `comment` | Paragraphs, bold, italic, links and mentions. No lists, media, toolbar, slash menu, `+` button, block handle or status bar. The selection menu stays.                                                                                                                                                           | `maxCharacters: 2000` | none               |
+
+Without an upload adapter, `image`, `gallery` and `file` are off in every preset unless you set them in `features`.
+
+### defaultFeatures
+
+`defaultFeatures` is the `Features` object of the `full` preset: every feature on, with `title` and `cover` off, all four gallery layouts with at most 10 photos, and every built-in embed provider.
+
+### resolveFeatures
+
+```ts
+function resolveFeatures(
+  preset?: PresetName,
+  overrides?: FeatureOverrides,
+  context?: { adapters?: Adapters },
+): Features;
+```
+
+`resolveFeatures` builds the complete feature set: `full`, then the preset's changes, then `overrides`. A key set to `undefined` in `overrides` is ignored.
+
+Pass `context.adapters` to apply the upload rule: without `adapters.upload`, `image`, `gallery` and `file` are turned off unless `overrides` sets them explicitly. In development a console warning says why.
+
+```ts
+import { resolveFeatures } from 'post-canvas';
+
+const features = resolveFeatures(
+  'social',
+  { gallery: { layouts: ['grid', 'carousel'], maxPhotos: 6 } },
+  { adapters },
+);
+```
+
+Use the same `features` for the editor and for `sanitizeDocument`, `renderToHTML` and `validateDocument` on your server. `builtInEmbedProviderNames` (the nine `embed` provider names) is also exported here from `post-canvas`; see [Embed providers](/docs/reference/embed-providers).
+
+## Document statistics
+
+These are pure walks over the JSON. They run anywhere.
+
+### getDocStats
+
+```ts
+function getDocStats(json: JSONContent | null | undefined): DocStats;
+```
+
+`getDocStats` returns every statistic for a document. `null` and `undefined` give an empty result.
+
+`DocStats` is the result. Its `media` field is a `MediaCounts` object, with one count per kind of media block.
+
+<TypeTable path="text/stats.ts" name="DocStats" />
+
+<TypeTable path="text/stats.ts" name="MediaCounts" />
+
+```ts
+const stats = getDocStats(post.content);
+console.log(`${stats.words} words, ${stats.readMinutes} min read, ${stats.photos} photos`);
+```
+
+### countWords, countCharacters, readMinutes and wordsPerMinute
+
+| Export                  | What it does                                                                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `countWords(text)`      | Counts whitespace-separated tokens that contain a letter or a digit, so a lone dash is not a word.                                               |
+| `countCharacters(text)` | Counts characters as a reader does: grapheme clusters (through `Intl.Segmenter` where it exists), so an emoji or an accented letter counts once. |
+| `readMinutes(words)`    | Minutes to read `words`, rounded up, at least 1. `0` for no words.                                                                               |
+| `wordsPerMinute`        | The reading speed behind `readMinutes`: 220.                                                                                                     |
+
+## Limits and problems
+
+A limit turns a too-long document into a problem that blocks publishing in the editor. A `Problem` is anything that blocks or warns before you publish.
+
+### Limits
+
+`Limits` are the caps on a document. Every one is optional. The `limits` prop of `PostCanvas` replaces the preset's.
+
+<TypeTable path="text/limits.ts" name="Limits" />
+
+### limitProblems, isInsertCapped and maxMentions
+
+| Export                                | What it does                                                                                                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `limitProblems(stats, limits, t)`     | The `Problem` entries that a document's `DocStats` break against `Limits`. The codes are `limit.words`, `limit.characters`, `limit.media`, `limit.photos` and `limit.mentions`. |
+| `isInsertCapped(item, stats, limits)` | `true` when an insert item would break a cap: media or embed items at `maxMedia`, and the `image` and `gallery` items at `maxPhotos`. The menus use it to hide those items.     |
+| `maxMentions`                         | At most 20 mentions and hashtags together in one document.                                                                                                                      |
+
+### getProblems, collectProblems and collectInsertItems
+
+These read the extensions of a live editor. See [Extension fields](/docs/reference/extensions#extension-fields).
+
+| Export                       | What it does                                                                                                                                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getProblems(editor)`        | What blocks publishing right now: limits broken, a missing article title, uploads still running, an open paste-a-link field, and every other problem the editor's extensions report. Empty when the document is ready. |
+| `collectProblems(editor)`    | Every problem the editor's extensions report right now. `getProblems` calls it.                                                                                                                                        |
+| `collectInsertItems(editor)` | Every `InsertItem` the editor's extensions offer, in extension order. The `+` and `/` menus read this.                                                                                                                 |
+
+```ts
+import { getProblems } from 'post-canvas';
+
+const blocking = getProblems(editor).filter((problem) => problem.severity === 'error');
+if (blocking.length > 0) alert(blocking.map((problem) => problem.message).join('\n'));
+```
+
+## Post classification
+
+A classifier decides what kind of post a document is, and whether the title and cover fields apply. The `social` preset uses `socialClassifier`. Pass your own, or `null` to switch classification off, in the `classify` prop of `PostCanvas`.
+
+<TypeTable path="text/classify.ts" name="Classification" />
+
+<TypeTable path="text/classify.ts" name="ClassifyInput" />
+
+`Classifier` is a function from `ClassifyInput` to `Classification`, and `SocialKind` lists the kinds the social classifier knows:
+
+```ts
+type Classifier = (input: ClassifyInput) => Classification;
+
+type SocialKind = 'text' | 'photo' | 'video' | 'embed' | 'article';
+```
+
+The social rule is simple. A post is at most one run of text plus at most one media block, up to 500 words. Anything more is an article, which needs a title and may have a cover.
+
+| Export                        | What it does                                                                                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `socialClassifier`            | The social `Classifier`. Articles show and require the title field.                                                                       |
+| `classifySocial(json, t)`     | Classifies a document's JSON with the social rules. A shortcut for tests and servers.                                                     |
+| `socialKind(stats)`           | The `SocialKind` for a `DocStats`, or `null` when there is nothing to publish yet.                                                        |
+| `articleReason(stats, t)`     | Why the rules made this an article, already translated, or `null` when it is not one.                                                     |
+| `kindSummary(json, stats, t)` | The status bar badge, in the translator's language: "Text post", "Photo post · 3 photos · Masonry" or "Article · 612 words · 3 min read". |
+| `postMaxWords`                | 500. A post holds at most this many words. One more and it becomes an article.                                                            |
+
+```ts
+import { classifySocial, createTranslator, en } from 'post-canvas';
+
+const { kind, requireTitle } = classifySocial(post.content, createTranslator(en));
+```
+
+## Autosave
+
+Autosave saves drafts after typing rests. `PostCanvas` uses it when you pass `autosave`. Use these directly for a custom editor.
+
+### createAutosave
+
+```ts
+function createAutosave(storage: DraftStorage, options?: AutosaveOptions): AutosaveController;
+```
+
+`createAutosave` creates an autosave for one storage key. Saves are debounced, and a document with nothing worth keeping (no words, no media, no title, no cover) clears the stored draft instead.
+
+`AutosaveOptions` are the settings. The `AutosaveController` that comes back saves, loads and clears drafts.
+
+<TypeTable path="text/autosave.ts" name="AutosaveOptions" />
+
+<TypeTable path="text/autosave.ts" name="AutosaveController" />
+
+```ts
+import { createAutosave, localDraftStorage } from 'post-canvas';
+
+const autosave = createAutosave(localDraftStorage, { key: 'post:42', delay: 500 });
+
+editor.on('update', () => autosave.schedule(editor.getJSON(), fields));
+window.addEventListener('pagehide', () => autosave.flush());
+
+const draft = await autosave.load(); // a DraftSnapshot, or null
+await autosave.clear(); // after the app has saved
+```
+
+### localDraftStorage
+
+`localDraftStorage` is the default `DraftStorage`: drafts in `localStorage` under `post-canvas:<key>`. It never throws: private mode or a full disk means nothing is kept. For another place (your server, IndexedDB), implement `DraftStorage` and pass it as `adapters.storage`.
+
+### storableContent and hasDraftContent
+
+| Export                              | What it does                                                                                                                                                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storableContent(json)`             | The document without the parts that cannot come back after a reload: uploads in flight, `blob:` previews and the paste-a-link field. A gallery keeps its finished photos. The result always has at least one block. |
+| `hasDraftContent(content, fields?)` | `true` for anything worth bringing back: words, media, a title or a cover.                                                                                                                                          |
+
+## Uploads and files
+
+### hasPendingUploads
+
+```ts
+function hasPendingUploads(json: JSONContent | null | undefined): boolean;
+```
+
+`hasPendingUploads` says whether a document still has uploads running, failed, or staged: a media node or gallery photo with an `uploadKey`, a `blob:` source that only exists in this browser, or a staged-upload marker source (`https://staged.post-canvas.invalid/<key>`). Do not save a document while it is `true`: `sanitizeDocument` would drop those pictures. `hasTransientContent(json)` from `post-canvas/render` covers editor-only state in general: an open link field, `blob:` sources and running uploads.
+
+```ts
+const json = editor.getJSON();
+if (hasPendingUploads(json)) return notify('Wait for the uploads to finish.');
+await save(json);
+```
+
+### CoverField
+
+`CoverField` picks, uploads and edits a post's cover picture: choose one, watch it upload, describe it, replace or remove it. It reads the upload adapter and the translator from the nearest `PostCanvasProvider`, and calls `onChange` only with a finished upload, so `value` never holds a local preview. `PostCanvas` renders one itself when the `cover` feature is on.
+
+Its props are `CoverFieldProps`:
+
+<TypeTable path="media/cover/cover-field.tsx" name="CoverFieldProps" />
+
+```tsx
+import { CoverField, PostCanvasProvider, usePostCanvasEditor, type CoverImage } from 'post-canvas';
+
+export function CoverPicker({ cover, setCover }: { cover: CoverImage | null; setCover: (cover: CoverImage | null) => void }) {
+  const { editor, features, t, adapters } = usePostCanvasEditor({ preset: 'article', adapters: myAdapters });
+  return (
+    <PostCanvasProvider value={{ editor, features, t, adapters }}>
+      <CoverField value={cover} onChange={setCover} />
+    </PostCanvasProvider>
+  );
+}
+```
+
+Here `myAdapters` holds your `upload` adapter.
+
+### File picking
+
+`openFilePicker` and `imageAccept` are shown with an example on the [commands page](/docs/reference/commands#file-picker-helpers).
+
+```ts
+function openFilePicker(options?: FilePickerOptions): Promise<File[]>;
+function imageAccept(accept: string | undefined): string;
+```
+
+<TypeTable path="media/upload/picker.ts" name="FilePickerOptions" />
+
+### UploadTarget, InsertImageOptions and InsertGalleryOptions
+
+These are the arguments of the media commands, which are listed on the [commands page](/docs/reference/commands#media-commands). `UploadTarget` says where uploaded files go: at the cursor, at a position, into a gallery, or in place of a picture or file.
+
+```ts
+type UploadTarget =
+  | { type: 'cursor'; as?: 'auto' | 'image' | 'gallery' | 'file' }
+  | { type: 'at'; pos: number }
+  | { type: 'gallery'; nodeId: string }
+  | { type: 'replace'; nodeId: string };
+```
+
+<TypeTable path="media/kit.ts" name="InsertImageOptions" />
+
+<TypeTable path="media/kit.ts" name="InsertGalleryOptions" />
+
+HEIC pictures need a converter: pass `convertHeic` on the upload adapter. Post Canvas does not bundle one. The `heic-to` package is LGPL, and your app installs it itself.
+
+## Cleaning pasted HTML
+
+`cleanPastedHTML(html)` cleans HTML pasted from Word, Google Docs or a web page, and keeps the structure while it drops the noise. It needs a DOM (`DOMParser`). On a server, use `fromHTML` from [`post-canvas/render`](/docs/reference/render#fromhtml) instead. The editor already runs it on every paste. The details are on the [extensions page](/docs/reference/extensions#paste-and-code).
+
+## Translation
+
+### createTranslator
+
+```ts
+function createTranslator(locale: Locale, fallback?: Locale): Translator;
+```
+
+`createTranslator` builds a translator for a locale. A key missing from `locale` falls back to `fallback` (English by default), then to the key itself. In development each missing key warns once. The message syntax is a small subset of ICU, with no dependency: `{name}`, `{n, number}`, plural (`{n, plural, =0 {none} one {# photo} other {# photos}}`) and select (`{x, select, a {...} other {...}}`).
+
+```ts
+import { createTranslator } from 'post-canvas';
+import de from 'post-canvas/locales/de';
+
+const t = createTranslator(de);
+t('core.frame.remove'); // 'Entfernen'
+```
+
+### en
+
+`en` is the English `Locale`: every namespace's messages merged. It is the default language and the fallback. The other built-in languages are `de`, `es`, `fr`, `it` and `pt`, each at `post-canvas/locales/<code>`. Pass a locale to the `locale` prop. `post-canvas/vanilla` also exports all six as `locales`.
+
+## URL safety
+
+Use these wherever you put a URL from untrusted data into a link or a media tag. The editor's nodes and marks use them in their sanitizers.
+
+| Function                      | What it does                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `safeHref(url)`               | Returns a URL that is safe in a link's `href`, or `null`. Allows http, https, mailto, tel and relative URLs. Blocks every other scheme (`javascript:`, `vbscript:`, `data:`, `file:` and the rest), also when it hides behind whitespace, control characters, mixed case, HTML entities or percent-encoding, and blocks protocol-relative URLs such as `//example.com`. |
+| `safeHttpUrl(url)`            | Returns an absolute http or https URL, normalised, or `null`. Use it for anything your server will fetch or a reader's browser will load from another site.                                                                                                                                                                                                             |
+| `safeMediaSrc(url, options?)` | Returns a URL that is safe as an image or media `src`, or `null`: absolute http or https only. With `{ allowBlob: true }` it also accepts a `blob:` URL, for an upload in progress in the editor. Saved documents never keep one.                                                                                                                                       |
+
+```ts
+safeHref('javascript:alert(1)'); // null
+safeHref('/pricing'); // '/pricing'
+safeHttpUrl('https://example.com'); // 'https://example.com/'
+safeHttpUrl('example.com'); // null, there is no scheme
+safeMediaSrc('blob:https://example.com/abc'); // null
+safeMediaSrc('blob:https://example.com/abc', { allowBlob: true }); // 'blob:https://example.com/abc'
+```
+
+## Ids and constants
+
+| Export               | What it is                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `createId()`         | A random UUID v4, for node ids.                                                                                                                        |
+| `createKey(prefix?)` | A short random key (12 hex characters after the optional prefix), such as a gallery photo's `key` or an upload's `uploadKey`. Not secret, only unique. |
+| `paletteColors`      | Every `PaletteColor` name, in menu order: `gray`, `brown`, `orange`, `yellow`, `green`, `blue`, `purple`, `pink`, `red`.                               |
+| `galleryLayouts`     | Every `GalleryLayout`, in menu order: `carousel`, `grid`, `masonry`, `collage`.                                                                        |
+
+## UI primitives
+
+These are the small parts that Post Canvas builds its media blocks from. Use them to build your own node views so they look and behave like the built-in ones.
+
+### MediaFrame
+
+`MediaFrame` is the frame around a media or embed block. Clicking it selects it (it takes focus). While selected, Backspace or Delete removes it, Enter and the arrow keys move to the text around it, and Escape lets go. Its optional handle drags it to another spot or, clicked, opens a menu: move up, move down, remove.
+
+Its props are `MediaFrameProps`:
+
+<TypeTable path="core/react/media-frame.tsx" name="MediaFrameProps" />
+
+`FrameHandle` is the frame's own handle. Leave `handle` out when the editor's block handle moves blocks.
+
+<TypeTable path="core/react/media-frame.tsx" name="FrameHandle" />
+
+`FrameKey` is what a key on a selected block asks the canvas to do. `onKey` receives it:
+
+```ts
+type FrameKey = 'remove' | 'before' | 'after';
+```
+
+`remove` comes from Backspace or Delete, `before` from the arrows up and left, and `after` from the arrows down and right and from Enter.
+
+### MediaToolbar and ToolButton
+
+`MediaToolbar` is a row of small round buttons over a block's top-right corner, shown while the block is hovered or selected. Put `ToolButton` components inside it, and pass it to `MediaFrame`'s `toolbar` slot. `ToolButton` is one small round icon button.
+
+The props are `MediaToolbarProps` and `ToolButtonProps`:
+
+<TypeTable path="core/react/media-toolbar.tsx" name="MediaToolbarProps" />
+
+<TypeTable path="core/react/tool-button.tsx" name="ToolButtonProps" />
+
+```tsx
+import { Trash2 } from 'lucide-react';
+import { MediaFrame, MediaToolbar, ToolButton } from 'post-canvas';
+
+export function PollFrame({ selected, onRemove }: { selected: boolean; onRemove: () => void }) {
+  return (
+    <MediaFrame
+      label="Poll: Lunch spot"
+      selected={selected}
+      onRemove={onRemove}
+      onKey={(key) => key === 'remove' && onRemove()}
+      toolbar={
+        <MediaToolbar label="Tools: Poll">
+          <ToolButton icon={Trash2} label="Remove poll" onClick={onRemove} />
+        </MediaToolbar>
+      }
+    >
+      <p>Where should we eat?</p>
+    </MediaFrame>
+  );
+}
+```
+
+Every label is a string you have already translated.
+
+### Popover
+
+`Popover` is a small floating panel, positioned with Floating UI. Escape and a press outside close it, and focus goes back to where it was before it opened (or to the anchor). It renders in place, inside `.pc-root`, so it keeps the theme.
+
+Its props are `PopoverProps`:
+
+<TypeTable path="core/react/popover.tsx" name="PopoverProps" />
+
+```tsx
+import { useState } from 'react';
+import { Popover } from 'post-canvas';
+
+export function Help() {
+  const [open, setOpen] = useState(false);
+  const [button, setButton] = useState<HTMLButtonElement | null>(null);
+  return (
+    <>
+      <button ref={setButton} type="button" onClick={() => setOpen((value) => !value)}>
+        Help
+      </button>
+      <Popover open={open} anchor={button} onClose={() => setOpen(false)} label="Help">
+        <p>Drag a photo to reorder it.</p>
+      </Popover>
+    </>
+  );
+}
+```

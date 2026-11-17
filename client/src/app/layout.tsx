@@ -9,7 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  // Relative URLs in metadata (canonical links, Open Graph images) resolve under the base path.
+  metadataBase: new URL(`${siteUrl}${basePath}/`),
   title: { default: `${appName}: a rich-text editor with a media canvas`, template: `%s | ${appName}` },
   description: appDescription,
   openGraph: { siteName: appName, type: 'website', description: appDescription },
@@ -21,7 +22,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
-        <RootProvider search={{ options: { type: 'static', api: `${basePath}/api/search/` } }}>{children}</RootProvider>
+        <RootProvider search={{ options: { type: 'static', api: `${basePath}/api/search` } }}>{children}</RootProvider>
       </body>
     </html>
   );
