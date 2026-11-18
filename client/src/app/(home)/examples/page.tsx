@@ -2,15 +2,20 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ServerCodeBlock } from 'fumadocs-ui/components/codeblock.rsc';
 import type { Metadata } from 'next';
+import { shareMetadata } from '@/components/seo/metadata';
 import Link from 'next/link';
 import { ExampleStage, type ExampleName } from '@/components/examples/example-stage';
 import { FolderTabs } from '@/components/site/folder-tabs';
 
+const title = 'React Rich Text Editor Examples: Article, Social Post, Comment | Post Canvas';
+const description =
+  'Three live React rich text editor examples on Tiptap, with their source: a blog and article editor, a social post composer and a comment box.';
+
 export const metadata: Metadata = {
-  title: 'Examples',
-  description:
-    'Three complete Post Canvas examples with their source: a social composer with a feed, an article editor with a title and cover, and a comment thread.',
+  title: { absolute: title },
+  description,
   alternates: { canonical: './' },
+  ...shareMetadata({ title, description }),
 };
 
 const examples: {

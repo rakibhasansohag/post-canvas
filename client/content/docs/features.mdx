@@ -1,0 +1,103 @@
+---
+title: 'Features of the React editor'
+description: 'A visual tour of the Post Canvas React rich text editor: menus, mentions, image galleries, collages, YouTube embeds, link cards, presets and HTML output.'
+---
+
+Each screenshot below is the real editor, captured from this site. Open the [playground](/playground) to try every switch yourself, or read the guide linked under each part.
+
+<Figure
+  name="editor-collage"
+  eager
+  caption="The social preset: a post with a mention, two hashtags and a four-photo collage."
+/>
+
+## Rich text and a toolbar
+
+Headings, bold, italic, underline, strike, code, sub and superscript, links, colours, highlights, alignment, lists, task lists, quotes, tables and code blocks. The toolbar shows what the current preset allows, and Markdown shortcuts work as you type.
+
+<Figure
+  name="rich-text"
+  caption="The full toolbar above a note with a heading, marks, a mention, a link, a task list and a quote."
+/>
+
+## Selection menu and slash menu
+
+Select text and a small menu offers the common marks and **Turn into**. Type `/` on an empty line to insert any block, and keep typing to filter the list.
+
+<Figures>
+  <Figure name="selection-menu" caption="The selection menu." />
+  <Figure name="slash-menu" caption="The / menu." />
+</Figures>
+
+## Mentions and hashtags
+
+Type `@` or `#` and pick from your own people and tags. The lists come from your API through the mention and hashtag adapters. See [Mentions and hashtags](/docs/guides/mentions-and-hashtags).
+
+<Figure name="mentions" caption="The @ list, with names and roles from a mentions adapter." />
+
+## Photo galleries in four layouts
+
+One gallery block holds several photos and shows them as a carousel, a grid, a masonry wall or a collage. Writers switch layouts from the gallery's own toolbar, reorder photos and add alt text and a caption. See [Galleries](/docs/guides/galleries).
+
+<Figures>
+  <Figure name="gallery-carousel" caption="Carousel" />
+  <Figure name="gallery-grid" caption="Grid" />
+  <Figure name="gallery-masonry" caption="Masonry" />
+  <Figure name="gallery-collage" caption="Collage" />
+</Figures>
+
+## Arrange a collage
+
+In a collage, the first photo is the background and the others sit on it. **Arrange the collage** lets writers drag each photo into place, resize it and turn it, with a pinch on touch screens.
+
+<Figure name="collage-arrange" caption="The collage editor, open on a five-photo gallery." />
+
+## Video, social embeds and link cards
+
+Paste a link and the editor picks the block. YouTube and Vimeo links become players, and posts from X, Instagram, TikTok and other providers become embeds. By default, players and embeds load only after a click, so nothing from the provider runs until the reader asks for it. Any other link becomes a card, filled in by your link preview adapter. See [Embeds and link previews](/docs/guides/embeds-and-link-previews).
+
+<Figure name="embed-youtube" caption="A YouTube link, shown as a player with a title and a description." />
+
+<Figures>
+  <Figure name="embed-social" caption="A post from X, waiting for a click before it loads." />
+  <Figure name="link-card" caption="A link card for any other page." />
+</Figures>
+
+## Presets for posts, articles and comments
+
+A preset turns on the right parts for the job: `social` for a post composer, `article` for long form with a title and a cover, `comment` for a small reply box, and `full` for everything. See [Presets and features](/docs/concepts/presets-and-features).
+
+<Figures>
+  <Figure name="preset-social" caption="social" />
+  <Figure name="preset-article" caption="article" />
+</Figures>
+
+<Figure name="preset-comment" caption="comment" maxWidth={640} />
+
+## Output as JSON, HTML and Markdown
+
+The editor saves Tiptap JSON. `renderToHTML()` and `PostCanvasView` show it on your server without the editor, and `toMarkdown()` and `toPlainText()` convert it. See [Rendering](/docs/concepts/rendering).
+
+<Figure name="output-html" caption="The same document as HTML. The JSON and Markdown tabs show the other formats." />
+
+## Sanitize what the browser sends
+
+`sanitizeDocument()` uses the same schema as the editor. It removes unsafe links, photos with unsafe sources, nodes the schema doesn't know and bad embed ids, and reports each removal. See [Security](/docs/concepts/security).
+
+<Figure
+  name="sanitizer"
+  caption="A hostile document on the left. On the right, what was removed and the safe HTML that renders."
+/>
+
+## Phone width, and light and dark themes
+
+The editor works at phone width with touch, and follows your light or dark theme through CSS tokens. See [Theming](/docs/guides/theming).
+
+<Figures>
+  <Figure name="mobile" caption="The social preset at phone width." maxWidth={300} />
+  <Figure name="playground" caption="The playground, where you can switch preset, theme, language and features." />
+</Figures>
+
+## Not yet
+
+Real-time collaboration, comments, AI features, emoji shortcodes, right-to-left layouts, and Vue and Angular wrappers are not built yet. The [roadmap](/docs/roadmap) lists them.

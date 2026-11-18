@@ -1,4 +1,14 @@
 {
   "title": "Post Canvas",
-  "pages": ["index", "getting-started", "concepts", "guides", "reference", "examples", "roadmap", "contributing"]
+  "pages": [
+    "index",
+    "features",
+    "getting-started",
+    "concepts",
+    "guides",
+    "reference",
+    "examples",
+    "roadmap",
+    "contributing"
+  ]
 }

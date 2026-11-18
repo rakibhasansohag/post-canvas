@@ -52,7 +52,7 @@ const tools: Tool[] = [
     title: 'Selection menu',
     body: 'Select text for bold, italic, links, highlight and colour, right where you are.',
     icon: MousePointerClick,
-    run: (editor) => void selectText(editor, 'two good cafés'),
+    run: (editor) => void selectText(editor, 'good cafés on the way'),
   },
   {
     title: 'Slash menu',

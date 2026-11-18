@@ -1,8 +1,9 @@
 import { createGetUrl } from 'fumadocs-core/source';
 
 export const appName = 'Post Canvas';
+export const appTitle = 'Post Canvas: Open-Source React Rich Text Editor on Tiptap';
 export const appDescription =
-  'An open-source React editor for posts and articles: rich text, photo galleries, video and social embeds, and safe output. Built on Tiptap.';
+  'An open-source React rich text editor built on Tiptap. A free WYSIWYG editor with photo galleries, collages, video and social embeds, and sanitized HTML output.';
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
 

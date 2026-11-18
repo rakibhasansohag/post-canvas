@@ -1,11 +1,11 @@
 ---
-title: 'Galleries'
-description: 'Add photo galleries in four layouts (carousel, grid, masonry, collage), set photo limits, and arrange photos with the manager and collage editor.'
+title: 'Image galleries'
+description: 'Add React image galleries in four layouts (carousel, grid, masonry and collage), set photo limits, and arrange photos with the manager and collage editor.'
 ---
 
 A **gallery** is one block that holds several photos. Writers pick a layout, reorder photos, describe each one, and add a caption. Galleries need an upload adapter, because the editor has to put the photos somewhere: see [Uploads](/docs/guides/uploads).
 
-## The four layouts
+## Four image gallery layouts
 
 | Layout     | What it looks like                                              | Good for                     |
 | ---------- | --------------------------------------------------------------- | ---------------------------- |
@@ -17,6 +17,17 @@ A **gallery** is one block that holds several photos. Writers pick a layout, reo
 A collage needs at least two photos: the first is the background and the rest sit on it. A collage with one photo shows as a carousel until a second photo arrives.
 
 Writers add a gallery from the Insert button, the `/` menu or the toolbar, then pick files. Choosing one picture inserts an image. Choosing several inserts a gallery. Files dropped on an existing gallery join it, and so does the **Add photos** button.
+
+<Figures>
+  <Figure name="gallery-carousel" caption="carousel" />
+  <Figure name="gallery-grid" caption="grid" />
+  <Figure name="gallery-masonry" caption="masonry" />
+  <Figure name="gallery-collage" caption="collage" />
+</Figures>
+
+Try the layouts on a live gallery: select it, then pick a layout from its toolbar.
+
+<LiveDemo sample="gallery-collage" minHeight="30rem" />
 
 ## Configure galleries
 
@@ -84,6 +95,8 @@ A live region announces moves, layer changes and removals. Under `prefers-reduce
 A pinch on a laptop trackpad (which browsers report as Ctrl and mouse wheel) over a collage photo resizes that photo instead of zooming the page. Touch pinch and Safari gesture events work too.
 
 Each photo's position is stored as numbers between 0 and 1, relative to the background photo: `x` and `y` for the centre, `w` for the width and `r` for the rotation in degrees. A collage frame is never taller than 560 CSS pixels. It gets narrower instead.
+
+<Figure name="collage-arrange" caption="The collage editor, open from Arrange the collage." />
 
 ## Unknown sizes
 

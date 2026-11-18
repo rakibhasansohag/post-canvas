@@ -21,7 +21,7 @@ const layouts: { id: GalleryLayout; label: string; body: string; icon: LucideIco
   {
     id: 'grid',
     label: 'Grid',
-    body: 'Even tiles that fill the width, with the first photo larger when the count is odd.',
+    body: 'Even square tiles that fill the width. Two photos sit side by side, and with three the first one is tall.',
     icon: LayoutGrid,
   },
   {

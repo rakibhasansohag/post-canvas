@@ -1,6 +1,6 @@
 ---
-title: 'Uploads'
-description: 'Connect an upload adapter to Post Canvas with S3, Cloudinary or a local route, with progress, cancel, retry and HEIC support.'
+title: 'Image uploads'
+description: 'Build a rich text editor with image upload: connect an upload adapter to S3, Cloudinary or your own route, with progress, cancel, retry and HEIC support.'
 ---
 
 Post Canvas does not store files. You give the editor an **upload adapter**: an object with one `upload()` function that sends a file to your storage and returns the public URL. The editor handles everything around it: picking, pasting and dropping files, checking them, showing progress, retrying failures and writing the result into the document.

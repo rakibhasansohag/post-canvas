@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LogoMark } from './logo';
 import { InstallCommand } from './install-command';
+import { seoPages } from '@/components/seo/pages';
 import { npmUrl, repoUrl } from '@/lib/shared';
 
 const columns: { title: string; links: { label: string; href: string }[] }[] = [
@@ -20,6 +21,10 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
       { label: 'Playground', href: '/playground' },
       { label: 'Roadmap', href: '/docs/roadmap' },
     ],
+  },
+  {
+    title: 'Compare',
+    links: seoPages.map((page) => ({ label: page.short, href: `/${page.slug}` })),
   },
   {
     title: 'Project',
@@ -59,15 +64,16 @@ export function SiteFooter() {
               <span className="font-display text-[1.45rem] font-bold tracking-[-0.02em]">Post Canvas</span>
             </Link>
             <p className="max-w-[26rem] text-site-deep-muted">
-              An open-source React editor for posts and articles, with a media canvas and safe output.
+              An open-source React rich text editor for posts and articles, built on Tiptap, with a media canvas and
+              safe output.
             </p>
             <InstallCommand className="w-full max-w-[22rem] text-white" />
           </div>
-          <nav aria-label="Footer" className="grid grid-cols-2 gap-8 sm:grid-cols-3">
-            {columns.map((column, index) => (
-              <div key={column.title} className={index === 2 ? 'col-span-2 sm:col-span-1' : undefined}>
+          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
+            {columns.map((column) => (
+              <div key={column.title}>
                 <p className="mb-3 font-mono text-[0.75rem] tracking-[0.14em] text-white uppercase">{column.title}</p>
-                <ul className={index === 2 ? 'columns-2 gap-8 sm:columns-1' : undefined}>
+                <ul>
                   {column.links.map((link) => (
                     <li key={link.label}>
                       <FooterLink href={link.href}>{link.label}</FooterLink>

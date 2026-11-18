@@ -5,6 +5,8 @@ import type { MDXComponents } from 'mdx/types';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Callout } from 'fumadocs-ui/components/callout';
+import { Figure, Figures } from '@/components/docs/figure';
+import { LiveDemo } from '@/components/docs/live-demo';
 
 // The reference tables are generated from the TSDoc comments in the package source, at build time.
 const generator = createGenerator({ tsconfigPath: '../package/tsconfig.json' });
@@ -23,6 +25,9 @@ export function getMDXComponents(components?: MDXComponents) {
     Step,
     Steps,
     Callout,
+    Figure,
+    Figures,
+    LiveDemo,
     ...components,
   } satisfies MDXComponents;
 }

@@ -1,6 +1,6 @@
 ---
 title: 'Security model'
-description: 'How Post Canvas keeps stored and rendered posts safe: sanitizing client JSON on the server, URL rules, sandboxed embeds, and what it does not protect against.'
+description: 'How Post Canvas sanitizes rich text for React apps: sanitize client JSON on the server with no DOM, URL rules, sandboxed embeds, and what it does not cover.'
 ---
 
 Post Canvas lets people write documents that other people read, so a hostile document is the main risk: a link that runs script, a picture that points at an internal address, an embed that loads a page you did not choose. This page describes what the library does about that, and what stays your job.
@@ -10,7 +10,7 @@ Post Canvas lets people write documents that other people read, so a hostile doc
   `sanitizeDocument()` on every document that comes from a client before you store it or show it to anyone else.
 </Callout>
 
-## The rule
+## The rule: sanitize on the server
 
 Treat JSON from a browser like any other form input. On your server:
 
@@ -57,6 +57,11 @@ It walks the document, keeps only what the schema knows, and rebuilds the result
 - **Colours.** Only the nine palette names are kept. A hex value or a CSS string is dropped.
 - **Size.** Documents are cut at 20,000 nodes, 48 levels of nesting and 500,000 characters of text by default. Override with `limits`. Anything cut appears in `removed`.
 - **Control characters.** Bidirectional text controls are stripped from captions, names and similar fields, so a file called `invoice<RLO>fdp.exe` cannot read as something else.
+
+<Figure
+  name="sanitizer"
+  caption="A hostile document from a client, and what sanitizeDocument removed before it renders."
+/>
 
 ## URL rules
 

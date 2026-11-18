@@ -1,6 +1,6 @@
 ---
 title: 'Document JSON'
-description: 'How Post Canvas stores a post: the Tiptap JSON shape, node ids, media fields, and the editor-only state you must not save.'
+description: 'How Post Canvas stores a post as Tiptap JSON: the document shape, node ids, media fields, and the editor-only state you must not save.'
 ---
 
 A Post Canvas document is plain JSON in the format of Tiptap (and ProseMirror, the engine under it). The editor gives it to you in `onChange`, you store it as it is, and you pass it back to the editor, to `renderToHTML` or to `PostCanvasView` later. The document holds the body only. The title and the cover picture are separate (see [fields](/docs/concepts/fields)).

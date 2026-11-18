@@ -1,6 +1,7 @@
 import { ServerCodeBlock } from 'fumadocs-ui/components/codeblock.rsc';
 import { ArrowDown, BookOpen, Plus, SlidersHorizontal } from 'lucide-react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { EmbedsDemo } from '@/components/demos/embeds-demo';
 import { GalleryDemo } from '@/components/demos/gallery-demo';
 import { HeroEditor } from '@/components/demos/hero-editor';
@@ -11,12 +12,15 @@ import { ButtonLink } from '@/components/site/button';
 import { FolderTabs } from '@/components/site/folder-tabs';
 import { InstallCommand } from '@/components/site/install-command';
 import { SectionHead } from '@/components/site/section-head';
-import { appDescription, appName, facts, npmUrl, repoUrl, siteUrl } from '@/lib/shared';
+import { shareMetadata } from '@/components/seo/metadata';
+import { seoPages } from '@/components/seo/pages';
+import { appDescription, appName, appTitle, basePath, facts, npmUrl, repoUrl, siteUrl } from '@/lib/shared';
 
 export const metadata: Metadata = {
-  title: { absolute: 'Post Canvas: an open-source React editor with a media canvas' },
+  title: { absolute: appTitle },
   description: appDescription,
   alternates: { canonical: './' },
+  ...shareMetadata({ title: appTitle, description: appDescription }),
 };
 
 const comparisonColumns = ['Post Canvas', 'TinyMCE', 'Froala', 'Tiptap', 'Lexical'] as const;
@@ -112,6 +116,11 @@ const faqs: { question: string; answer: string }[] = [
       'Yes. It is released under the MIT licence, so you can use it in commercial and closed-source products. The optional HEIC photo conversion uses heic-to, which is LGPL and which you install yourself if you want it.',
   },
   {
+    question: 'How is it different from TinyMCE or Froala?',
+    answer:
+      'Post Canvas is MIT licensed and needs no API key, licence key or cloud: it is one npm package you host with your app. It is built for posts and articles, so photo galleries, collages and click-to-load embeds are built in, and a server-side sanitizer comes with it. TinyMCE and Froala cover more ground, such as collaboration and Vue and Angular wrappers, which Post Canvas does not have yet.',
+  },
+  {
     question: 'Does it work with Next.js and React Server Components?',
     answer:
       'Yes. The editor is a Client Component. renderToHTML, PostCanvasView and sanitizeDocument run in Server Components and on any server, with no DOM, so saved posts render without shipping the editor to readers.',
@@ -152,13 +161,19 @@ const jsonLd = {
   '@graph': [
     {
       '@type': 'SoftwareSourceCode',
+      '@id': `${siteUrl}${basePath}/#software`,
       name: appName,
       description: appDescription,
-      url: siteUrl,
+      url: `${siteUrl}${basePath}/`,
       codeRepository: repoUrl,
       programmingLanguage: ['TypeScript', 'React'],
+      runtimePlatform: 'Browser, Node.js 20.19 or later',
+      version: '0.1.0',
       license: 'https://opensource.org/licenses/MIT',
-      sameAs: [npmUrl],
+      isAccessibleForFree: true,
+      keywords: 'React rich text editor, WYSIWYG editor, Tiptap, image gallery, embeds, HTML sanitizer',
+      author: { '@type': 'Person', name: 'Saimul Islam' },
+      sameAs: [npmUrl, repoUrl],
     },
     {
       '@type': 'FAQPage',
@@ -184,8 +199,8 @@ function Hero() {
           </div>
           <div className="site-rise flex flex-col gap-6 [--i:2]">
             <p className="text-[1.125rem] leading-relaxed text-site-deep-muted sm:text-[1.2rem]">
-              Post Canvas is a rich-text editor with galleries, collages, video and social embeds built in, and output
-              you can sanitize and render on your server. Built on Tiptap.
+              Post Canvas is an open-source React rich text editor with galleries, collages, video and social embeds
+              built in, and output you can sanitize and render on your server. Built on Tiptap.
             </p>
             <div className="flex flex-wrap gap-3">
               <ButtonLink href="/docs/getting-started">Get started</ButtonLink>
@@ -348,6 +363,20 @@ export default function HomePage() {
               </tbody>
             </table>
           </div>
+          <nav aria-labelledby="compare-more" className="mt-10">
+            <h3 id="compare-more" className="site-h3 mb-4">
+              Side-by-side pages, with sources
+            </h3>
+            <ul className="flex flex-wrap gap-2">
+              {seoPages.map((page) => (
+                <li key={page.slug}>
+                  <Link href={`/${page.slug}`} className="site-chip">
+                    {page.short}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
       </section>
 

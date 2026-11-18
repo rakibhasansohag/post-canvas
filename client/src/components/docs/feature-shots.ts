@@ -19,14 +19,14 @@ export const featureShots = {
     dark: [1764, 1120],
   },
   'gallery-grid': {
-    alt: 'A gallery in the grid layout: five coast photos in even square tiles',
-    light: [1764, 1548],
-    dark: [1764, 1548],
+    alt: 'A gallery in the grid layout: six coast photos in two rows of even square tiles',
+    light: [1764, 1564],
+    dark: [1764, 1564],
   },
   'gallery-masonry': {
     alt: 'A gallery in the masonry layout: five photos in three columns, each at its own proportions',
-    light: [1764, 1488],
-    dark: [1764, 1488],
+    light: [1764, 1516],
+    dark: [1764, 1516],
   },
   'gallery-collage': {
     alt: 'A gallery in the collage layout: four photos tilted and layered over a clifftop background photo',
@@ -53,7 +53,7 @@ export const featureShots = {
     light: [1764, 790],
     dark: [1764, 784],
   },
-  'mentions': {
+  mentions: {
     alt: 'The mention list open after typing @, showing people with their initials and roles',
     light: [1764, 790],
     dark: [1764, 784],
@@ -103,17 +103,17 @@ export const featureShots = {
     light: [2304, 1156],
     dark: [2304, 1114],
   },
-  'sanitizer': {
+  sanitizer: {
     alt: 'A hostile document with a javascript: link, an unsafe photo, an iframe and a script in a video id, next to what sanitizeDocument removed and the safe HTML it renders',
     light: [2304, 1116],
     dark: [2304, 1116],
   },
-  'playground': {
+  playground: {
     alt: 'The playground: switches for preset, theme, language and features beside a live editor with a sample post',
     light: [2320, 1760],
     dark: [2320, 1760],
   },
-  'mobile': {
+  mobile: {
     alt: 'The editor at phone width with the social preset, a mention, hashtags and a collage',
     light: [720, 1146],
     dark: [720, 1146],

@@ -1,6 +1,6 @@
 ---
-title: 'Use with Next.js'
-description: 'Use Post Canvas with the Next.js App Router: the editor in a client component, a route handler that sanitizes on save, and server-side rendering of posts.'
+title: 'Next.js rich text editor'
+description: 'Use Post Canvas as a Next.js rich text editor on the App Router: Tiptap in a client component, sanitizing on save, and server rendering of posts.'
 ---
 
 In the App Router, the editor lives in a Client Component, and saved posts render in a Server Component. That split keeps Tiptap and ProseMirror out of the reader's page: the browser gets only the small client parts, which are the click-to-load player and the carousel. This guide shows the editor, a route handler that checks what it receives, and the read-only page.
@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 }
 ```
 
-## The editor in a client component
+## The rich text editor in a client component
 
 Anything that passes functions to `PostCanvas` (`onChange`, adapters) must be a Client Component, so wrap it in a file that starts with `'use client'`.
 

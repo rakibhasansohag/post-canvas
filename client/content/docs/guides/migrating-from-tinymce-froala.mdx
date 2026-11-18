@@ -1,6 +1,6 @@
 ---
 title: 'Migrating from TinyMCE or Froala'
-description: 'Move existing HTML content into Post Canvas with fromHTML, check what was lost, and see which TinyMCE and Froala features have an equivalent.'
+description: 'Use Post Canvas as a TinyMCE alternative or Froala alternative: move existing HTML content over with fromHTML, check what was lost, and map each feature.'
 ---
 
 TinyMCE and Froala store a post as an HTML string. Post Canvas stores a post as JSON (see [Document JSON](/docs/concepts/document-json)). To move over, you convert each HTML string once with `fromHTML()`, check the result, and save the JSON. The HTML is read through Post Canvas's schema, so anything the schema has no place for is left out, and then the result is sanitized.

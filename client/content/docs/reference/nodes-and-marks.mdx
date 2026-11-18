@@ -1,6 +1,6 @@
 ---
 title: 'Nodes and marks'
-description: 'Every node and mark in a Post Canvas document, with its attributes, its feature flag and what the sanitizer clamps or drops.'
+description: 'Every node and mark in a Post Canvas document, including tables, images and links, with its attributes, its feature flag and what the sanitizer drops.'
 ---
 
 A Post Canvas document is Tiptap JSON: a `doc` node holding block nodes, which hold text nodes with marks. This page lists every node and mark, the attributes each one stores, and the rule the sanitizer applies to each attribute. `sanitizeDocument()` runs these rules, and so do `renderToHTML`, `PostCanvasView`, `fromHTML`, `fromMarkdown` and the paste handler. See [Render](/docs/reference/render) and [Server](/docs/reference/server).

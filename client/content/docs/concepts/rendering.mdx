@@ -1,6 +1,6 @@
 ---
 title: 'Rendering documents'
-description: 'Show a saved Post Canvas document with renderToHTML, PostCanvasView or a read-only editor, and control how videos and embeds load for readers.'
+description: 'Turn Tiptap JSON into HTML: show a saved Post Canvas document with renderToHTML, PostCanvasView or a read-only editor, and control how videos and embeds load.'
 ---
 
 A saved post is JSON. To show it to a reader you turn it into something the browser can display. Post Canvas gives you three ways, and all of them read the same JSON.
@@ -12,6 +12,8 @@ A saved post is JSON. To show it to a reader you turn it into something the brow
 | `<PostCanvas readOnly defaultContent={json} />` | The editor, locked | Browser                          | A preview that looks exactly like the editor                                     |
 
 Pick the first two for readers. Both import from `post-canvas/render`, and both sanitize the document before they render it.
+
+<Figure name="output-html" caption="A document in the editor and the HTML that renderToHTML returns for it." />
 
 ## renderToHTML
 
@@ -120,6 +122,11 @@ const doc = fromMarkdown('# Hello\n\nA **bold** idea.'); // sanitized JSON
 - **Markdown.** Galleries become a list of images. Videos, embeds and link cards become a link on their own line. Formatting that Markdown cannot hold, such as underline and colour, is left out. Link text and link addresses are escaped, and a code block gets a fence longer than any run of backticks inside it. `fromMarkdown` sanitizes its result, and syntax for features that are off ends up as plain text.
 - **HTML in.** `fromHTML(html)` reads HTML from other editors (TinyMCE, Froala, Word, Google Docs) into a sanitized document. In a browser it uses `DOMParser`. On a server, pass a window from a DOM library: `fromHTML(html, { window: new (await import('happy-dom')).Window() })`. It throws a `RangeError` for input over 1,000,000 characters or nested deeper than 512 elements, and `onRemoved` lists what it left out.
 - `getCover` skips pictures whose size is unknown (`width` or `height` of `0`).
+
+<Figures>
+  <Figure name="output-markdown" caption="The same document as Markdown." />
+  <Figure name="output-json" caption="The JSON the editor saves." />
+</Figures>
 
 ## Styles
 

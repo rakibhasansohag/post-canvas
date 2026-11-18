@@ -1,6 +1,6 @@
 ---
 title: 'Embeds and link previews'
-description: 'How a pasted link becomes a video, an embed or a link card, which providers are built in, and how to wire the server resolvers.'
+description: 'Embed YouTube and Vimeo players, posts from X and other providers in a Tiptap editor, turn other links into link previews, and wire the server resolvers.'
 ---
 
 When a writer pastes a link into an empty paragraph, Post Canvas turns it into the best block it can:
@@ -13,6 +13,17 @@ When a writer pastes a link into an empty paragraph, Post Canvas turns it into t
 The link is inserted as text first, as its own undo step, so Undo turns the block back into the plain link. Writers can also use the Insert button or the `/` menu: **Video**, **Embed** and **Link card** open a small paste-a-link field.
 
 Only a link on its own works this way. A link pasted inside a sentence, or into a paragraph that already has text, stays a normal link.
+
+<Figure name="embed-youtube" caption="A YouTube link becomes a video block with a title and a description." />
+
+<Figures>
+  <Figure name="embed-social" caption="A post from X, as a click-to-load embed." />
+  <Figure name="link-card" caption="Any other page, as a link card." />
+</Figures>
+
+Paste a link into the empty line under the video to try it. The link card here uses a demo preview, so every page gets the same canned title.
+
+<LiveDemo sample="embeds" minHeight="30rem" />
 
 ## Built-in providers
 

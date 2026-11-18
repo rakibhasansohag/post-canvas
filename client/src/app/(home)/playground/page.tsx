@@ -1,11 +1,16 @@
 import type { Metadata } from 'next';
+import { shareMetadata } from '@/components/seo/metadata';
 import { PlaygroundEditor } from '@/components/playground-editor';
 
+const title = 'Rich Text Editor Playground: Try Post Canvas Online | Post Canvas';
+const description =
+  'Try an online rich text editor in your browser: switch presets, themes, languages and features, then read the document as JSON, HTML, Markdown and text.';
+
 export const metadata: Metadata = {
-  title: 'Playground',
-  description:
-    'Try Post Canvas in your browser: switch presets, themes, languages and features, then read the document as JSON, HTML, Markdown and text.',
+  title: { absolute: title },
+  description,
   alternates: { canonical: './' },
+  ...shareMetadata({ title, description }),
 };
 
 export default function PlaygroundPage() {

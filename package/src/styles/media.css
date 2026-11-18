@@ -157,6 +157,18 @@
   background: var(--pc-surface);
 }
 
+/* A gallery is a list. Inside .pc-content the text list rules (indent, markers and the space between items) are more
+   specific than the two rules above, so they are reset here at a higher specificity. The layout rules below still win. */
+.pc-content .pc-gallery__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-content .pc-gallery__item {
+  margin: 0;
+}
+
 .pc-gallery__img {
   display: block;
   width: 100%;
@@ -733,6 +745,17 @@
   position: relative;
   border-radius: var(--pc-radius);
   transition: box-shadow 200ms ease-out;
+}
+
+/* The same reset for the photo manager's list, which sits inside the gallery block. */
+.pc-content .pc-photo-manager__grid {
+  margin: 0;
+  padding: var(--pc-space-2) 0 0;
+  list-style: none;
+}
+
+.pc-content .pc-photo-manager__cell {
+  margin: 0;
 }
 
 .pc-photo-manager__cell[data-target] {

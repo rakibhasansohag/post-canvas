@@ -1,11 +1,13 @@
 ---
 title: 'Mentions and hashtags'
-description: 'Back the @ mention and # hashtag menus with your own search API, and learn how they are stored, rendered and limited.'
+description: 'Add Tiptap mentions and hashtags to a React editor: back the @ and # menus with your own search API, and see how they are stored, rendered and limited.'
 ---
 
 Typing `@` opens a list of people. Typing `#` opens a list of tags. Post Canvas does not know your users or your tags, so you provide two adapters that look them up: `adapters.mentions` for `@` and `adapters.hashtags` for `#`. Each one has a single `search()` function.
 
 Both features are on in the `full`, `article` and `social` presets. The `comment` preset keeps mentions and turns hashtags off. If an adapter is missing, the menu has nothing to list (for hashtags, it still offers the typed text as a new tag).
+
+<Figure name="mentions" caption="The @ menu, filled by a mentions adapter." />
 
 ## The adapter
 
