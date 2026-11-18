@@ -10,7 +10,7 @@ export const docsImageRoute = '/og/docs';
 export const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 /** The public origin, for the sitemap and Open Graph tags. Set `NEXT_PUBLIC_SITE_URL` when you build for a host. */
-export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://post-canvas.pages.dev').replace(/\/$/, '');
+export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://postcanvas.saimulislam.com').replace(/\/$/, '');
 
 export const gitConfig = {
   user: 'saimulft',

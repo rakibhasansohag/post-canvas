@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://post-canvas.pages.dev">
+  <a href="https://postcanvas.saimulislam.com">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/saimulft/post-canvas/main/.github/assets/wordmark-dark.svg" />
       <img alt="Post Canvas" src="https://raw.githubusercontent.com/saimulft/post-canvas/main/.github/assets/wordmark-light.svg" width="300" />
@@ -11,10 +11,10 @@ An open-source React editor for posts and articles, built on [Tiptap](https://ti
 from TinyMCE or Froala, plus a media canvas: photo galleries, video and social embeds, link cards and drag-to-reorder
 blocks. Documents render to HTML or React on your server with a built-in sanitizer.
 
-[![Post Canvas: the social preset with a formatted post, a mention, hashtags and a four-photo collage](https://raw.githubusercontent.com/saimulft/post-canvas/main/.github/assets/demo.jpg)](https://post-canvas.pages.dev)
+[![Post Canvas: the social preset with a formatted post, a mention, hashtags and a four-photo collage](https://raw.githubusercontent.com/saimulft/post-canvas/main/.github/assets/demo.jpg)](https://postcanvas.saimulislam.com)
 
-[Website and live demos](https://post-canvas.pages.dev) · [Docs](https://post-canvas.pages.dev/docs/) ·
-[Examples](https://post-canvas.pages.dev/examples/) · [Playground](https://post-canvas.pages.dev/playground/) ·
+[Website and live demos](https://postcanvas.saimulislam.com) · [Docs](https://postcanvas.saimulislam.com/docs/) ·
+[Examples](https://postcanvas.saimulislam.com/examples/) · [Playground](https://postcanvas.saimulislam.com/playground/) ·
 [npm](https://www.npmjs.com/package/post-canvas) · [Contributing](https://github.com/saimulft/post-canvas/blob/main/CONTRIBUTING.md)
 
 ## Features
@@ -115,7 +115,7 @@ before you store it: use `sanitizeDocument()` or `validateDocument()` from `post
 ```
 
 Uploads, mentions, link previews, autosave, theming and the other guides are in the
-[docs](https://post-canvas.pages.dev/docs/).
+[docs](https://postcanvas.saimulislam.com/docs/).
 
 ## Browser support
 

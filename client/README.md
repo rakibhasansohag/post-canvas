@@ -2,7 +2,7 @@
 
 The website for [Post Canvas](../README.md): a home page made of live demos, three examples with their source, a
 playground and the docs. It is built with Next.js 16 and Fumadocs, and builds as a static export, so it runs on any
-static host. It is live at https://post-canvas.pages.dev.
+static host. It is live at https://postcanvas.saimulislam.com.
 
 ## Run it
 
@@ -44,10 +44,10 @@ built at build time.
 
 Two environment variables, read at build time, set where the site lives:
 
-| Variable                | Default                         | Use                                                                             |
-| ----------------------- | ------------------------------- | ------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_BASE_PATH` | empty                           | The sub-path the site is served from, such as `/post-canvas`. No trailing slash |
-| `NEXT_PUBLIC_SITE_URL`  | `https://post-canvas.pages.dev` | The public origin, used in the sitemap, `robots.txt` and Open Graph tags        |
+| Variable                | Default                              | Use                                                                             |
+| ----------------------- | ------------------------------------ | ------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_BASE_PATH` | empty                                | The sub-path the site is served from, such as `/post-canvas`. No trailing slash |
+| `NEXT_PUBLIC_SITE_URL`  | `https://postcanvas.saimulislam.com` | The public origin, used in the sitemap, `robots.txt` and Open Graph tags        |
 
 For example, for `https://example.com/post-canvas/`:
 
@@ -63,7 +63,7 @@ each pull request gets a preview URL. The project's build settings:
 | Build command    | `npm --prefix package ci && npm --prefix package run build && npm --prefix client ci && npm --prefix client run build` |
 | Output directory | `client/out`                                                                                                           |
 | Root directory   | the repo root                                                                                                          |
-| Variables        | `NODE_VERSION=22`, `NEXT_PUBLIC_SITE_URL=https://post-canvas.pages.dev`                                                |
+| Variables        | `NODE_VERSION=22`, `NEXT_PUBLIC_SITE_URL=https://postcanvas.saimulislam.com`                                           |
 
 ## How the local package is wired
 
