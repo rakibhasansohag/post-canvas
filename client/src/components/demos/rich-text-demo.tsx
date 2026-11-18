@@ -13,6 +13,7 @@ import { PostCanvas, type PostCanvasHandle } from 'post-canvas';
 import 'post-canvas/styles.css';
 import { useMemo, useRef, useState } from 'react';
 import { LazyStage, StageFallback } from '@/components/site/lazy-stage';
+import { LiveNote } from '@/components/site/live-note';
 import { useSiteTheme } from '@/components/site/use-site-theme';
 import { createFakeAdapters } from '@/lib/fake-adapters';
 import { richTextContent } from '@/lib/sample-content';
@@ -112,42 +113,47 @@ export function RichTextDemo() {
   const [last, setLast] = useState<string | null>(null);
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
-      <ul className="grid content-start gap-2.5 sm:grid-cols-2 lg:grid-cols-1" aria-label="Writing tools">
-        {tools.map((tool) => (
-          <li key={tool.title}>
-            <button
-              type="button"
-              className="site-card group flex w-full items-start gap-4 p-4 text-left aria-pressed:border-site-accent"
-              aria-pressed={last === tool.title}
-              onClick={() => {
-                const editor = handle.current?.editor;
-                if (!editor) return;
-                tool.run(editor);
-                setLast(tool.title);
-              }}
-            >
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-site-accent-soft text-site-accent transition-transform duration-500 ease-(--ease-out) group-hover:-rotate-6">
-                <tool.icon size={19} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-baseline justify-between gap-3">
-                  <span className="font-semibold">{tool.title}</span>
-                  <span className="font-mono text-[0.75rem] tracking-[0.08em] text-site-accent uppercase">Try it</span>
+    <div className="flex flex-col gap-4">
+      <LiveNote>Press Try it on any tool, or click into the editor and type.</LiveNote>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
+        <ul className="grid content-start gap-2.5 sm:grid-cols-2 lg:grid-cols-1" aria-label="Writing tools">
+          {tools.map((tool) => (
+            <li key={tool.title}>
+              <button
+                type="button"
+                className="site-card group flex w-full items-start gap-4 p-4 text-left aria-pressed:border-site-accent"
+                aria-pressed={last === tool.title}
+                onClick={() => {
+                  const editor = handle.current?.editor;
+                  if (!editor) return;
+                  tool.run(editor);
+                  setLast(tool.title);
+                }}
+              >
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-site-accent-soft text-site-accent transition-transform duration-500 ease-(--ease-out) group-hover:-rotate-6">
+                  <tool.icon size={19} strokeWidth={2} aria-hidden="true" />
                 </span>
-                <span className="mt-1 block text-[0.94rem] leading-snug text-site-muted">{tool.body}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <LazyStage
-        minHeight={['27rem', '26rem']}
-        className="site-stage self-start lg:sticky lg:top-20"
-        fallback={<StageFallback />}
-      >
-        <PostCanvas ref={handle} defaultContent={content} preset="full" adapters={adapters} theme={theme} />
-      </LazyStage>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="font-semibold">{tool.title}</span>
+                    <span className="font-mono text-[0.75rem] tracking-[0.08em] text-site-accent uppercase">
+                      Try it
+                    </span>
+                  </span>
+                  <span className="mt-1 block text-[0.94rem] leading-snug text-site-muted">{tool.body}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <LazyStage
+          minHeight={['27rem', '26rem']}
+          className="site-stage self-start lg:sticky lg:top-20"
+          fallback={<StageFallback />}
+        >
+          <PostCanvas ref={handle} defaultContent={content} preset="full" adapters={adapters} theme={theme} />
+        </LazyStage>
+      </div>
     </div>
   );
 }

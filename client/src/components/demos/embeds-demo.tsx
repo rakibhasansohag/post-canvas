@@ -5,6 +5,7 @@ import { PostCanvas, type FeatureOverrides, type JSONContent, type PostCanvasHan
 import 'post-canvas/styles.css';
 import { useId, useMemo, useRef, useState } from 'react';
 import { LazyStage, StageFallback } from '@/components/site/lazy-stage';
+import { LiveNote } from '@/components/site/live-note';
 import { useSiteTheme } from '@/components/site/use-site-theme';
 import { createFakeAdapters } from '@/lib/fake-adapters';
 import { caretAtEmptyEnd, simulatePaste } from './demo-utils';
@@ -62,80 +63,83 @@ export function EmbedsDemo() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
-      <div className="flex flex-col gap-6">
-        <ul className="grid grid-cols-2 gap-2.5" aria-label="Sample links">
-          {samples.map((sample) => (
-            <li key={sample.url}>
-              <button
-                type="button"
-                onClick={() => paste(sample.url)}
-                className="site-card group flex w-full items-center gap-3 p-3 text-left"
-                aria-label={`Paste a ${sample.label} link`}
-              >
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-site-accent-soft text-site-accent transition-transform duration-500 ease-(--ease-out) group-hover:scale-110">
-                  <sample.icon size={17} strokeWidth={2} aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate font-semibold">{sample.label}</span>
-                  <span className="block font-mono text-[0.72rem] tracking-[0.08em] text-site-muted uppercase">
-                    {sample.kind}
+    <div className="flex flex-col gap-4">
+      <LiveNote>Pick a sample link, or paste any link straight into the editor.</LiveNote>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
+        <div className="flex flex-col gap-6">
+          <ul className="grid grid-cols-2 gap-2.5" aria-label="Sample links">
+            {samples.map((sample) => (
+              <li key={sample.url}>
+                <button
+                  type="button"
+                  onClick={() => paste(sample.url)}
+                  className="site-card group flex w-full items-center gap-3 p-3 text-left"
+                  aria-label={`Paste a ${sample.label} link`}
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-site-accent-soft text-site-accent transition-transform duration-500 ease-(--ease-out) group-hover:scale-110">
+                    <sample.icon size={17} strokeWidth={2} aria-hidden="true" />
                   </span>
-                </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">{sample.label}</span>
+                    <span className="block font-mono text-[0.72rem] tracking-[0.08em] text-site-muted uppercase">
+                      {sample.kind}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!own.trim()) return;
+              paste(own.trim());
+              setOwn('');
+            }}
+          >
+            <label htmlFor={inputId} className="font-semibold">
+              Or paste your own link
+            </label>
+            <div className="flex gap-2">
+              <span className="relative min-w-0 flex-1">
+                <Link2
+                  size={17}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-site-muted"
+                />
+                <input
+                  id={inputId}
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://"
+                  value={own}
+                  onChange={(event) => setOwn(event.target.value)}
+                  className="h-12 w-full rounded-[14px] border border-site-border bg-site-bg ps-10 pe-3 transition-colors duration-200 outline-none focus:border-site-accent"
+                />
+              </span>
+              <button type="submit" className="site-btn site-btn-primary px-5">
+                Paste
               </button>
-            </li>
-          ))}
-        </ul>
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!own.trim()) return;
-            paste(own.trim());
-            setOwn('');
-          }}
-        >
-          <label htmlFor={inputId} className="font-semibold">
-            Or paste your own link
-          </label>
-          <div className="flex gap-2">
-            <span className="relative min-w-0 flex-1">
-              <Link2
-                size={17}
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-site-muted"
-              />
-              <input
-                id={inputId}
-                type="url"
-                inputMode="url"
-                placeholder="https://"
-                value={own}
-                onChange={(event) => setOwn(event.target.value)}
-                className="h-12 w-full rounded-[14px] border border-site-border bg-site-bg ps-10 pe-3 transition-colors duration-200 outline-none focus:border-site-accent"
-              />
-            </span>
-            <button type="submit" className="site-btn site-btn-primary px-5">
-              Paste
-            </button>
-          </div>
-          <p className="text-[0.9rem] text-site-muted">
-            YouTube, Vimeo, X, Instagram, TikTok, Spotify, SoundCloud, CodePen, Loom, Figma and Google Maps become
-            players. Other links become cards. Players load only after a click.
-          </p>
-        </form>
+            </div>
+            <p className="text-[0.9rem] text-site-muted">
+              YouTube, Vimeo, X, Instagram, TikTok, Spotify, SoundCloud, CodePen, Loom, Figma and Google Maps become
+              players. Other links become cards. Players load only after a click.
+            </p>
+          </form>
+        </div>
+        <LazyStage minHeight={['20rem', '28rem']} className="site-stage self-start" fallback={<StageFallback />}>
+          <PostCanvas
+            ref={handle}
+            defaultContent={start}
+            preset="full"
+            features={features}
+            classify={null}
+            adapters={adapters}
+            theme={theme}
+          />
+        </LazyStage>
       </div>
-      <LazyStage minHeight={['20rem', '28rem']} className="site-stage self-start" fallback={<StageFallback />}>
-        <PostCanvas
-          ref={handle}
-          defaultContent={start}
-          preset="full"
-          features={features}
-          classify={null}
-          adapters={adapters}
-          theme={theme}
-        />
-      </LazyStage>
     </div>
   );
 }

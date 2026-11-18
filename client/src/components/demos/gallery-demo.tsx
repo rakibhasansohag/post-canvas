@@ -5,6 +5,7 @@ import { PostCanvas, type FeatureOverrides, type GalleryLayout, type PostCanvasH
 import 'post-canvas/styles.css';
 import { useMemo, useRef, useState } from 'react';
 import { LazyStage, StageFallback } from '@/components/site/lazy-stage';
+import { LiveNote } from '@/components/site/live-note';
 import { useSiteTheme } from '@/components/site/use-site-theme';
 import { createFakeAdapters } from '@/lib/fake-adapters';
 import { galleryContent } from '@/lib/sample-content';
@@ -66,54 +67,57 @@ export function GalleryDemo() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-8">
-      <div
-        role="radiogroup"
-        aria-label="Gallery layout"
-        className="grid content-start gap-2.5 sm:grid-cols-2 lg:grid-cols-1"
-      >
-        {layouts.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="radio"
-            aria-checked={layout === item.id}
-            onClick={() => choose(item.id)}
-            className="site-card group flex items-start gap-4 p-4 text-left aria-checked:border-site-accent aria-checked:shadow-[0_0_0_1px_var(--site-accent)]"
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-site-bg text-site-muted ring-1 ring-site-border transition-colors duration-300 group-aria-checked:bg-site-accent group-aria-checked:text-white group-aria-checked:ring-site-accent dark:group-aria-checked:text-[#0e1320]">
-              <item.icon size={19} strokeWidth={2} aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block font-semibold">{item.label}</span>
-              <span className="mt-1 block text-[0.94rem] leading-snug text-site-muted">{item.body}</span>
-            </span>
-          </button>
-        ))}
+    <div className="flex flex-col gap-4">
+      <LiveNote>Pick a layout here, or select the gallery and use its own menu.</LiveNote>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-8">
+        <div
+          role="radiogroup"
+          aria-label="Gallery layout"
+          className="grid content-start gap-2.5 sm:grid-cols-2 lg:grid-cols-1"
+        >
+          {layouts.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="radio"
+              aria-checked={layout === item.id}
+              onClick={() => choose(item.id)}
+              className="site-card group flex items-start gap-4 p-4 text-left aria-checked:border-site-accent aria-checked:shadow-[0_0_0_1px_var(--site-accent)]"
+            >
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-site-bg text-site-muted ring-1 ring-site-border transition-colors duration-300 group-aria-checked:bg-site-accent group-aria-checked:text-white group-aria-checked:ring-site-accent dark:group-aria-checked:text-[#0e1320]">
+                <item.icon size={19} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold">{item.label}</span>
+                <span className="mt-1 block text-[0.94rem] leading-snug text-site-muted">{item.body}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+        <LazyStage
+          minHeight={['17rem', '26rem', '30rem']}
+          className="site-stage site-dots self-start p-2 sm:p-4"
+          fallback={<StageFallback />}
+        >
+          {start && (
+            <div className="overflow-hidden rounded-xl">
+              <PostCanvas
+                ref={handle}
+                defaultContent={start}
+                preset="full"
+                features={features}
+                adapters={adapters}
+                theme={theme}
+                onChange={({ json }) => {
+                  const gallery = json.content?.find((block) => block.type === 'gallery');
+                  const next = gallery?.attrs?.layout as GalleryLayout | undefined;
+                  if (next && next !== layout) setLayout(next);
+                }}
+              />
+            </div>
+          )}
+        </LazyStage>
       </div>
-      <LazyStage
-        minHeight={['17rem', '26rem', '30rem']}
-        className="site-stage site-dots self-start p-2 sm:p-4"
-        fallback={<StageFallback />}
-      >
-        {start && (
-          <div className="overflow-hidden rounded-xl">
-            <PostCanvas
-              ref={handle}
-              defaultContent={start}
-              preset="full"
-              features={features}
-              adapters={adapters}
-              theme={theme}
-              onChange={({ json }) => {
-                const gallery = json.content?.find((block) => block.type === 'gallery');
-                const next = gallery?.attrs?.layout as GalleryLayout | undefined;
-                if (next && next !== layout) setLayout(next);
-              }}
-            />
-          </div>
-        )}
-      </LazyStage>
     </div>
   );
 }

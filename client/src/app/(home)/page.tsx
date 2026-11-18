@@ -1,5 +1,5 @@
 import { ServerCodeBlock } from 'fumadocs-ui/components/codeblock.rsc';
-import { BookOpen, Plus, SlidersHorizontal } from 'lucide-react';
+import { ArrowDown, BookOpen, Plus, SlidersHorizontal } from 'lucide-react';
 import type { Metadata } from 'next';
 import { EmbedsDemo } from '@/components/demos/embeds-demo';
 import { GalleryDemo } from '@/components/demos/gallery-demo';
@@ -171,12 +171,6 @@ const jsonLd = {
   ],
 };
 
-const callouts = [
-  { label: 'Toolbar', side: 'left', top: '4.6rem' },
-  { label: 'Mentions', side: 'right', top: '7.4rem' },
-  { label: 'Collage', side: 'left', top: '11.5rem' },
-] as const;
-
 function Hero() {
   return (
     <section aria-labelledby="hero-title" className="site-col pt-3 sm:pt-4">
@@ -200,6 +194,17 @@ function Hero() {
               </ButtonLink>
             </div>
             <InstallCommand className="w-full max-w-[24rem] text-white" />
+            <a
+              href="#try-it"
+              className="group inline-flex min-h-11 items-center gap-2 self-start font-semibold text-white underline-offset-4 hover:underline"
+            >
+              Or try the live editor below
+              <ArrowDown
+                size={17}
+                aria-hidden="true"
+                className="transition-transform duration-300 ease-(--ease-out) group-hover:translate-y-0.5"
+              />
+            </a>
           </div>
         </div>
         <dl className="site-rise mt-12 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-white/12 pt-6 [--i:3] sm:grid-cols-4">
@@ -216,53 +221,22 @@ function Hero() {
           ))}
         </dl>
       </div>
-      <div className="relative z-[1] mx-auto -mt-[11rem] max-w-[60rem] px-2 sm:px-6 md:-mt-[15rem] 2xl:max-w-[54rem]">
-        <div className="site-window site-rise [--i:4]">
+      <div className="relative z-[1] -mt-[11rem] px-2 sm:px-6 md:-mt-[15rem] lg:px-0">
+        <div className="site-window site-try-window group site-rise [--i:4]">
           <div className="site-window-bar">
             <span className="site-window-dots" aria-hidden="true">
               <span />
               <span />
               <span />
             </span>
-            <span className="truncate">preset=&quot;social&quot;</span>
-            <span className="ms-auto inline-flex items-center gap-1.5 text-site-ok">
-              <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-              Live
+            <span className="hidden truncate sm:inline">preset=&quot;social&quot;</span>
+            <span className="ms-auto inline-flex shrink-0 items-center gap-2 text-site-ok">
+              <span className="site-live-dot" aria-hidden="true" />
+              <span className="group-focus-within:hidden">Live: click the post to type</span>
+              <span className="hidden group-focus-within:inline">Live: you are editing</span>
             </span>
           </div>
-          <div className="min-h-[33rem] sm:min-h-[38rem] md:min-h-[41rem] lg:min-h-[51.5rem] 2xl:min-h-[47rem] min-[160rem]:min-h-[43.75rem] min-[215rem]:min-h-[40.5rem] min-[240rem]:min-h-[38rem]">
-            <HeroEditor />
-          </div>
-        </div>
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden 2xl:block">
-          {callouts.map((callout, index) => (
-            <div
-              key={callout.label}
-              className="site-fade absolute flex items-center gap-3"
-              style={{
-                top: callout.top,
-                ...(callout.side === 'left' ? { right: 'calc(100% - 1.5rem)' } : { left: 'calc(100% - 1.5rem)' }),
-                flexDirection: callout.side === 'left' ? 'row' : 'row-reverse',
-                ['--i' as string]: index,
-              }}
-            >
-              <span className="font-mono text-[0.75rem] tracking-[0.14em] whitespace-nowrap text-white uppercase">
-                {callout.label}
-              </span>
-              <svg width="56" height="10" viewBox="0 0 72 10" className="overflow-visible text-[#7aa2f7]">
-                <path
-                  d={callout.side === 'left' ? 'M0 5H66' : 'M72 5H6'}
-                  pathLength={1}
-                  className="site-draw"
-                  style={{ ['--i' as string]: index }}
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  fill="none"
-                />
-                <circle cx={callout.side === 'left' ? 68 : 4} cy="5" r="3.5" fill="currentColor" />
-              </svg>
-            </div>
-          ))}
+          <HeroEditor />
         </div>
       </div>
     </section>

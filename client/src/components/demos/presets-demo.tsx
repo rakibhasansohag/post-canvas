@@ -6,6 +6,7 @@ import { PostCanvasView } from 'post-canvas/render';
 import 'post-canvas/styles.css';
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { LazyStage, StageFallback } from '@/components/site/lazy-stage';
+import { LiveNote } from '@/components/site/live-note';
 import { useSiteTheme } from '@/components/site/use-site-theme';
 import { createFakeAdapters } from '@/lib/fake-adapters';
 import { articleSample, socialSample, socialSecondParagraph } from '@/lib/sample-content';
@@ -238,11 +239,14 @@ export function PresetsDemo() {
             </p>
           </div>
         ))}
-        <LazyStage minHeight={['24rem', '28rem']} fallback={<StageFallback />}>
-          {active === 'social' && origin && <SocialStage theme={theme} origin={origin} />}
-          {active === 'article' && origin && <ArticleStage theme={theme} origin={origin} />}
-          {active === 'comment' && <CommentStage theme={theme} />}
-        </LazyStage>
+        <div className="flex min-w-0 flex-col gap-3">
+          <LiveNote>Each tab is the same component with a different preset. Type in it.</LiveNote>
+          <LazyStage minHeight={['24rem', '28rem']} fallback={<StageFallback />}>
+            {active === 'social' && origin && <SocialStage theme={theme} origin={origin} />}
+            {active === 'article' && origin && <ArticleStage theme={theme} origin={origin} />}
+            {active === 'comment' && <CommentStage theme={theme} />}
+          </LazyStage>
+        </div>
       </div>
     </div>
   );

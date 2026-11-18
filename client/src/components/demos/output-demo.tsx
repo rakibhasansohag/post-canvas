@@ -7,6 +7,7 @@ import 'post-canvas/styles.css';
 import { useDeferredValue, useId, useMemo, useState } from 'react';
 import { FolderTabs } from '@/components/site/folder-tabs';
 import { LazyStage, StageFallback } from '@/components/site/lazy-stage';
+import { LiveNote } from '@/components/site/live-note';
 import { useSiteTheme } from '@/components/site/use-site-theme';
 import { createFakeAdapters } from '@/lib/fake-adapters';
 import { hostileSample, outputContent } from '@/lib/sample-content';
@@ -44,37 +45,40 @@ export function FormatsDemo() {
 
   const panel = 'h-[22rem] md:h-[26rem]';
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
-      <LazyStage minHeight={['24rem', '28.5rem']} className="site-stage" fallback={<StageFallback />}>
-        {start && (
-          <PostCanvas
-            defaultContent={start}
-            preset="full"
-            features={features}
-            adapters={adapters}
-            theme={theme}
-            onChange={({ json: next }) => setJson(next)}
-          />
-        )}
-      </LazyStage>
-      <FolderTabs
-        label="Output format"
-        bodyClassName={panel}
-        tabs={[
-          { label: 'JSON', content: <Code>{outputs?.json ?? ''}</Code> },
-          { label: 'HTML', content: <Code>{outputs?.html ?? ''}</Code> },
-          { label: 'Markdown', content: <Code>{outputs?.markdown ?? ''}</Code> },
-          { label: 'Text', content: <Code>{outputs?.text ?? ''}</Code> },
-          {
-            label: 'View',
-            content: (
-              <div className={`${panel} overflow-auto p-4`}>
-                {doc && <PostCanvasView content={doc} features={resolved} theme={theme} />}
-              </div>
-            ),
-          },
-        ]}
-      />
+    <div className="flex flex-col gap-4">
+      <LiveNote>Edit the post, and every output format updates as you type.</LiveNote>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+        <LazyStage minHeight={['24rem', '28.5rem']} className="site-stage" fallback={<StageFallback />}>
+          {start && (
+            <PostCanvas
+              defaultContent={start}
+              preset="full"
+              features={features}
+              adapters={adapters}
+              theme={theme}
+              onChange={({ json: next }) => setJson(next)}
+            />
+          )}
+        </LazyStage>
+        <FolderTabs
+          label="Output format"
+          bodyClassName={panel}
+          tabs={[
+            { label: 'JSON', content: <Code>{outputs?.json ?? ''}</Code> },
+            { label: 'HTML', content: <Code>{outputs?.html ?? ''}</Code> },
+            { label: 'Markdown', content: <Code>{outputs?.markdown ?? ''}</Code> },
+            { label: 'Text', content: <Code>{outputs?.text ?? ''}</Code> },
+            {
+              label: 'View',
+              content: (
+                <div className={`${panel} overflow-auto p-4`}>
+                  {doc && <PostCanvasView content={doc} features={resolved} theme={theme} />}
+                </div>
+              ),
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 }

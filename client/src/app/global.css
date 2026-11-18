@@ -727,6 +727,157 @@ label[for],
     background: var(--site-border-strong);
   }
 
+  /* The hero's live editor: a pulsing dot in the bar, and a ring that says "you can type here". */
+  .site-live-dot {
+    position: relative;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .site-live-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    animation: site-live 2.4s var(--ease-out) infinite;
+  }
+
+  @keyframes site-live {
+    from {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    to {
+      transform: scale(3.2);
+      opacity: 0;
+    }
+  }
+
+  /*
+   * The window is a container, so the editor's reserved height can follow its width: the post's text, then the collage,
+   * whose height is about 0.66 of its width plus its frame, up to its cap. Measured from 390 to 3840 px; phones add the
+   * extra lines the intro wraps to. The editor fills the reserved height, so nothing below moves when it loads.
+   */
+  .site-try-window {
+    container-type: inline-size;
+  }
+
+  /* "Live editor" above a demo stage. */
+  .site-live-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    font-size: 0.92rem;
+    line-height: 1.4;
+    color: var(--site-muted);
+  }
+
+  .site-live-note-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--site-ok);
+  }
+
+  .site-deep .site-live-note {
+    color: var(--site-deep-muted);
+  }
+
+  .site-deep .site-live-note-tag {
+    color: #ffffff;
+  }
+
+  .site-deep .site-live-note-tag .site-live-dot {
+    color: #72c48e;
+  }
+
+  .site-try {
+    --try-width: 100cqw;
+    --try-extra: 110px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: calc(124px + 8.125rem + min(0.66 * (var(--try-width) - 96px) + 46.5px, 602px) + var(--try-extra));
+  }
+
+  .site-try > *,
+  .site-try .pc-canvas {
+    flex: 1;
+  }
+
+  @media (min-width: 40rem) {
+    .site-try {
+      --try-extra: 32px;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    .site-try {
+      --try-extra: 0px;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .site-try {
+      --try-width: calc(100cqw - 19rem);
+    }
+  }
+
+  @media (min-width: 96rem) {
+    .site-try {
+      --try-width: calc(100cqw - 20rem);
+    }
+  }
+
+  .site-try::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 0 0 19px 19px;
+    box-shadow: inset 0 0 0 2px transparent;
+    pointer-events: none;
+    transition: box-shadow 300ms var(--ease-out);
+  }
+
+  @media (min-width: 80rem) {
+    .site-try::after {
+      border-bottom-left-radius: 0;
+    }
+  }
+
+  .site-try:hover::after {
+    box-shadow: inset 0 0 0 2px var(--site-accent-soft);
+  }
+
+  .site-try:focus-within::after {
+    box-shadow: inset 0 0 0 2px var(--site-accent);
+  }
+
+  /* Past the width where the collage reaches its height cap, the writing column stops growing and centres. */
+  .site-try .ProseMirror {
+    width: 100%;
+    max-width: 940px;
+    margin-inline: auto;
+    cursor: text;
+  }
+
+  /* Text keeps a readable measure while the photos use the width. */
+  .site-try .pc-content > p,
+  .site-try .pc-content > ul,
+  .site-try .pc-content > ol {
+    max-width: 38rem;
+  }
+
   /* ---------- Scroll reveal ---------- */
 
   [data-reveal='pending'] {
@@ -868,6 +1019,12 @@ label[for],
   }
 }
 
+/* The hero's window frames its editor, so the editor's own border goes. Unlayered, to win over the package styles. */
+.site-try .pc-root {
+  border: 0;
+  border-radius: 0;
+}
+
 /* The playground's writing area keeps a usable height when the document is short. */
 .site-fill .ProseMirror {
   min-height: 14rem;
@@ -980,5 +1137,10 @@ article > h1 {
 
   [data-reveal='pending'] {
     transform: none;
+  }
+
+  .site-live-dot::after {
+    animation: none !important;
+    opacity: 0;
   }
 }
