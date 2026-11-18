@@ -22,7 +22,14 @@
   <a href="https://www.npmjs.com/package/post-canvas">npm</a>
 </p>
 
-<!-- README-DEMO-LOOP: the coordinator puts chat H's demo loop (GIF or animated WebP, about 800 px wide) here. -->
+<p align="center">
+  <a href="https://postcanvas.saimulislam.com/playground/">
+    <picture>
+      <source type="image/webp" srcset="https://postcanvas.saimulislam.com/features/demo-loop.webp" />
+      <img alt="Post Canvas: a photo gallery switched to a collage, then three photos dragged into place" src="https://postcanvas.saimulislam.com/features/demo-loop.gif" width="480" />
+    </picture>
+  </a>
+</p>
 
 <a href="https://postcanvas.saimulislam.com">
   <picture>

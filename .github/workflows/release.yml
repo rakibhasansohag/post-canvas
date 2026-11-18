@@ -61,7 +61,5 @@ jobs:
           commit: 'Version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Trusted publishing needs no token. Until it is set up on npmjs.com, add an NPM_TOKEN secret (an automation
-          # token) and the action uses it instead. Provenance comes from publishConfig in package.json.
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # npm publishes through trusted publishing (OIDC, the id-token permission above), so there is no npm token.
+          # Provenance comes from publishConfig in package.json.

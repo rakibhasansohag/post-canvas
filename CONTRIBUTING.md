@@ -147,15 +147,13 @@ These steps are for whoever publishes releases. The pipeline is in `.github/work
 
 1. **Allow the workflow to open pull requests.** On GitHub: Settings, Actions, General, Workflow permissions, tick "Allow
    GitHub Actions to create and approve pull requests".
-2. **Set up npm publishing.** Prefer trusted publishing, which needs no secret:
-   - On npmjs.com, publish the first version of `post-canvas` once by hand (`npm publish --access public` from
-     `package/`, after `npm run build`), because a trusted publisher can only be added to a package that exists.
-   - Open the package's Settings, Trusted Publisher, choose GitHub Actions, and enter the owner `saimulft`, the
-     repository `post-canvas` and the workflow file `release.yml`.
-   - Leave the `NPM_TOKEN` secret unset.
-
-   If you would rather use a token: create an automation access token on npmjs.com and add it as the repository secret
-   `NPM_TOKEN`. The workflow uses it when it exists.
+2. **npm publishing** uses trusted publishing, so there is no npm token and no secret:
+   - A trusted publisher can only be added to a package that already exists, so a new package's first version is
+     published once by hand (`npm publish --access public` from `package/`, after `npm run build`).
+   - The package's Settings, Trusted Publisher: GitHub Actions, owner `saimulft`, repository `post-canvas`, workflow
+     file `release.yml`, with "Allow npm publish" ticked, so merging the "Version packages" pull request publishes
+     directly. Without that tick, npm stages each version until a maintainer approves it on npmjs.com.
+   - Don't add an `NPM_TOKEN` secret: the release workflow doesn't read one.
 
 3. **First version.** `package/package.json` starts at `0.0.0` and the repo has one changeset, so the first "Version
    packages" pull request produces `0.1.0`.

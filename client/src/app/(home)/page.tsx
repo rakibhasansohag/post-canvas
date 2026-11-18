@@ -51,7 +51,13 @@ const comparison: { feature: string; values: [string, string, string, string, st
   },
   {
     feature: 'Real-time collaboration',
-    values: ['Not yet', 'Paid plans', 'Collaboration plugin in the licence', 'Yjs and Hocuspocus', 'Yjs binding'],
+    values: [
+      'Not yet',
+      'Retired at the end of 2023',
+      'Collaboration plugin in the licence',
+      'Yjs and Hocuspocus',
+      'Yjs binding',
+    ],
   },
   {
     feature: 'Comments and track changes',
