@@ -1,7 +1,5 @@
-# Cloudflare Pages response headers. The generated Open Graph image, the home-screen icon and the search index have no
-# file extension in the static export, so give them their type here. A JSON type also lets Cloudflare compress the index.
-/opengraph-image
-  Content-Type: image/png
+# Cloudflare Pages response headers. The home-screen icon and the search index have no file extension in the static
+# export, so give them their type here. A JSON type also lets Cloudflare compress the index.
 /apple-icon
   Content-Type: image/png
 /api/search

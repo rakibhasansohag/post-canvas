@@ -4,7 +4,7 @@ import { seoPage, type SeoSlug } from './pages';
 
 /**
  * Open Graph and Twitter tags for a page with its own title. A page's `openGraph` replaces the root one rather than
- * merging with it, so the site name and the share image (app/opengraph-image.tsx) are set again here.
+ * merging with it, so the site name and the share image (app/opengraph-image.jpg) are set again here.
  */
 export function shareMetadata({
   title,
@@ -17,10 +17,10 @@ export function shareMetadata({
 }): Pick<Metadata, 'openGraph' | 'twitter'> {
   const image = {
     // Relative to metadataBase, so it keeps any base path.
-    url: 'opengraph-image',
-    width: 1200,
-    height: 630,
-    type: 'image/png',
+    url: 'opengraph-image.jpg',
+    width: 3600,
+    height: 1890,
+    type: 'image/jpeg',
     alt: `${appName}: posts with photos, video and links in one React editor`,
   };
   return {

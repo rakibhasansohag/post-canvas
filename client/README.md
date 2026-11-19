@@ -29,7 +29,7 @@ The site runs on http://localhost:3100. The docs pages are in `content/docs/`.
 | `src/lib/sample-content.ts`, `src/lib/photos.ts` | Sample documents and the sample photos' sizes, alt text and placeholders               |
 | `public/samples/`                                | The sample photos, 640 and 1280 wide WebP, generated for this site                     |
 | `src/assets/fonts/`                              | Static font files for the Open Graph images (OFL; licences beside them)                |
-| `public/_headers`                                | Cloudflare Pages headers: image types for the extension-less Open Graph image and icon |
+| `public/_headers`                                | Cloudflare Pages headers: types for the extension-less icon and search index           |
 
 ## Build and host the static export
 
